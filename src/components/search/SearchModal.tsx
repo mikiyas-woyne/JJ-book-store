@@ -15,9 +15,9 @@ export const SearchModal: React.FC<SearchModalProps> = ({
   books,
   onSelectBook
 }) => {
-  if (!isOpen) return null;
-
   const [query, setQuery] = useState("");
+
+  if (!isOpen) return null;
 
   const filtered = query.trim()
     ? books.filter(

@@ -14,6 +14,7 @@ import {
   Sparkles
 } from "lucide-react";
 import { Book } from "../../types";
+import { getValidBookCover } from "../../lib/sampleData";
 import { useCart } from "../../context/CartContext";
 import { useWishlist } from "../../context/WishlistContext";
 import { BookReviews } from "./BookReviews";
@@ -34,13 +35,13 @@ export const BookDetailsModal: React.FC<BookDetailsModalProps> = ({
   relatedBooks,
   onSelectBook
 }) => {
-  if (!book) return null;
-
   const { addToCart } = useCart();
   const { isInWishlist, toggleWishlist } = useWishlist();
   const { showToast } = useToast();
   const [quantity, setQuantity] = useState(1);
   const [activeTab, setActiveTab] = useState<"description" | "details" | "reviews">("description");
+
+  if (!book) return null;
 
   const isFavorited = isInWishlist(book.id);
   const hasDiscount = book.discountPrice && book.discountPrice < book.price;
@@ -110,6 +111,11 @@ export const BookDetailsModal: React.FC<BookDetailsModalProps> = ({
                   src={book.coverImage}
                   alt={book.title}
                   className="w-full h-full object-cover"
+                  onError={(e) => {
+                    const target = e.currentTarget;
+                    target.onerror = null;
+                    target.src = getValidBookCover(book);
+                  }}
                 />
                 {hasDiscount && (
                   <div className="absolute top-4 left-4 bg-rose-600 text-white text-xs font-extrabold px-3 py-1 rounded-full shadow-lg">
@@ -195,16 +201,18 @@ export const BookDetailsModal: React.FC<BookDetailsModalProps> = ({
                 <div className="flex items-center border border-slate-200 rounded-xl bg-slate-50 overflow-hidden">
                   <button
                     onClick={() => setQuantity(Math.max(1, quantity - 1))}
-                    className="px-3 py-1.5 hover:bg-slate-200 font-bold text-slate-700 text-sm"
+                    className="w-10 h-10 hover:bg-slate-200 active:bg-slate-300 font-bold text-slate-700 text-base flex items-center justify-center transition-colors"
+                    aria-label="Decrease quantity"
                   >
                     -
                   </button>
-                  <span className="px-4 py-1.5 text-sm font-bold text-slate-900 bg-white">
+                  <span className="px-4 py-2 text-sm font-bold text-slate-900 bg-white min-w-[36px] text-center">
                     {quantity}
                   </span>
                   <button
                     onClick={() => setQuantity(Math.min(book.stock, quantity + 1))}
-                    className="px-3 py-1.5 hover:bg-slate-200 font-bold text-slate-700 text-sm"
+                    className="w-10 h-10 hover:bg-slate-200 active:bg-slate-300 font-bold text-slate-700 text-base flex items-center justify-center transition-colors"
+                    aria-label="Increase quantity"
                   >
                     +
                   </button>

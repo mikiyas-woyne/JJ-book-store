@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import html2canvas from "html2canvas";
+import { captureElementToCanvas } from "../../lib/screenshotUtils";
 import {
   User as UserIcon,
   ShoppingBag,
@@ -13,14 +13,15 @@ import {
   ChevronDown,
   ChevronUp,
   XCircle,
-  Plus
+  Plus,
+  Mail
 } from "lucide-react";
 import { collection, query, where, getDocs, doc, updateDoc } from "firebase/firestore";
 import { db } from "../../lib/firebase";
 import { useAuth } from "../../context/AuthContext";
 import { useWishlist } from "../../context/WishlistContext";
 import { useCart } from "../../context/CartContext";
-import { Book, Order, OrderStatus } from "../../types";
+import { Book, Order, OrderStatus, EmailNotificationLog } from "../../types";
 import { useToast } from "../ui/Toast";
 
 interface UserAccountViewProps {
@@ -46,6 +47,7 @@ export const UserAccountView: React.FC<UserAccountViewProps> = ({
   );
 
   const [orders, setOrders] = useState<Order[]>([]);
+  const [emailLogs, setEmailLogs] = useState<EmailNotificationLog[]>([]);
   const [loadingOrders, setLoadingOrders] = useState(true);
   const [expandedOrderId, setExpandedOrderId] = useState<string | null>(null);
   const [downloadingOrderId, setDownloadingOrderId] = useState<string | null>(null);
@@ -55,11 +57,9 @@ export const UserAccountView: React.FC<UserAccountViewProps> = ({
     if (!el) return;
     setDownloadingOrderId(order.id);
     try {
-      const canvas = await html2canvas(el, {
+      const canvas = await captureElementToCanvas(el, {
         scale: 2,
-        useCORS: true,
-        backgroundColor: "#ffffff",
-        logging: false
+        backgroundColor: "#ffffff"
       });
       const imageUri = canvas.toDataURL("image/png");
       const link = document.createElement("a");
@@ -107,6 +107,18 @@ export const UserAccountView: React.FC<UserAccountViewProps> = ({
         // Sort by newest
         list.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
         setOrders(list);
+        // Fetch email notification logs
+        try {
+          const emailSnap = await getDocs(collection(db, "emailNotifications"));
+          const eList: EmailNotificationLog[] = [];
+          emailSnap.forEach((doc) => {
+            eList.push({ id: doc.id, ...doc.data() } as EmailNotificationLog);
+          });
+          eList.sort((a, b) => new Date(b.sentAt).getTime() - new Date(a.sentAt).getTime());
+          setEmailLogs(eList);
+        } catch (eErr) {
+          console.warn("Could not fetch email notifications:", eErr);
+        }
       } catch (err) {
         console.error("Error fetching user orders:", err);
       } finally {
@@ -116,6 +128,7 @@ export const UserAccountView: React.FC<UserAccountViewProps> = ({
 
     fetchUserOrders();
   }, [currentUser]);
+
 
   const handleSaveProfile = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -311,13 +324,13 @@ export const UserAccountView: React.FC<UserAccountViewProps> = ({
                             <div className={`p-2 rounded-xl border ${ord.orderStatus !== "cancelled" ? "bg-amber-500 text-amber-950 font-bold border-amber-600" : "bg-slate-100 text-slate-400"}`}>
                               1. Order Placed
                             </div>
-                            <div className={`p-2 rounded-xl border ${["confirmed", "processing", "shipped", "out_for_delivery", "delivered"].includes(ord.orderStatus) ? "bg-amber-500 text-amber-950 font-bold border-amber-600" : "bg-slate-100 text-slate-400"}`}>
+                            <div className={`p-2 rounded-xl border ${["confirmed", "processing", "packing", "packed", "ready_for_delivery", "assigned", "handed_to_delivery", "out_for_delivery", "shipped", "delivered"].includes(ord.orderStatus) ? "bg-amber-500 text-amber-950 font-bold border-amber-600" : "bg-slate-100 text-slate-400"}`}>
                               2. Confirmed
                             </div>
-                            <div className={`p-2 rounded-xl border ${["processing", "shipped", "out_for_delivery", "delivered"].includes(ord.orderStatus) ? "bg-amber-500 text-amber-950 font-bold border-amber-600" : "bg-slate-100 text-slate-400"}`}>
-                              3. Processing
+                            <div className={`p-2 rounded-xl border ${["processing", "packing", "packed", "ready_for_delivery", "assigned", "handed_to_delivery", "out_for_delivery", "shipped", "delivered"].includes(ord.orderStatus) ? "bg-amber-500 text-amber-950 font-bold border-amber-600" : "bg-slate-100 text-slate-400"}`}>
+                              3. Processing / Packing
                             </div>
-                            <div className={`p-2 rounded-xl border ${["shipped", "out_for_delivery", "delivered"].includes(ord.orderStatus) ? "bg-amber-500 text-amber-950 font-bold border-amber-600" : "bg-slate-100 text-slate-400"}`}>
+                            <div className={`p-2 rounded-xl border ${["ready_for_delivery", "assigned", "handed_to_delivery", "out_for_delivery", "shipped", "delivered"].includes(ord.orderStatus) ? "bg-amber-500 text-amber-950 font-bold border-amber-600" : "bg-slate-100 text-slate-400"}`}>
                               4. Out for Delivery
                             </div>
                             <div className={`p-2 rounded-xl border ${ord.orderStatus === "delivered" ? "bg-emerald-600 text-white font-bold border-emerald-700" : "bg-slate-100 text-slate-400"}`}>
@@ -373,6 +386,64 @@ export const UserAccountView: React.FC<UserAccountViewProps> = ({
                             <span className="text-amber-800">{ord.grandTotal} ETB</span>
                           </div>
                         </div>
+
+                        {/* Customer Email Notifications Section */}
+                        {(() => {
+                          const matchingEmails = emailLogs.filter(
+                            (e) => e.orderId === ord.orderId || e.recipientEmail === ord.customerEmail
+                          );
+
+                          if (matchingEmails.length === 0) return null;
+
+                          return (
+                            <div className="p-4 rounded-2xl bg-amber-50/70 border border-amber-900/15 space-y-3 text-xs">
+                              <h5 className="font-bold text-amber-950 text-xs flex items-center justify-between">
+                                <span className="flex items-center gap-1.5">
+                                  <Mail className="w-4 h-4 text-amber-700" /> Dispatched Staff Verification Email ({matchingEmails.length})
+                                </span>
+                                <span className="text-[10px] font-bold text-amber-800 bg-amber-200/60 px-2.5 py-0.5 rounded-full">
+                                  Customer Mail Logged
+                                </span>
+                              </h5>
+
+                              <div className="space-y-2">
+                                {matchingEmails.map((log) => (
+                                  <div
+                                    key={log.id}
+                                    className="p-3.5 bg-white rounded-xl border border-amber-900/10 space-y-2"
+                                  >
+                                    <div className="flex items-center justify-between">
+                                      <span className="font-bold text-slate-900 flex items-center gap-1.5 text-xs">
+                                        <span
+                                          className={`w-2 h-2 rounded-full ${
+                                            log.emailType === "approved" ? "bg-emerald-500" : "bg-rose-500"
+                                          }`}
+                                        />
+                                        {log.subject}
+                                      </span>
+                                      <span className="text-[10px] text-slate-400">
+                                        {new Date(log.sentAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+                                      </span>
+                                    </div>
+                                    <p className="text-slate-600 text-[11px]">
+                                      Sent to: <strong>{log.recipientEmail}</strong> • Staff Verifier:{" "}
+                                      <strong>{log.verifiedByEmployeeName || "Store Staff"}</strong>
+                                    </p>
+                                    <details className="mt-1">
+                                      <summary className="text-[11px] text-amber-800 font-bold cursor-pointer hover:underline">
+                                        View Formatted HTML Email Body
+                                      </summary>
+                                      <div
+                                        className="mt-2 p-3 bg-slate-50 rounded-xl border border-slate-200 max-h-52 overflow-y-auto text-[11px]"
+                                        dangerouslySetInnerHTML={{ __html: log.htmlBody }}
+                                      />
+                                    </details>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          );
+                        })()}
 
                         {/* Order Footer Actions */}
                         <div className="flex flex-col sm:flex-row items-center justify-between gap-3 pt-2 border-t border-slate-100 text-xs">

@@ -25,8 +25,6 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({
   onClose,
   onProceedToCheckout
 }) => {
-  if (!isOpen) return null;
-
   const {
     cartItems,
     removeFromCart,
@@ -44,6 +42,8 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({
 
   const { showToast } = useToast();
   const [couponCodeInput, setCouponCodeInput] = useState("");
+
+  if (!isOpen) return null;
 
   const handleApplyCoupon = (e: React.FormEvent) => {
     e.preventDefault();
@@ -156,25 +156,28 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({
                     <div className="flex items-center border border-slate-200 rounded-lg bg-slate-50 overflow-hidden text-xs">
                       <button
                         onClick={() => updateQuantity(item.bookId, item.quantity - 1)}
-                        className="px-2 py-0.5 hover:bg-slate-200 text-slate-700 font-bold"
+                        className="p-2 hover:bg-slate-200 text-slate-700 font-bold min-w-[32px] min-h-[32px] flex items-center justify-center active:bg-slate-300"
+                        aria-label="Decrease quantity"
                       >
-                        <Minus className="w-3 h-3" />
+                        <Minus className="w-3.5 h-3.5" />
                       </button>
-                      <span className="px-2.5 py-0.5 font-bold text-slate-900 bg-white">
+                      <span className="px-3 py-1 font-bold text-slate-900 bg-white min-w-[28px] text-center">
                         {item.quantity}
                       </span>
                       <button
                         onClick={() => updateQuantity(item.bookId, item.quantity + 1)}
-                        className="px-2 py-0.5 hover:bg-slate-200 text-slate-700 font-bold"
+                        className="p-2 hover:bg-slate-200 text-slate-700 font-bold min-w-[32px] min-h-[32px] flex items-center justify-center active:bg-slate-300"
+                        aria-label="Increase quantity"
                       >
-                        <Plus className="w-3 h-3" />
+                        <Plus className="w-3.5 h-3.5" />
                       </button>
                     </div>
 
                     <button
                       onClick={() => removeFromCart(item.bookId)}
-                      className="text-slate-400 hover:text-rose-600 p-1"
+                      className="text-slate-400 hover:text-rose-600 p-2 min-w-[36px] min-h-[36px] flex items-center justify-center"
                       title="Remove item"
+                      aria-label="Remove item"
                     >
                       <Trash2 className="w-4 h-4" />
                     </button>

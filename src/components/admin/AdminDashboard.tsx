@@ -33,6 +33,7 @@ import {
   XCircle,
   Box,
   Eye,
+  EyeOff,
   Activity,
   AlertCircle
 } from "lucide-react";
@@ -42,6 +43,7 @@ import { Author, Book, Category, Coupon, Order, OrderStatus } from "../../types"
 import { seedBookstoreData } from "../../lib/seed";
 import { useToast } from "../ui/Toast";
 import { useAuth } from "../../context/AuthContext";
+import { getValidBookCover } from "../../lib/sampleData";
 import { EmployeeManager } from "./EmployeeManager";
 import { ImageUploader } from "./ImageUploader";
 
@@ -82,6 +84,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   const [adminUsername, setAdminUsername] = useState("");
   const [adminNewPassword, setAdminNewPassword] = useState("");
   const [adminConfirmPassword, setAdminConfirmPassword] = useState("");
+  const [showAdminPassword, setShowAdminPassword] = useState(false);
   const [savingCredentials, setSavingCredentials] = useState(false);
 
   useEffect(() => {
@@ -299,7 +302,12 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
         price: Number(bookPrice),
         discountPrice: bookDiscountPrice ? Number(bookDiscountPrice) : undefined,
         currency: "ETB",
-        coverImage: bookCover || "https://images.unsplash.com/photo-1544947950-fa07a98d237f?w=600&auto=format&fit=crop&q=80",
+        coverImage: getValidBookCover({
+          title: bookTitle,
+          authorName: selectedAuthor?.name,
+          categoryName: selectedCat?.name,
+          coverImage: bookCover
+        }),
         ISBN: bookISBN || `98944-${Math.floor(1000 + Math.random() * 9000)}`,
         publisher: bookPublisher || "Mega Publishing",
         publicationDate: new Date().toISOString().split("T")[0],
@@ -1847,14 +1855,21 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                 <label className="block font-bold text-slate-700 mb-1">New Password *</label>
                 <div className="relative">
                   <input
-                    type="password"
+                    type={showAdminPassword ? "text" : "password"}
                     value={adminNewPassword}
                     onChange={(e) => setAdminNewPassword(e.target.value)}
                     placeholder="Enter new password..."
                     required
-                    className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:outline-none focus:border-amber-500 font-semibold text-slate-900"
+                    className="w-full pl-4 pr-10 py-3 rounded-xl border border-slate-200 focus:outline-none focus:border-amber-500 font-semibold text-slate-900"
                   />
-                  <Key className="w-4 h-4 text-slate-400 absolute right-3.5 top-3.5" />
+                  <button
+                    type="button"
+                    onClick={() => setShowAdminPassword(!showAdminPassword)}
+                    className="absolute right-3.5 top-3.5 text-slate-400 hover:text-slate-600 focus:outline-none transition-colors"
+                    title={showAdminPassword ? "Hide password" : "Show password"}
+                  >
+                    {showAdminPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  </button>
                 </div>
               </div>
 
@@ -1862,14 +1877,21 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                 <label className="block font-bold text-slate-700 mb-1">Confirm New Password *</label>
                 <div className="relative">
                   <input
-                    type="password"
+                    type={showAdminPassword ? "text" : "password"}
                     value={adminConfirmPassword}
                     onChange={(e) => setAdminConfirmPassword(e.target.value)}
                     placeholder="Confirm new password..."
                     required
-                    className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:outline-none focus:border-amber-500 font-semibold text-slate-900"
+                    className="w-full pl-4 pr-10 py-3 rounded-xl border border-slate-200 focus:outline-none focus:border-amber-500 font-semibold text-slate-900"
                   />
-                  <Lock className="w-4 h-4 text-slate-400 absolute right-3.5 top-3.5" />
+                  <button
+                    type="button"
+                    onClick={() => setShowAdminPassword(!showAdminPassword)}
+                    className="absolute right-3.5 top-3.5 text-slate-400 hover:text-slate-600 focus:outline-none transition-colors"
+                    title={showAdminPassword ? "Hide password" : "Show password"}
+                  >
+                    {showAdminPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  </button>
                 </div>
               </div>
             </div>

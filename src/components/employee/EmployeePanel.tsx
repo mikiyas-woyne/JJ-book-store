@@ -242,7 +242,7 @@ export const EmployeePanel: React.FC<{
           await updateDoc(empRef, {
             failedDeliveriesCount: (currentEmployee.failedDeliveriesCount || 0) + 1
           });
-        } else if (newStatus === "confirmed" || newStatus === "processing" || newStatus === "packed") {
+        } else if (newStatus === "confirmed" || newStatus === "processing" || newStatus === "packing" || newStatus === "packed" || newStatus === "ready_for_delivery") {
           await updateDoc(empRef, {
             ordersProcessedCount: (currentEmployee.ordersProcessedCount || 0) + 1
           });
@@ -295,7 +295,7 @@ export const EmployeePanel: React.FC<{
   const pendingOrders = orders.filter((o) => o.orderStatus === "pending");
   const confirmedOrders = orders.filter((o) => o.orderStatus === "confirmed");
   const processingOrders = orders.filter((o) => o.orderStatus === "processing");
-  const packedOrders = orders.filter((o) => o.orderStatus === "packed");
+  const packingOrders = orders.filter((o) => o.orderStatus === "packing" || o.orderStatus === "packed");
   const readyOrders = orders.filter((o) => o.orderStatus === "ready_for_delivery");
   const assignedOrders = orders.filter((o) => o.orderStatus === "assigned" || o.orderStatus === "handed_to_delivery" || o.orderStatus === "out_for_delivery");
   const deliveredOrders = orders.filter((o) => o.orderStatus === "delivered");
@@ -303,7 +303,7 @@ export const EmployeePanel: React.FC<{
   const lowStockBooks = books.filter((b) => b.stock <= 5);
 
   // Operational Statistics Calculations
-  const ordersAwaitingAction = pendingOrders.length + confirmedOrders.length + processingOrders.length + packedOrders.length + readyOrders.length;
+  const ordersAwaitingAction = pendingOrders.length + confirmedOrders.length + processingOrders.length + packingOrders.length + readyOrders.length;
   const totalVolumeProcessed = orders.filter((o) => o.orderStatus !== "pending" && o.orderStatus !== "cancelled").length;
   const totalPendingCODAmount = assignedOrders.reduce((sum, o) => sum + (o.grandTotal || 0), 0);
   const totalDeliveredRevenue = deliveredOrders.reduce((sum, o) => sum + (o.grandTotal || 0), 0);
@@ -342,7 +342,7 @@ export const EmployeePanel: React.FC<{
           id: "ready" as TabType,
           label: "Packaging & Labeling",
           icon: Box,
-          badge: packedOrders.length + readyOrders.length,
+          badge: packingOrders.length + readyOrders.length,
           permission: "pack_orders"
         }
       ]
@@ -666,7 +666,7 @@ export const EmployeePanel: React.FC<{
 
                 <div className="bg-slate-950 p-3.5 rounded-2xl border border-slate-800 space-y-1">
                   <span className="text-[10px] font-extrabold text-slate-400 uppercase">3. Packing</span>
-                  <div className="text-xl font-black text-indigo-400">{packedOrders.length + readyOrders.length}</div>
+                  <div className="text-xl font-black text-indigo-400">{packingOrders.length + readyOrders.length}</div>
                   <span className="text-[10px] text-indigo-300/70 block truncate">Boxes labeled</span>
                 </div>
 
@@ -933,11 +933,15 @@ export const EmployeePanel: React.FC<{
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {[...packedOrders, ...readyOrders].map((ord) => (
+                {[...packingOrders, ...readyOrders].map((ord) => (
                   <div key={ord.id} className="p-5 rounded-3xl bg-slate-900 border border-slate-800 space-y-4">
                     <div className="flex items-center justify-between">
                       <span className="font-mono font-bold text-amber-400 text-sm">{ord.orderId}</span>
-                      <span className="px-2.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 text-[10px] font-extrabold border border-emerald-500/30">
+                      <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-extrabold border ${
+                        ord.orderStatus === "ready_for_delivery"
+                          ? "bg-emerald-500/20 text-emerald-300 border-emerald-500/30"
+                          : "bg-indigo-500/20 text-indigo-300 border-indigo-500/30"
+                      }`}>
                         {ord.orderStatus.replace(/_/g, " ").toUpperCase()}
                       </span>
                     </div>
@@ -945,23 +949,35 @@ export const EmployeePanel: React.FC<{
                     <p className="text-xs text-white font-bold">{ord.customerName} • {ord.shippingAddress.subcity || ord.shippingAddress.city}</p>
 
                     <div className="pt-2 border-t border-slate-800 flex items-center justify-between gap-2">
-                      <button
-                        onClick={() => openWorkflow(ord, "pack")}
-                        className="px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold text-xs"
-                      >
-                        Package Barcode
-                      </button>
-                      <button
-                        onClick={() => openWorkflow(ord, "assign")}
-                        className="px-4 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-extrabold text-xs shadow-md"
-                      >
-                        Assign Driver
-                      </button>
+                      {(ord.orderStatus === "packing" || ord.orderStatus === "packed") && (
+                        <>
+                          <button
+                            onClick={() => openWorkflow(ord, "pack")}
+                            className="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-extrabold text-xs shadow-md"
+                          >
+                            Pack Box & Label Barcode
+                          </button>
+                          <button
+                            onClick={() => handleUpdateOrderStatus(ord.id, "ready_for_delivery", "Box packed and labeled. Ready for driver dispatch.")}
+                            className="px-3 py-2 rounded-xl bg-emerald-600/20 hover:bg-emerald-500/30 text-emerald-300 border border-emerald-500/30 font-bold text-xs"
+                          >
+                            Mark Ready
+                          </button>
+                        </>
+                      )}
+                      {ord.orderStatus === "ready_for_delivery" && (
+                        <button
+                          onClick={() => openWorkflow(ord, "assign")}
+                          className="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-extrabold text-xs shadow-md ml-auto"
+                        >
+                          Assign Driver Dispatch
+                        </button>
+                      )}
                     </div>
                   </div>
                 ))}
 
-                {packedOrders.length === 0 && readyOrders.length === 0 && (
+                {packingOrders.length === 0 && readyOrders.length === 0 && (
                   <div className="col-span-full py-12 text-center text-slate-400 space-y-2">
                     <Box className="w-10 h-10 text-indigo-400 mx-auto" />
                     <p className="font-serif font-bold text-lg text-white">No orders currently waiting for packaging!</p>

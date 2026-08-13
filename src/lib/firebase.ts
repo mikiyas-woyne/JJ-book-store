@@ -1,6 +1,6 @@
 import { initializeApp, getApps, getApp } from "firebase/app";
 import { getAuth, GoogleAuthProvider } from "firebase/auth";
-import { getFirestore } from "firebase/firestore";
+import { getFirestore, initializeFirestore, doc, getDocFromServer } from "firebase/firestore";
 import { getStorage } from "firebase/storage";
 import firebaseConfigData from "../../firebase-applet-config.json";
 
@@ -21,8 +21,29 @@ const app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
 export const auth = getAuth(app);
 export const googleProvider = new GoogleAuthProvider();
 
-// Firebase Firestore
-export const db = getFirestore(app, firebaseConfigData.firestoreDatabaseId || "(default)");
+// Firebase Firestore with auto-detect long polling fallback for sandboxed web environments
+const dbId = firebaseConfigData.firestoreDatabaseId || "(default)";
+let firestoreDb;
+try {
+  firestoreDb = initializeFirestore(app, {
+    experimentalAutoDetectLongPolling: true
+  }, dbId);
+} catch {
+  firestoreDb = getFirestore(app, dbId);
+}
+export const db = firestoreDb;
+
+// Test connection gracefully
+async function testConnection() {
+  try {
+    await getDocFromServer(doc(db, 'test', 'connection'));
+  } catch (error) {
+    if (error instanceof Error && (error.message.includes('offline') || error.message.includes('unavailable'))) {
+      console.warn("Firestore connected in resilient offline cache mode.");
+    }
+  }
+}
+testConnection();
 
 // Firebase Storage
 export const storage = getStorage(app);

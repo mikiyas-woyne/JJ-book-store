@@ -1,5 +1,5 @@
 import React, { useState, useRef } from "react";
-import html2canvas from "html2canvas";
+import { captureElementToCanvas } from "../../lib/screenshotUtils";
 import {
   X,
   CheckCircle2,
@@ -35,8 +35,6 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
   onClose,
   onOrderCompleted
 }) => {
-  if (!isOpen) return null;
-
   const { currentUser, userProfile } = useAuth();
   const { cartItems, clearCart, subtotal, discount, shippingFee, tax, grandTotal, appliedCoupon } = useCart();
   const { showToast } = useToast();
@@ -48,15 +46,15 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
   const receiptRef = useRef<HTMLDivElement>(null);
   const [capturingScreenshot, setCapturingScreenshot] = useState(false);
 
+  if (!isOpen) return null;
+
   const handleDownloadScreenshot = async () => {
     if (!receiptRef.current) return;
     setCapturingScreenshot(true);
     try {
-      const canvas = await html2canvas(receiptRef.current, {
+      const canvas = await captureElementToCanvas(receiptRef.current, {
         scale: 2,
-        useCORS: true,
-        backgroundColor: "#ffffff",
-        logging: false
+        backgroundColor: "#ffffff"
       });
       const imageUri = canvas.toDataURL("image/png");
       const link = document.createElement("a");
@@ -190,16 +188,16 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
         paymentMethod,
         paymentStatus: paymentMethod === "cod" ? "pending" : "paid",
         paymentReference: paymentReference || "",
-        orderStatus: "confirmed",
+        orderStatus: "pending",
         shippingAddress: shippingAddressObj,
         couponCode: appliedCoupon?.code || "",
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
         statusHistory: [
           {
-            status: "confirmed",
+            status: "pending",
             timestamp: new Date().toISOString(),
-            note: "Order placed successfully."
+            note: "Order placed. Awaiting staff payment & address verification."
           }
         ]
       };
@@ -308,7 +306,7 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
 
         {/* Progress Tracker Bar */}
         {step !== 6 && (
-          <div className="bg-stone-900/90 px-6 py-3 border-b border-stone-800 flex items-center justify-between text-xs font-semibold text-stone-400 overflow-x-auto">
+          <div className="bg-stone-900/90 px-3 sm:px-6 py-2.5 sm:py-3 border-b border-stone-800 flex items-center justify-between text-xs font-semibold text-stone-400 overflow-x-auto gap-2 shrink-0 scrollbar-none">
             <span className={step >= 1 ? "text-amber-400 font-bold flex items-center gap-1" : "flex items-center gap-1"}>
               <span className={`w-4 h-4 rounded-full text-[10px] flex items-center justify-center ${step >= 1 ? "bg-amber-500 text-stone-950 font-extrabold" : "bg-stone-800 text-stone-400"}`}>1</span> Contact
             </span>

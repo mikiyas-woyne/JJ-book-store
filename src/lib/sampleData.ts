@@ -134,6 +134,172 @@ export function generateBookCoverSvg(
   return `data:image/svg+xml;utf8,${encodeURIComponent(svg)}`;
 }
 
+export function getValidBookCover(book: Partial<Book>): string {
+  // Return custom non-generic image if available
+  if (
+    book.coverImage &&
+    book.coverImage.length > 20 &&
+    !book.coverImage.includes("photo-1544947950") &&
+    !book.coverImage.includes("photo-1512820790") &&
+    !book.coverImage.includes("photo-1544716278") &&
+    !book.coverImage.includes("photo-1457369804")
+  ) {
+    return book.coverImage;
+  }
+
+  const title = (book.title || "").trim();
+  const titleLower = title.toLowerCase();
+  const author = (book.authorName || "Ethiopian Author").split("(")[0].trim();
+  const category = (book.categoryName || "Ethiopian Bookstore").toUpperCase();
+
+  if (titleLower.includes("fiqir") || titleLower.includes("ፍቅር")) {
+    return generateBookCoverSvg(
+      "ፍቅር እስከ መቃብር",
+      "Fiqir Eske Mequabir",
+      author || "ሀዲስ ዓለማየሁ",
+      "Amharic Literature",
+      ["#381002", "#1c0700"],
+      "#F59E0B",
+      "📜"
+    );
+  }
+  if (titleLower.includes("oromay") || titleLower.includes("ኦሮማይ")) {
+    return generateBookCoverSvg(
+      "ኦሮማይ",
+      "Oromay",
+      author || "በአሉ ግርማ",
+      "Amharic Literature",
+      ["#180808", "#3f0808"],
+      "#38BDF8",
+      "✒️"
+    );
+  }
+  if (titleLower.includes("yetoqolefebet") || titleLower.includes("ቁልፍ")) {
+    return generateBookCoverSvg(
+      "የተቆለፈበት ቁልፍ",
+      "Yetoqolefebet Kulf",
+      author || "ዶ/ር ምሕረት ደበበ",
+      "Personal Growth",
+      ["#1e1b4b", "#312e81"],
+      "#FBBF24",
+      "🔑"
+    );
+  }
+  if (titleLower.includes("egre") || titleLower.includes("እግረ")) {
+    return generateBookCoverSvg(
+      "እግረ መንገድ",
+      "Egre Menged",
+      author || "ዶ/ር ምሕረት ደበበ",
+      "Personal Growth",
+      ["#064e3b", "#022c22"],
+      "#34D399",
+      "🧭"
+    );
+  }
+  if (titleLower.includes("alweledim") || titleLower.includes("አልወለድም")) {
+    return generateBookCoverSvg(
+      "አልወለድም",
+      "Alweledim",
+      author || "ዓቤ ጉበኛ",
+      "Amharic Literature",
+      ["#881337", "#4c0519"],
+      "#FB7185",
+      "✊"
+    );
+  }
+  if (titleLower.includes("bashager") || titleLower.includes("አድማስ")) {
+    return generateBookCoverSvg(
+      "ከአድማስ ባሻገር",
+      "Keadmas Bashager",
+      author || "በአሉ ግርማ",
+      "Amharic Literature",
+      ["#7c2d12", "#431407"],
+      "#F97316",
+      "🌅"
+    );
+  }
+  if (titleLower.includes("derasew") || titleLower.includes("ደራሲው")) {
+    return generateBookCoverSvg(
+      "ደራሲው",
+      "Derasew",
+      author || "በአሉ ግርማ",
+      "Amharic Literature",
+      ["#1e1b4b", "#0f172a"],
+      "#A78BFA",
+      "📖"
+    );
+  }
+  if (titleLower.includes("hiwete") || titleLower.includes("ሕይወቴና")) {
+    return generateBookCoverSvg(
+      "ሕይወቴና የኢትዮጵያ እርምጃ",
+      "Hiwete ena YeEthiopia Erimja",
+      author || "ቀዳማዊ ኃይለ ሥላሴ",
+      "Ethiopian History",
+      ["#14532d", "#052e16"],
+      "#FACC15",
+      "👑"
+    );
+  }
+  if (titleLower.includes("yesat") || titleLower.includes("እሳት")) {
+    return generateBookCoverSvg(
+      "የእሳት ወይ አበባ",
+      "Yesat Wey Abeba",
+      author || "ሎሬት ፀጋዬ ገብረመድህን",
+      "Poetry & Anthology",
+      ["#701a75", "#4a044e"],
+      "#F472B6",
+      "🌹"
+    );
+  }
+  if (titleLower.includes("taytu") || titleLower.includes("ጣይቱ")) {
+    return generateBookCoverSvg(
+      "እቴጌ ጣይቱ - የዓድዋ ድል",
+      "Empress Taytu & Battle of Adwa",
+      author || "ፕሮፌሰር ላፕሶ ጌታሁን",
+      "Ethiopian History",
+      ["#7f1d1d", "#450a0a"],
+      "#FBBF24",
+      "🛡️"
+    );
+  }
+  if (titleLower.includes("mahlet") || titleLower.includes("ማህሌት")) {
+    return generateBookCoverSvg(
+      "ማህሌት",
+      "Mahlet",
+      author || "ብርሃኑ ዘሪሁን",
+      "Amharic Literature",
+      ["#0284c7", "#0c4a6e"],
+      "#7DD3FC",
+      "🎼"
+    );
+  }
+  if (titleLower.includes("lenes") || titleLower.includes("ለእኔስ")) {
+    return generateBookCoverSvg(
+      "ለእኔስ ማነህ",
+      "Lenes Maneh",
+      author || "አዳም ረጣ",
+      "Amharic Literature",
+      ["#111827", "#030712"],
+      "#E11D48",
+      "🎨"
+    );
+  }
+
+  const titleParts = title.split("(");
+  const amharicPart = titleParts[0]?.trim() || title;
+  const englishPart = titleParts[1]?.replace(")", "").trim() || amharicPart;
+
+  return generateBookCoverSvg(
+    amharicPart,
+    englishPart,
+    author || "JJ Bookstore Author",
+    category,
+    ["#1e293b", "#0f172a"],
+    "#F59E0B",
+    "📚"
+  );
+}
+
 export const INITIAL_AUTHORS: Author[] = [
   {
     id: "auth-haddis",

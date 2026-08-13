@@ -7,6 +7,7 @@ import { WishlistProvider } from "./context/WishlistContext";
 import { ToastProvider, useToast } from "./components/ui/Toast";
 import { Header } from "./components/layout/Header";
 import { Footer } from "./components/layout/Footer";
+import { MobileBottomNav } from "./components/layout/MobileBottomNav";
 import { BookGrid } from "./components/books/BookGrid";
 import { BookDetailsModal } from "./components/books/BookDetailsModal";
 import { CartDrawer } from "./components/cart/CartDrawer";
@@ -22,7 +23,8 @@ import {
   INITIAL_BOOKS,
   INITIAL_AUTHORS,
   INITIAL_CATEGORIES,
-  INITIAL_COUPONS
+  INITIAL_COUPONS,
+  getValidBookCover
 } from "./lib/sampleData";
 import {
   BookOpen,
@@ -88,7 +90,14 @@ function MainAppContent() {
         (snap) => {
           if (!snap.empty) {
             const list: Book[] = [];
-            snap.forEach((d) => list.push({ id: d.id, ...d.data() } as Book));
+            snap.forEach((d) => {
+              const bookData = d.data() as Book;
+              list.push({
+                ...bookData,
+                id: d.id,
+                coverImage: getValidBookCover(bookData)
+              });
+            });
             setBooks(list);
           }
         },
@@ -188,7 +197,7 @@ function MainAppContent() {
       />
 
       {/* Main Page Area */}
-      <main className="flex-1">
+      <main className="flex-1 pb-16 md:pb-0">
         {/* PAGE 1: HOME PAGE */}
         {activePage === "home" && (
           <div className="space-y-16 pb-16">
@@ -569,6 +578,14 @@ function MainAppContent() {
 
       {/* Footer */}
       <Footer onNavigate={handleNavigate} />
+
+      {/* Mobile Sticky Navigation */}
+      <MobileBottomNav
+        activePage={activePage}
+        onNavigate={handleNavigate}
+        onOpenSearch={() => setIsSearchOpen(true)}
+        onOpenCart={() => setIsCartOpen(true)}
+      />
 
       {/* Modals & Drawers */}
       <BookDetailsModal

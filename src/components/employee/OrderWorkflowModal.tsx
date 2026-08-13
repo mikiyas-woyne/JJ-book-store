@@ -1,12 +1,14 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   Order,
   OrderStatus,
   Employee,
   PackageInfo,
   DeliveryAssignment,
-  DeliveryHandoffRecord
+  DeliveryHandoffRecord,
+  EmailNotificationLog
 } from "../../types";
+import { sendCustomerOrderEmail } from "../../lib/emailService";
 import {
   CheckCircle2,
   XCircle,
@@ -23,7 +25,10 @@ import {
   Printer,
   X,
   Sparkles,
-  FileText
+  FileText,
+  Mail,
+  Send,
+  Check
 } from "lucide-react";
 import { BarcodeScannerModal } from "./BarcodeScannerModal";
 
@@ -49,34 +54,36 @@ export const OrderWorkflowModal: React.FC<OrderWorkflowModalProps> = ({
   employees,
   currentEmployee
 }) => {
-  if (!order) return null;
-
   const [loading, setLoading] = useState(false);
   const [note, setNote] = useState("");
   const [isScannerOpen, setIsScannerOpen] = useState(false);
 
   // Verification Form State
   const [receiptNumber, setReceiptNumber] = useState(
-    order.verifiedReceiptNumber || order.paymentReference || ""
+    order?.verifiedReceiptNumber || order?.paymentReference || ""
   );
   const [verifierName, setVerifierName] = useState(
-    currentEmployee?.fullName || order.verifiedByEmployeeName || "Store Staff"
+    currentEmployee?.fullName || order?.verifiedByEmployeeName || "Store Staff"
   );
   const [selectedVerifierId, setSelectedVerifierId] = useState(
-    currentEmployee?.uid || order.verifiedByEmployeeId || "emp-101"
+    currentEmployee?.uid || order?.verifiedByEmployeeId || "emp-101"
   );
 
   // Item Picking Checklist State
   const [itemsChecklist, setItemsChecklist] = useState(
-    order.items.map((it) => ({
-      ...it,
-      collected: true,
-      shelfLocation: `Shelf ${it.bookId.slice(0, 2).toUpperCase()}-12`
-    }))
+    order?.items
+      ? order.items.map((it) => ({
+          ...it,
+          collected: true,
+          shelfLocation: `Shelf ${it.bookId.slice(0, 2).toUpperCase()}-12`
+        }))
+      : []
   );
 
   // Packing Form State
-  const [packageNumber, setPackageNumber] = useState(`PKG-${order.orderId.replace("#", "")}`);
+  const [packageNumber, setPackageNumber] = useState(
+    order?.orderId ? `PKG-${order.orderId.replace("#", "")}` : "PKG-0000"
+  );
   const [packageType, setPackageType] = useState<"box" | "bubble_mailer" | "bag" | "envelope">("box");
   const [weightKg, setWeightKg] = useState("0.8");
 
@@ -87,11 +94,28 @@ export const OrderWorkflowModal: React.FC<OrderWorkflowModalProps> = ({
   );
 
   // Delivery Result State
-  const [codAmountCollected, setCodAmountCollected] = useState(order.grandTotal.toString());
+  const [codAmountCollected, setCodAmountCollected] = useState(
+    order?.grandTotal ? order.grandTotal.toString() : "0"
+  );
   const [failedReason, setFailedReason] = useState("Customer unavailable at time of delivery");
   const [returnCondition, setReturnCondition] = useState<"good" | "damaged" | "opened">("good");
 
+  // Email Dispatch State
+  const [dispatchedEmailLog, setDispatchedEmailLog] = useState<EmailNotificationLog | null>(null);
+
   const drivers = employees.filter((e) => e.assignedRoles?.includes("delivery_personnel"));
+
+  useEffect(() => {
+    if (mode === "assign" && !selectedDriverId) {
+      if (drivers.length > 0) {
+        setSelectedDriverId(drivers[0].uid);
+      } else {
+        setSelectedDriverId("driver-default-01");
+      }
+    }
+  }, [mode, drivers, selectedDriverId]);
+
+  if (!order) return null;
 
   const toggleItemCollected = (index: number) => {
     const updated = [...itemsChecklist];
@@ -110,6 +134,28 @@ export const OrderWorkflowModal: React.FC<OrderWorkflowModalProps> = ({
       setItemsChecklist(updated);
     } else {
       setPackageNumber(code);
+    }
+  };
+
+  const handleCancelOrderInWorkflow = async () => {
+    const cancelReason = prompt(
+      `Enter reason for cancelling order ${order.orderId}:`,
+      "Cancelled by store staff due to customer request or inventory shortage."
+    );
+    if (!cancelReason) return;
+
+    setLoading(true);
+    try {
+      await onUpdateOrderStatus(order.id, "cancelled", cancelReason, {
+        cancelledAt: new Date().toISOString(),
+        cancelledByEmployeeName: currentEmployee?.fullName || "Store Staff"
+      });
+      alert(`Order ${order.orderId} marked as Cancelled.`);
+      onClose();
+    } catch (err) {
+      console.error("Failed to cancel order:", err);
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -142,7 +188,19 @@ export const OrderWorkflowModal: React.FC<OrderWorkflowModalProps> = ({
       }
 
       await onUpdateOrderStatus(order.id, status, statusNote, metadata);
-      onClose();
+
+      // Automatically dispatch email notification to the customer
+      const emailLog = await sendCustomerOrderEmail(
+        order,
+        approved ? "approved" : "rejected",
+        finalVerifierName,
+        finalReceipt,
+        statusNote
+      );
+
+      setDispatchedEmailLog(emailLog);
+    } catch (err) {
+      console.error("Failed verification workflow:", err);
     } finally {
       setLoading(false);
     }
@@ -158,8 +216,9 @@ export const OrderWorkflowModal: React.FC<OrderWorkflowModalProps> = ({
           return;
         }
       }
-      const prepNote = note || `Books collected by ${currentEmployee?.fullName || "Staff"}. Ready for packaging.`;
-      await onUpdateOrderStatus(order.id, "processing", prepNote, {
+      const prepNote = note || `Books collected by ${currentEmployee?.fullName || "Staff"}. Moved to packaging.`;
+      // Transition status to 'packing' so order advances to Stage 3 (Packaging)
+      await onUpdateOrderStatus(order.id, "packing", prepNote, {
         itemsChecklist
       });
       onClose();
@@ -193,19 +252,17 @@ export const OrderWorkflowModal: React.FC<OrderWorkflowModalProps> = ({
   };
 
   const handleAssignDelivery = async () => {
-    if (!selectedDriverId) {
-      alert("Please select a delivery personnel / driver");
-      return;
-    }
+    const targetDriverId = selectedDriverId || (drivers.length > 0 ? drivers[0].uid : "driver-default-01");
     setLoading(true);
     try {
-      const driver = employees.find((e) => e.uid === selectedDriverId);
-      const assignNote = `Assigned to delivery driver ${driver?.fullName || "Personnel"}. Expected: ${expectedDate}.`;
+      const driver = employees.find((e) => e.uid === targetDriverId);
+      const driverName = driver?.fullName || (targetDriverId === "driver-default-01" ? "Express Delivery Driver (Abebe)" : "Delivery Personnel");
+      const assignNote = `Assigned to delivery driver ${driverName}. Expected: ${expectedDate}.`;
       
       await onUpdateOrderStatus(order.id, "assigned", assignNote, {
-        assignedDeliveryDriverId: driver?.uid,
-        assignedDeliveryDriverName: driver?.fullName,
-        assignedDeliveryDriverPhone: driver?.phone,
+        assignedDeliveryDriverId: targetDriverId,
+        assignedDeliveryDriverName: driverName,
+        assignedDeliveryDriverPhone: driver?.phone || "+251 911 234 567",
         expectedDeliveryDate: expectedDate
       });
       onClose();
@@ -286,8 +343,88 @@ export const OrderWorkflowModal: React.FC<OrderWorkflowModalProps> = ({
             </button>
           </div>
 
-          {/* Mode 1: Order Verification */}
-          {mode === "verify" && (
+          {/* IF EMAIL DISPATCHED SCREEN */}
+          {dispatchedEmailLog ? (
+            <div className="space-y-5 animate-in fade-in">
+              <div className="p-4 rounded-2xl bg-emerald-50 border border-emerald-200 text-emerald-900 flex items-start gap-3">
+                <div className="p-2 rounded-xl bg-emerald-600 text-white shrink-0">
+                  <Mail className="w-5 h-5" />
+                </div>
+                <div className="space-y-1">
+                  <h4 className="font-serif font-bold text-sm text-emerald-950">
+                    Automated Customer Email Notification Dispatched!
+                  </h4>
+                  <p className="text-xs text-emerald-800">
+                    An email has been formatted, logged, and sent to <strong>{dispatchedEmailLog.recipientEmail}</strong> for Order {order.orderId}.
+                  </p>
+                </div>
+              </div>
+
+              {/* Email Record Details */}
+              <div className="p-4 bg-slate-50 rounded-2xl border border-slate-200 space-y-2 text-xs">
+                <div className="flex justify-between border-b border-slate-200 pb-2">
+                  <span className="text-slate-500 font-medium">Recipient:</span>
+                  <strong className="text-slate-900">{dispatchedEmailLog.recipientName} ({dispatchedEmailLog.recipientEmail})</strong>
+                </div>
+                <div className="flex justify-between border-b border-slate-200 pb-2">
+                  <span className="text-slate-500 font-medium">Subject:</span>
+                  <strong className="text-amber-800">{dispatchedEmailLog.subject}</strong>
+                </div>
+                <div className="flex justify-between border-b border-slate-200 pb-2">
+                  <span className="text-slate-500 font-medium">Verification Status:</span>
+                  <span className={`px-2 py-0.5 rounded-md font-bold uppercase text-[10px] ${dispatchedEmailLog.emailType === "approved" ? "bg-emerald-100 text-emerald-800" : "bg-rose-100 text-rose-800"}`}>
+                    {dispatchedEmailLog.emailType === "approved" ? "Verified & Confirmed" : "Declined & Cancelled"}
+                  </span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-slate-500 font-medium">Verified By:</span>
+                  <strong className="text-slate-800">{dispatchedEmailLog.verifiedByEmployeeName}</strong>
+                </div>
+              </div>
+
+              {/* HTML Email Body Live Preview Box */}
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1.5 flex items-center justify-between">
+                  <span>HTML Email Body Render Preview</span>
+                  <span className="text-[10px] text-emerald-700 font-semibold flex items-center gap-1">
+                    <Check className="w-3 h-3" /> Dispatched to Customer Inbox
+                  </span>
+                </label>
+                <div
+                  className="max-h-64 overflow-y-auto p-4 bg-white rounded-2xl border border-slate-200 shadow-inner text-xs scrollbar-none"
+                  dangerouslySetInnerHTML={{ __html: dispatchedEmailLog.htmlBody }}
+                />
+              </div>
+
+              <div className="flex items-center justify-end gap-3 pt-4 border-t border-slate-100">
+                <button
+                  onClick={async () => {
+                    await sendCustomerOrderEmail(
+                      order,
+                      dispatchedEmailLog.emailType as any,
+                      dispatchedEmailLog.verifiedByEmployeeName || "Staff",
+                      dispatchedEmailLog.receiptNumber,
+                      dispatchedEmailLog.note
+                    );
+                    alert(`Email notification resent to ${dispatchedEmailLog.recipientEmail}!`);
+                  }}
+                  className="px-4 py-2.5 rounded-xl border border-slate-200 text-slate-700 font-bold text-xs hover:bg-slate-100 flex items-center gap-1.5"
+                >
+                  <Send className="w-3.5 h-3.5 text-amber-700" />
+                  <span>Resend Email</span>
+                </button>
+                <button
+                  onClick={onClose}
+                  className="px-6 py-2.5 rounded-xl bg-amber-950 text-amber-50 font-extrabold text-xs shadow-md hover:bg-amber-900"
+                >
+                  Done & Close Workflow
+                </button>
+              </div>
+            </div>
+          ) : (
+            <>
+              {/* Mode 1: Order Verification */}
+              {mode === "verify" && (
             <div className="space-y-5">
               {/* Order Summary Box */}
               <div className="p-4 bg-slate-50 rounded-2xl border border-slate-200 space-y-2 text-xs">
@@ -443,6 +580,30 @@ export const OrderWorkflowModal: React.FC<OrderWorkflowModalProps> = ({
           {/* Mode 2: Item Preparation / Collecting Checklist */}
           {mode === "prepare" && (
             <div className="space-y-6">
+              {order.orderStatus === "confirmed" && (
+                <div className="p-3 bg-blue-50 border border-blue-200 rounded-2xl flex items-center justify-between text-xs text-blue-950">
+                  <div>
+                    <strong className="font-extrabold text-blue-900 block">Status: Confirmed</strong>
+                    <span className="text-[11px] text-blue-800 font-medium">Click to set status to 'Processing' while picking books.</span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      setLoading(true);
+                      try {
+                        await onUpdateOrderStatus(order.id, "processing", "Order marked as Processing by staff during picking", { itemsChecklist });
+                      } finally {
+                        setLoading(false);
+                      }
+                    }}
+                    disabled={loading}
+                    className="px-3.5 py-1.5 bg-blue-600 hover:bg-blue-500 text-white font-extrabold rounded-xl text-xs shrink-0 shadow-sm"
+                  >
+                    Mark as Processing
+                  </button>
+                </div>
+              )}
+
               <div className="flex items-center justify-between">
                 <span className="text-xs font-bold uppercase text-slate-500">
                   Book Picking Checklist ({itemsChecklist.filter((i) => i.collected).length}/{itemsChecklist.length})
@@ -516,20 +677,34 @@ export const OrderWorkflowModal: React.FC<OrderWorkflowModalProps> = ({
                 />
               </div>
 
-              <div className="flex items-center justify-end gap-3 pt-4 border-t border-slate-100">
+              <div className="flex flex-wrap items-center justify-between gap-3 pt-4 border-t border-slate-100">
                 <button
-                  onClick={onClose}
-                  className="px-5 py-2.5 rounded-xl text-xs font-bold text-slate-600 hover:bg-slate-100"
-                >
-                  Cancel
-                </button>
-                <button
-                  onClick={handleFinishPreparation}
+                  type="button"
+                  onClick={handleCancelOrderInWorkflow}
                   disabled={loading}
-                  className="px-6 py-2.5 rounded-xl bg-amber-600 hover:bg-amber-500 text-white font-extrabold text-xs shadow-md"
+                  className="px-4 py-2.5 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-700 font-bold text-xs border border-rose-200 flex items-center gap-1.5"
                 >
-                  Mark Prepared & Ready to Pack
+                  <XCircle className="w-4 h-4 text-rose-600" />
+                  <span>Cancel Order</span>
                 </button>
+
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={onClose}
+                    className="px-4 py-2.5 rounded-xl text-xs font-bold text-slate-600 hover:bg-slate-100"
+                  >
+                    Close Window
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleFinishPreparation}
+                    disabled={loading}
+                    className="px-6 py-2.5 rounded-xl bg-amber-600 hover:bg-amber-500 text-white font-extrabold text-xs shadow-md"
+                  >
+                    Mark Prepared & Move to Stage 3 (Pack)
+                  </button>
+                </div>
               </div>
             </div>
           )}
@@ -606,20 +781,34 @@ export const OrderWorkflowModal: React.FC<OrderWorkflowModalProps> = ({
                 />
               </div>
 
-              <div className="flex items-center justify-end gap-3 pt-4 border-t border-slate-100">
+              <div className="flex flex-wrap items-center justify-between gap-3 pt-4 border-t border-slate-100">
                 <button
-                  onClick={onClose}
-                  className="px-5 py-2.5 rounded-xl text-xs font-bold text-slate-600 hover:bg-slate-100"
-                >
-                  Cancel
-                </button>
-                <button
-                  onClick={handleSavePacking}
+                  type="button"
+                  onClick={handleCancelOrderInWorkflow}
                   disabled={loading}
-                  className="px-6 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-extrabold text-xs shadow-md"
+                  className="px-4 py-2.5 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-700 font-bold text-xs border border-rose-200 flex items-center gap-1.5"
                 >
-                  Mark Packed & Ready for Delivery
+                  <XCircle className="w-4 h-4 text-rose-600" />
+                  <span>Cancel Order</span>
                 </button>
+
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={onClose}
+                    className="px-4 py-2.5 rounded-xl text-xs font-bold text-slate-600 hover:bg-slate-100"
+                  >
+                    Close Window
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleSavePacking}
+                    disabled={loading}
+                    className="px-6 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-extrabold text-xs shadow-md"
+                  >
+                    Mark Packed & Ready for Driver
+                  </button>
+                </div>
               </div>
             </div>
           )}
@@ -666,20 +855,34 @@ export const OrderWorkflowModal: React.FC<OrderWorkflowModalProps> = ({
                 <p>• Amount to Collect (COD): ETB {order.grandTotal.toLocaleString()}</p>
               </div>
 
-              <div className="flex items-center justify-end gap-3 pt-4 border-t border-slate-100">
+              <div className="flex flex-wrap items-center justify-between gap-3 pt-4 border-t border-slate-100">
                 <button
-                  onClick={onClose}
-                  className="px-5 py-2.5 rounded-xl text-xs font-bold text-slate-600 hover:bg-slate-100"
-                >
-                  Cancel
-                </button>
-                <button
-                  onClick={handleAssignDelivery}
+                  type="button"
+                  onClick={handleCancelOrderInWorkflow}
                   disabled={loading}
-                  className="px-6 py-2.5 rounded-xl bg-amber-600 hover:bg-amber-500 text-white font-extrabold text-xs shadow-md"
+                  className="px-4 py-2.5 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-700 font-bold text-xs border border-rose-200 flex items-center gap-1.5"
                 >
-                  Assign Order & Create Dispatch Slip
+                  <XCircle className="w-4 h-4 text-rose-600" />
+                  <span>Cancel Order</span>
                 </button>
+
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={onClose}
+                    className="px-4 py-2.5 rounded-xl text-xs font-bold text-slate-600 hover:bg-slate-100"
+                  >
+                    Close Window
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleAssignDelivery}
+                    disabled={loading}
+                    className="px-6 py-2.5 rounded-xl bg-amber-600 hover:bg-amber-500 text-white font-extrabold text-xs shadow-md"
+                  >
+                    Assign Driver & Dispatch
+                  </button>
+                </div>
               </div>
             </div>
           )}
@@ -729,22 +932,36 @@ export const OrderWorkflowModal: React.FC<OrderWorkflowModalProps> = ({
                 />
               </div>
 
-              <div className="flex items-center justify-between pt-4 border-t border-slate-100">
+              <div className="flex flex-wrap items-center justify-between gap-3 pt-4 border-t border-slate-100">
                 <button
-                  onClick={() => handleDeliveryCompletion(false)}
+                  type="button"
+                  onClick={handleCancelOrderInWorkflow}
                   disabled={loading}
-                  className="px-5 py-2.5 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-700 font-bold text-xs"
+                  className="px-4 py-2.5 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-700 font-bold text-xs border border-rose-200 flex items-center gap-1.5"
                 >
-                  Mark Delivery Failed
+                  <XCircle className="w-4 h-4 text-rose-600" />
+                  <span>Cancel Order</span>
                 </button>
 
-                <button
-                  onClick={() => handleDeliveryCompletion(true)}
-                  disabled={loading}
-                  className="px-6 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-extrabold text-xs shadow-md"
-                >
-                  Mark Delivered & Paid ✅
-                </button>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => handleDeliveryCompletion(false)}
+                    disabled={loading}
+                    className="px-4 py-2.5 rounded-xl bg-slate-200 hover:bg-slate-300 text-slate-800 font-bold text-xs"
+                  >
+                    Mark Delivery Failed
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => handleDeliveryCompletion(true)}
+                    disabled={loading}
+                    className="px-6 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-extrabold text-xs shadow-md"
+                  >
+                    Mark Delivered & Paid ✅
+                  </button>
+                </div>
               </div>
             </div>
           )}
@@ -776,14 +993,16 @@ export const OrderWorkflowModal: React.FC<OrderWorkflowModalProps> = ({
                 />
               </div>
 
-              <div className="flex items-center justify-end gap-3 pt-4 border-t border-slate-100">
+              <div className="flex items-center justify-between gap-3 pt-4 border-t border-slate-100">
                 <button
+                  type="button"
                   onClick={onClose}
                   className="px-5 py-2.5 rounded-xl text-xs font-bold text-slate-600 hover:bg-slate-100"
                 >
-                  Cancel
+                  Close Window
                 </button>
                 <button
+                  type="button"
                   onClick={handleRegisterReturn}
                   disabled={loading}
                   className="px-6 py-2.5 rounded-xl bg-slate-900 text-white font-extrabold text-xs shadow-md"
@@ -793,8 +1012,11 @@ export const OrderWorkflowModal: React.FC<OrderWorkflowModalProps> = ({
               </div>
             </div>
           )}
+          </>
+          )}
         </div>
       </div>
+
 
       <BarcodeScannerModal
         isOpen={isScannerOpen}

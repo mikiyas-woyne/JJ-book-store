@@ -151,6 +151,7 @@ export type OrderStatus =
   | 'pending'
   | 'confirmed'
   | 'processing'
+  | 'packing'
   | 'packed'
   | 'ready_for_delivery'
   | 'assigned'
@@ -361,6 +362,21 @@ export interface StoreNotification {
   read: boolean;
   link?: string;
   createdAt: string;
+}
+
+export interface EmailNotificationLog {
+  id: string;
+  orderId: string;
+  recipientEmail: string;
+  recipientName: string;
+  subject: string;
+  emailType: 'approved' | 'rejected' | 'status_update';
+  status: 'sent' | 'delivered' | 'failed';
+  verifiedByEmployeeName?: string;
+  receiptNumber?: string;
+  note?: string;
+  sentAt: string;
+  htmlBody: string;
 }
 
 export interface StoreSettings {
