@@ -1,0 +1,118 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    // Global bookstore settings
+    match /settings/{settingId} {
+      allow read, write: if true;
+    }
+
+    // Users profiles
+    match /users/{userId} {
+      allow read, write: if true;
+    }
+
+    // Book catalog items
+    match /books/{bookId} {
+      allow read, write: if true;
+    }
+
+    // Authors
+    match /authors/{authorId} {
+      allow read, write: if true;
+    }
+
+    // Categories
+    match /categories/{categoryId} {
+      allow read, write: if true;
+    }
+
+    // Discount coupons
+    match /coupons/{couponId} {
+      allow read, write: if true;
+    }
+
+    // User shopping carts
+    match /carts/{userId} {
+      allow read, write: if true;
+    }
+
+    // User wishlists
+    match /wishlists/{userId} {
+      allow read, write: if true;
+    }
+
+    // Customer orders
+    match /orders/{orderId} {
+      allow read, write: if true;
+    }
+
+    // Ratings & Reviews
+    match /reviews/{reviewId} {
+      allow read, write: if true;
+    }
+
+    // Notifications
+    match /notifications/{notificationId} {
+      allow read, write: if true;
+    }
+
+    // Stock audit inventory transactions
+    match /inventoryTransactions/{txId} {
+      allow read, write: if true;
+    }
+
+    // Employees
+    match /employees/{employeeId} {
+      allow read, write: if true;
+    }
+
+    // Employee Activity Logs
+    match /employeeActivityLogs/{logId} {
+      allow read, write: if true;
+    }
+
+    // System & Admin Activity Logs
+    match /activity_logs/{logId} {
+      allow read, write: if true;
+    }
+
+    // Delivery Assignments
+    match /deliveryAssignments/{assignmentId} {
+      allow read, write: if true;
+    }
+
+    // Delivery Handoffs
+    match /deliveryHandoffs/{handoffId} {
+      allow read, write: if true;
+    }
+
+    // Delivery Events
+    match /deliveryEvents/{eventId} {
+      allow read, write: if true;
+    }
+
+    // Packages
+    match /packages/{packageId} {
+      allow read, write: if true;
+    }
+
+    // Customer Communications
+    match /customerCommunications/{commId} {
+      allow read, write: if true;
+    }
+
+    // Catch-all fallback for any additional collection
+    match /{document=**} {
+      allow read, write: if true;
+    }
+  }
+}

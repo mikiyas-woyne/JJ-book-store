@@ -1,0 +1,6 @@
+{
+  "name": "JJ Book Shopping",
+  "description": "A modern, scalable online bookstore with book discovery, cart, wishlist, checkout, orders, reviews, and admin management.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

@@ -1,0 +1,285 @@
+{
+  "collections": {
+    "users": {
+      "description": "User profiles and roles",
+      "fields": {
+        "uid": "string",
+        "fullName": "string",
+        "email": "string",
+        "phone": "string",
+        "photoURL": "string",
+        "role": "string",
+        "status": "string",
+        "createdAt": "timestamp",
+        "updatedAt": "timestamp"
+      }
+    },
+    "books": {
+      "description": "Book catalog items",
+      "fields": {
+        "title": "string",
+        "slug": "string",
+        "description": "string",
+        "authorId": "string",
+        "authorName": "string",
+        "categoryId": "string",
+        "categoryName": "string",
+        "price": "number",
+        "discountPrice": "number",
+        "currency": "string",
+        "coverImage": "string",
+        "ISBN": "string",
+        "publisher": "string",
+        "publicationDate": "string",
+        "pages": "number",
+        "language": "string",
+        "stock": "number",
+        "reservedStock": "number",
+        "soldCount": "number",
+        "ratingAverage": "number",
+        "reviewCount": "number",
+        "featured": "boolean",
+        "newArrival": "boolean",
+        "active": "boolean",
+        "createdAt": "timestamp",
+        "updatedAt": "timestamp"
+      }
+    },
+    "authors": {
+      "description": "Book authors",
+      "fields": {
+        "name": "string",
+        "slug": "string",
+        "image": "string",
+        "bio": "string",
+        "active": "boolean",
+        "createdAt": "timestamp",
+        "updatedAt": "timestamp"
+      }
+    },
+    "categories": {
+      "description": "Book categories",
+      "fields": {
+        "name": "string",
+        "slug": "string",
+        "description": "string",
+        "image": "string",
+        "active": "boolean",
+        "createdAt": "timestamp",
+        "updatedAt": "timestamp"
+      }
+    },
+    "orders": {
+      "description": "Customer purchase orders",
+      "fields": {
+        "orderId": "string",
+        "customerId": "string",
+        "customerName": "string",
+        "customerEmail": "string",
+        "customerPhone": "string",
+        "items": "array",
+        "subtotal": "number",
+        "discount": "number",
+        "tax": "number",
+        "shippingFee": "number",
+        "grandTotal": "number",
+        "paymentMethod": "string",
+        "paymentStatus": "string",
+        "orderStatus": "string",
+        "shippingAddress": "map",
+        "notes": "string",
+        "couponCode": "string",
+        "createdAt": "timestamp",
+        "updatedAt": "timestamp"
+      }
+    },
+    "carts": {
+      "description": "Persistent user shopping carts",
+      "fields": {
+        "userId": "string",
+        "items": "array",
+        "updatedAt": "timestamp"
+      }
+    },
+    "wishlists": {
+      "description": "User favorite books",
+      "fields": {
+        "userId": "string",
+        "bookIds": "array",
+        "updatedAt": "timestamp"
+      }
+    },
+    "reviews": {
+      "description": "Book ratings and reviews",
+      "fields": {
+        "bookId": "string",
+        "userId": "string",
+        "userName": "string",
+        "userPhoto": "string",
+        "rating": "number",
+        "comment": "string",
+        "verifiedPurchase": "boolean",
+        "status": "string",
+        "createdAt": "timestamp",
+        "updatedAt": "timestamp"
+      }
+    },
+    "coupons": {
+      "description": "Discount codes",
+      "fields": {
+        "code": "string",
+        "discountType": "string",
+        "discountValue": "number",
+        "minOrderAmount": "number",
+        "maxDiscount": "number",
+        "expirationDate": "string",
+        "usageLimit": "number",
+        "usedCount": "number",
+        "active": "boolean",
+        "createdAt": "timestamp"
+      }
+    },
+    "inventoryTransactions": {
+      "description": "Stock audit logs",
+      "fields": {
+        "bookId": "string",
+        "bookTitle": "string",
+        "changeQuantity": "number",
+        "previousStock": "number",
+        "newStock": "number",
+        "reason": "string",
+        "performedBy": "string",
+        "createdAt": "timestamp"
+      }
+    },
+    "notifications": {
+      "description": "User and admin alerts",
+      "fields": {
+        "userId": "string",
+        "title": "string",
+        "message": "string",
+        "type": "string",
+        "read": "boolean",
+        "link": "string",
+        "createdAt": "timestamp"
+      }
+    },
+    "employees": {
+      "description": "Bookstore staff and operational personnel profiles",
+      "fields": {
+        "uid": "string",
+        "fullName": "string",
+        "email": "string",
+        "phone": "string",
+        "role": "string",
+        "assignedRoles": "array",
+        "permissions": "array",
+        "active": "boolean",
+        "zone": "string",
+        "ordersProcessedCount": "number",
+        "deliveriesCompletedCount": "number",
+        "failedDeliveriesCount": "number",
+        "createdAt": "timestamp",
+        "updatedAt": "timestamp"
+      }
+    },
+    "employeeActivityLogs": {
+      "description": "Immutable operational activity log for bookstore staff",
+      "fields": {
+        "employeeId": "string",
+        "employeeName": "string",
+        "action": "string",
+        "orderId": "string",
+        "description": "string",
+        "metadata": "map",
+        "timestamp": "timestamp"
+      }
+    },
+    "deliveryAssignments": {
+      "description": "Orders assigned to delivery drivers and coordinators",
+      "fields": {
+        "orderId": "string",
+        "deliveryEmployeeId": "string",
+        "deliveryEmployeeName": "string",
+        "customerName": "string",
+        "customerPhone": "string",
+        "address": "map",
+        "packageCount": "number",
+        "codAmountToCollect": "number",
+        "assignedAt": "timestamp",
+        "assignedBy": "string",
+        "expectedDeliveryDate": "string",
+        "status": "string"
+      }
+    },
+    "deliveryHandoffs": {
+      "description": "Handover record of packages from store staff to delivery drivers",
+      "fields": {
+        "orderId": "string",
+        "packageNumber": "string",
+        "packageCount": "number",
+        "givenByStoreEmployeeId": "string",
+        "givenByStoreEmployeeName": "string",
+        "receivedByDeliveryEmployeeId": "string",
+        "receivedByDeliveryEmployeeName": "string",
+        "timestamp": "timestamp",
+        "notes": "string"
+      }
+    },
+    "deliveryEvents": {
+      "description": "Delivery lifecycle events (out for delivery, delivered, failed, returned)",
+      "fields": {
+        "orderId": "string",
+        "status": "string",
+        "reason": "string",
+        "notes": "string",
+        "amountCollected": "number",
+        "employeeId": "string",
+        "employeeName": "string",
+        "timestamp": "timestamp"
+      }
+    },
+    "packages": {
+      "description": "Packed box/bag metadata for order fulfillment",
+      "fields": {
+        "orderId": "string",
+        "packageNumber": "string",
+        "itemCount": "number",
+        "weightKg": "number",
+        "packageType": "string",
+        "packedByEmployeeId": "string",
+        "packedByEmployeeName": "string",
+        "packedAt": "timestamp"
+      }
+    },
+    "customerCommunications": {
+      "description": "Customer service call and communication logs",
+      "fields": {
+        "orderId": "string",
+        "customerId": "string",
+        "employeeId": "string",
+        "employeeName": "string",
+        "note": "string",
+        "channel": "string",
+        "timestamp": "timestamp"
+      }
+    },
+    "settings": {
+      "description": "Global bookstore settings",
+      "fields": {
+        "storeName": "string",
+        "logo": "string",
+        "email": "string",
+        "phone": "string",
+        "address": "string",
+        "currency": "string",
+        "shippingFee": "number",
+        "minFreeShipping": "number",
+        "taxRate": "number",
+        "storeStatus": "string",
+        "socialLinks": "map",
+        "paymentGateways": "map"
+      }
+    }
+  }
+}
