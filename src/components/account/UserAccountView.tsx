@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { captureElementToCanvas } from "../../lib/screenshotUtils";
+import { downloadOrderReceiptScreenshot } from "../../lib/screenshotUtils";
 import {
   User as UserIcon,
   ShoppingBag,
@@ -53,21 +53,10 @@ export const UserAccountView: React.FC<UserAccountViewProps> = ({
   const [downloadingOrderId, setDownloadingOrderId] = useState<string | null>(null);
 
   const handleDownloadOrderScreenshot = async (order: Order) => {
-    const el = document.getElementById(`order-receipt-${order.id}`);
-    if (!el) return;
     setDownloadingOrderId(order.id);
     try {
-      const canvas = await captureElementToCanvas(el, {
-        scale: 2,
-        backgroundColor: "#ffffff"
-      });
-      const imageUri = canvas.toDataURL("image/png");
-      const link = document.createElement("a");
-      link.href = imageUri;
-      link.download = `JJ-Bookstore-Receipt-${order.orderId}.png`;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
+      const el = document.getElementById(`order-receipt-${order.id}`);
+      await downloadOrderReceiptScreenshot(order, el);
       showToast("Screenshot Saved", "Receipt image downloaded successfully.", "success");
     } catch (err) {
       console.error("Screenshot download error:", err);
@@ -324,13 +313,13 @@ export const UserAccountView: React.FC<UserAccountViewProps> = ({
                             <div className={`p-2 rounded-xl border ${ord.orderStatus !== "cancelled" ? "bg-amber-500 text-amber-950 font-bold border-amber-600" : "bg-slate-100 text-slate-400"}`}>
                               1. Order Placed
                             </div>
-                            <div className={`p-2 rounded-xl border ${["confirmed", "processing", "packing", "packed", "ready_for_delivery", "assigned", "handed_to_delivery", "out_for_delivery", "shipped", "delivered"].includes(ord.orderStatus) ? "bg-amber-500 text-amber-950 font-bold border-amber-600" : "bg-slate-100 text-slate-400"}`}>
+                            <div className={`p-2 rounded-xl border ${["confirmed", "processing", "shipped", "out_for_delivery", "delivered"].includes(ord.orderStatus) ? "bg-amber-500 text-amber-950 font-bold border-amber-600" : "bg-slate-100 text-slate-400"}`}>
                               2. Confirmed
                             </div>
-                            <div className={`p-2 rounded-xl border ${["processing", "packing", "packed", "ready_for_delivery", "assigned", "handed_to_delivery", "out_for_delivery", "shipped", "delivered"].includes(ord.orderStatus) ? "bg-amber-500 text-amber-950 font-bold border-amber-600" : "bg-slate-100 text-slate-400"}`}>
-                              3. Processing / Packing
+                            <div className={`p-2 rounded-xl border ${["processing", "shipped", "out_for_delivery", "delivered"].includes(ord.orderStatus) ? "bg-amber-500 text-amber-950 font-bold border-amber-600" : "bg-slate-100 text-slate-400"}`}>
+                              3. Processing
                             </div>
-                            <div className={`p-2 rounded-xl border ${["ready_for_delivery", "assigned", "handed_to_delivery", "out_for_delivery", "shipped", "delivered"].includes(ord.orderStatus) ? "bg-amber-500 text-amber-950 font-bold border-amber-600" : "bg-slate-100 text-slate-400"}`}>
+                            <div className={`p-2 rounded-xl border ${["shipped", "out_for_delivery", "delivered"].includes(ord.orderStatus) ? "bg-amber-500 text-amber-950 font-bold border-amber-600" : "bg-slate-100 text-slate-400"}`}>
                               4. Out for Delivery
                             </div>
                             <div className={`p-2 rounded-xl border ${ord.orderStatus === "delivered" ? "bg-emerald-600 text-white font-bold border-emerald-700" : "bg-slate-100 text-slate-400"}`}>

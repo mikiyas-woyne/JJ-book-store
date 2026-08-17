@@ -151,7 +151,6 @@ export type OrderStatus =
   | 'pending'
   | 'confirmed'
   | 'processing'
-  | 'packing'
   | 'packed'
   | 'ready_for_delivery'
   | 'assigned'

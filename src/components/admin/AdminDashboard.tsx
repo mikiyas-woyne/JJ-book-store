@@ -38,7 +38,7 @@ import {
   AlertCircle
 } from "lucide-react";
 import { collection, getDocs, doc, setDoc, updateDoc, deleteDoc, addDoc, onSnapshot } from "firebase/firestore";
-import { db } from "../../lib/firebase";
+import { db, cleanFirestoreData } from "../../lib/firebase";
 import { Author, Book, Category, Coupon, Order, OrderStatus } from "../../types";
 import { seedBookstoreData } from "../../lib/seed";
 import { useToast } from "../ui/Toast";
@@ -173,13 +173,13 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     extraData?: Record<string, any>
   ) => {
     try {
-      await addDoc(collection(db, "activity_logs"), {
+      await addDoc(collection(db, "activity_logs"), cleanFirestoreData({
         title,
         description,
         category,
         timestamp: new Date().toISOString(),
         ...extraData
-      });
+      }));
     } catch (err) {
       console.warn("Could not log activity event:", err);
     }
@@ -324,13 +324,13 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
       };
 
       if (editingBook) {
-        await updateDoc(doc(db, "books", editingBook.id), bookData);
+        await updateDoc(doc(db, "books", editingBook.id), cleanFirestoreData(bookData));
         showToast("Book Updated", `Changes saved to "${bookTitle}".`, "success");
       } else {
-        await addDoc(collection(db, "books"), {
+        await addDoc(collection(db, "books"), cleanFirestoreData({
           ...bookData,
           createdAt: new Date().toISOString()
-        });
+        }));
         showToast("Book Added", `"${bookTitle}" added to catalog.`, "success");
       }
 
@@ -1513,15 +1513,15 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
               {/* Status Filter Buttons */}
               <div className="flex items-center gap-1.5 bg-slate-100 p-1 rounded-2xl shrink-0 overflow-x-auto text-xs">
-                {["all", "pending", "confirmed", "processing", "packing", "ready_for_delivery", "assigned", "shipped", "delivered", "cancelled"].map((st) => (
+                {["all", "pending", "confirmed", "processing", "shipped", "delivered", "cancelled"].map((st) => (
                   <button
                     key={st}
                     onClick={() => setSelectedOrderStatusFilter(st)}
-                    className={`px-3 py-1.5 rounded-xl font-bold uppercase text-[10px] whitespace-nowrap transition-all ${
+                    className={`px-3 py-1.5 rounded-xl font-bold uppercase text-[10px] transition-all ${
                       selectedOrderStatusFilter === st ? "bg-slate-900 text-white shadow-sm" : "text-slate-500 hover:text-slate-800"
                     }`}
                   >
-                    {st.replace(/_/g, " ")}
+                    {st}
                   </button>
                 ))}
               </div>
@@ -1590,11 +1590,8 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                             <option value="pending">Pending</option>
                             <option value="confirmed">Confirmed</option>
                             <option value="processing">Processing</option>
-                            <option value="packing">Packing</option>
-                            <option value="ready_for_delivery">Ready for Delivery</option>
-                            <option value="assigned">Assigned Driver</option>
-                            <option value="out_for_delivery">Out for Delivery</option>
                             <option value="shipped">Shipped</option>
+                            <option value="out_for_delivery">Out for Delivery</option>
                             <option value="delivered">Delivered</option>
                             <option value="cancelled">Cancelled</option>
                           </select>

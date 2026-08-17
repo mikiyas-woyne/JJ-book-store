@@ -6,9 +6,10 @@ import {
   query,
   orderBy,
   updateDoc,
+  setDoc,
   addDoc
 } from "firebase/firestore";
-import { db } from "../../lib/firebase";
+import { db, cleanFirestoreData } from "../../lib/firebase";
 import {
   Book,
   Order,
@@ -59,21 +60,6 @@ type TabType =
   | "customers"
   | "activity"
   | "profile";
-
-function cleanFirestoreData<T extends Record<string, any>>(obj: T): T {
-  const result: any = {};
-  for (const key of Object.keys(obj)) {
-    const val = obj[key];
-    if (val !== undefined) {
-      if (val && typeof val === "object" && !Array.isArray(val) && !(val instanceof Date)) {
-        result[key] = cleanFirestoreData(val);
-      } else {
-        result[key] = val;
-      }
-    }
-  }
-  return result;
-}
 
 export const EmployeePanel: React.FC<{
   books: Book[];
@@ -199,14 +185,14 @@ export const EmployeePanel: React.FC<{
   const logActivity = async (action: string, description: string, orderId?: string) => {
     try {
       const now = new Date().toISOString();
-      await addDoc(collection(db, "employeeActivityLogs"), {
+      await addDoc(collection(db, "employeeActivityLogs"), cleanFirestoreData({
         employeeId: currentEmployee?.uid || "staff-01",
         employeeName: currentEmployee?.fullName || "Staff",
         action,
         orderId: orderId || "",
         description,
         timestamp: now
-      });
+      }));
     } catch (err) {
       console.warn("Failed to record activity log:", err);
     }
@@ -223,49 +209,44 @@ export const EmployeePanel: React.FC<{
       const orderRef = doc(db, "orders", orderId);
       const existingOrder = orders.find((o) => o.id === orderId);
 
-      const empUid = currentEmployee?.uid || currentUser?.uid || "staff-001";
-      const empName = currentEmployee?.fullName || userProfile?.displayName || "JJ Staff";
-
       const statusHistory = existingOrder?.statusHistory || [];
       const updatedHistory = [
         ...statusHistory,
         {
           status: newStatus,
           timestamp: now,
-          note: note || `Order updated to ${newStatus}`,
-          employeeId: empUid,
-          employeeName: empName
+          note,
+          employeeId: currentEmployee?.uid,
+          employeeName: currentEmployee?.fullName
         }
       ];
 
-      const rawUpdateData: Record<string, any> = {
+      const updateData: any = {
         orderStatus: newStatus,
         updatedAt: now,
         statusHistory: updatedHistory,
-        lastActionByEmployeeId: empUid,
-        lastActionByEmployeeName: empName,
-        ...(metadata || {})
+        lastActionByEmployeeId: currentEmployee?.uid || "staff-01",
+        lastActionByEmployeeName: currentEmployee?.fullName || "Store Staff",
+        ...metadata
       };
 
-      const updateData = cleanFirestoreData(rawUpdateData);
+      await updateDoc(orderRef, cleanFirestoreData(updateData));
 
-      await updateDoc(orderRef, updateData);
-
-      // Increment employee performance counter in Firestore
-      if (currentEmployee?.id) {
+      // Safely increment employee performance counter in Firestore
+      if (currentEmployee?.id && employees.some((e) => e.id === currentEmployee.id)) {
         const empRef = doc(db, "employees", currentEmployee.id);
         if (newStatus === "delivered") {
-          await updateDoc(empRef, {
+          await setDoc(empRef, {
             deliveriesCompletedCount: (currentEmployee.deliveriesCompletedCount || 0) + 1
-          });
+          }, { merge: true });
         } else if (newStatus === "delivery_failed") {
-          await updateDoc(empRef, {
+          await setDoc(empRef, {
             failedDeliveriesCount: (currentEmployee.failedDeliveriesCount || 0) + 1
-          });
-        } else if (newStatus === "confirmed" || newStatus === "processing" || newStatus === "packing" || newStatus === "packed" || newStatus === "ready_for_delivery") {
-          await updateDoc(empRef, {
+          }, { merge: true });
+        } else if (newStatus === "confirmed" || newStatus === "processing" || newStatus === "packed") {
+          await setDoc(empRef, {
             ordersProcessedCount: (currentEmployee.ordersProcessedCount || 0) + 1
-          });
+          }, { merge: true });
         }
       }
 
@@ -288,14 +269,14 @@ export const EmployeePanel: React.FC<{
 
     try {
       const now = new Date().toISOString();
-      await addDoc(collection(db, "customerCommunications"), {
+      await addDoc(collection(db, "customerCommunications"), cleanFirestoreData({
         orderId: commOrderId,
-        employeeId: currentEmployee?.uid,
-        employeeName: currentEmployee?.fullName,
+        employeeId: currentEmployee?.uid || "staff-01",
+        employeeName: currentEmployee?.fullName || "Store Staff",
         note: customerCommNote.trim(),
         channel: "phone",
         timestamp: now
-      });
+      }));
 
       await logActivity("customer_communication", `Added call note for order ${commOrderId}: ${customerCommNote}`);
       setCustomerCommNote("");
@@ -315,7 +296,7 @@ export const EmployeePanel: React.FC<{
   const pendingOrders = orders.filter((o) => o.orderStatus === "pending");
   const confirmedOrders = orders.filter((o) => o.orderStatus === "confirmed");
   const processingOrders = orders.filter((o) => o.orderStatus === "processing");
-  const packingOrders = orders.filter((o) => o.orderStatus === "packing" || o.orderStatus === "packed");
+  const packedOrders = orders.filter((o) => o.orderStatus === "packed");
   const readyOrders = orders.filter((o) => o.orderStatus === "ready_for_delivery");
   const assignedOrders = orders.filter((o) => o.orderStatus === "assigned" || o.orderStatus === "handed_to_delivery" || o.orderStatus === "out_for_delivery");
   const deliveredOrders = orders.filter((o) => o.orderStatus === "delivered");
@@ -323,7 +304,7 @@ export const EmployeePanel: React.FC<{
   const lowStockBooks = books.filter((b) => b.stock <= 5);
 
   // Operational Statistics Calculations
-  const ordersAwaitingAction = pendingOrders.length + confirmedOrders.length + processingOrders.length + packingOrders.length + readyOrders.length;
+  const ordersAwaitingAction = pendingOrders.length + confirmedOrders.length + processingOrders.length + packedOrders.length + readyOrders.length;
   const totalVolumeProcessed = orders.filter((o) => o.orderStatus !== "pending" && o.orderStatus !== "cancelled").length;
   const totalPendingCODAmount = assignedOrders.reduce((sum, o) => sum + (o.grandTotal || 0), 0);
   const totalDeliveredRevenue = deliveredOrders.reduce((sum, o) => sum + (o.grandTotal || 0), 0);
@@ -362,7 +343,7 @@ export const EmployeePanel: React.FC<{
           id: "ready" as TabType,
           label: "Packaging & Labeling",
           icon: Box,
-          badge: packingOrders.length + readyOrders.length,
+          badge: packedOrders.length + readyOrders.length,
           permission: "pack_orders"
         }
       ]
@@ -686,7 +667,7 @@ export const EmployeePanel: React.FC<{
 
                 <div className="bg-slate-950 p-3.5 rounded-2xl border border-slate-800 space-y-1">
                   <span className="text-[10px] font-extrabold text-slate-400 uppercase">3. Packing</span>
-                  <div className="text-xl font-black text-indigo-400">{packingOrders.length + readyOrders.length}</div>
+                  <div className="text-xl font-black text-indigo-400">{packedOrders.length + readyOrders.length}</div>
                   <span className="text-[10px] text-indigo-300/70 block truncate">Boxes labeled</span>
                 </div>
 
@@ -721,8 +702,8 @@ export const EmployeePanel: React.FC<{
 
                   <div className="space-y-3">
                     {orders
-                      .filter((o) => ["pending", "confirmed", "processing", "packing", "packed", "ready_for_delivery"].includes(o.orderStatus))
-                      .slice(0, 8)
+                      .filter((o) => o.orderStatus === "pending" || o.orderStatus === "confirmed" || o.orderStatus === "ready_for_delivery")
+                      .slice(0, 6)
                       .map((ord) => (
                         <div
                           key={ord.id}
@@ -741,62 +722,22 @@ export const EmployeePanel: React.FC<{
                             </p>
                           </div>
 
-                          <div className="flex items-center flex-wrap gap-2 w-full sm:w-auto">
+                          <div className="flex items-center gap-2 w-full sm:w-auto">
                             {ord.orderStatus === "pending" && (
                               <button
                                 onClick={() => openWorkflow(ord, "verify")}
                                 className="w-full sm:w-auto px-4 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-extrabold text-xs shadow-md"
                               >
-                                Verify & Confirm
+                                Verify Order
                               </button>
                             )}
                             {ord.orderStatus === "confirmed" && (
-                              <>
-                                <button
-                                  onClick={() => handleUpdateOrderStatus(ord.id, "processing", "Order marked as Processing by staff")}
-                                  className="px-3 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-blue-300 text-xs font-bold border border-slate-700"
-                                >
-                                  Set Processing
-                                </button>
-                                <button
-                                  onClick={() => openWorkflow(ord, "prepare")}
-                                  className="px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-extrabold text-xs shadow-md"
-                                >
-                                  Pick Books
-                                </button>
-                              </>
-                            )}
-                            {ord.orderStatus === "processing" && (
-                              <>
-                                <button
-                                  onClick={() => handleUpdateOrderStatus(ord.id, "packing", "Book picking complete. Ready for packaging.")}
-                                  className="px-3 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-indigo-300 text-xs font-bold border border-slate-700"
-                                >
-                                  Move to Packing
-                                </button>
-                                <button
-                                  onClick={() => openWorkflow(ord, "prepare")}
-                                  className="px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-extrabold text-xs shadow-md"
-                                >
-                                  Pick Checklist
-                                </button>
-                              </>
-                            )}
-                            {(ord.orderStatus === "packing" || ord.orderStatus === "packed") && (
-                              <>
-                                <button
-                                  onClick={() => handleUpdateOrderStatus(ord.id, "ready_for_delivery", "Order packed and staged for delivery")}
-                                  className="px-3 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-emerald-300 text-xs font-bold border border-slate-700"
-                                >
-                                  Mark Ready
-                                </button>
-                                <button
-                                  onClick={() => openWorkflow(ord, "pack")}
-                                  className="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-extrabold text-xs shadow-md"
-                                >
-                                  Pack & Label
-                                </button>
-                              </>
+                              <button
+                                onClick={() => openWorkflow(ord, "prepare")}
+                                className="w-full sm:w-auto px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-extrabold text-xs shadow-md"
+                              >
+                                Pick Books
+                              </button>
                             )}
                             {ord.orderStatus === "ready_for_delivery" && (
                               <button
@@ -962,28 +903,13 @@ export const EmployeePanel: React.FC<{
                       </div>
                     </div>
 
-                    <div className="pt-2 border-t border-slate-800 flex items-center justify-between gap-2">
-                      {ord.orderStatus === "confirmed" && (
-                        <button
-                          onClick={() => handleUpdateOrderStatus(ord.id, "processing", "Order marked as Processing by staff")}
-                          className="px-3 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-blue-300 text-xs font-bold border border-slate-700"
-                        >
-                          Set Processing
-                        </button>
-                      )}
-                      {ord.orderStatus === "processing" && (
-                        <button
-                          onClick={() => handleUpdateOrderStatus(ord.id, "packing", "Book picking complete. Moved to packaging.")}
-                          className="px-3 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-indigo-300 text-xs font-bold border border-slate-700"
-                        >
-                          Move to Packing
-                        </button>
-                      )}
+                    <div className="pt-2 border-t border-slate-800 flex items-center justify-between">
+                      <span className="text-xs text-slate-400 font-medium">Shelf Pick Checklist</span>
                       <button
                         onClick={() => openWorkflow(ord, "prepare")}
-                        className="px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-extrabold text-xs shadow-md ml-auto"
+                        className="px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-extrabold text-xs shadow-md"
                       >
-                        Pick Checklist
+                        Start Picking Checklist
                       </button>
                     </div>
                   </div>
@@ -1008,15 +934,11 @@ export const EmployeePanel: React.FC<{
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {[...packingOrders, ...readyOrders].map((ord) => (
+                {[...packedOrders, ...readyOrders].map((ord) => (
                   <div key={ord.id} className="p-5 rounded-3xl bg-slate-900 border border-slate-800 space-y-4">
                     <div className="flex items-center justify-between">
                       <span className="font-mono font-bold text-amber-400 text-sm">{ord.orderId}</span>
-                      <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-extrabold border ${
-                        ord.orderStatus === "ready_for_delivery"
-                          ? "bg-emerald-500/20 text-emerald-300 border-emerald-500/30"
-                          : "bg-indigo-500/20 text-indigo-300 border-indigo-500/30"
-                      }`}>
+                      <span className="px-2.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 text-[10px] font-extrabold border border-emerald-500/30">
                         {ord.orderStatus.replace(/_/g, " ").toUpperCase()}
                       </span>
                     </div>
@@ -1024,35 +946,23 @@ export const EmployeePanel: React.FC<{
                     <p className="text-xs text-white font-bold">{ord.customerName} • {ord.shippingAddress.subcity || ord.shippingAddress.city}</p>
 
                     <div className="pt-2 border-t border-slate-800 flex items-center justify-between gap-2">
-                      {(ord.orderStatus === "packing" || ord.orderStatus === "packed") && (
-                        <>
-                          <button
-                            onClick={() => openWorkflow(ord, "pack")}
-                            className="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-extrabold text-xs shadow-md"
-                          >
-                            Pack Box & Label Barcode
-                          </button>
-                          <button
-                            onClick={() => handleUpdateOrderStatus(ord.id, "ready_for_delivery", "Box packed and labeled. Ready for driver dispatch.")}
-                            className="px-3 py-2 rounded-xl bg-emerald-600/20 hover:bg-emerald-500/30 text-emerald-300 border border-emerald-500/30 font-bold text-xs"
-                          >
-                            Mark Ready
-                          </button>
-                        </>
-                      )}
-                      {ord.orderStatus === "ready_for_delivery" && (
-                        <button
-                          onClick={() => openWorkflow(ord, "assign")}
-                          className="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-extrabold text-xs shadow-md ml-auto"
-                        >
-                          Assign Driver Dispatch
-                        </button>
-                      )}
+                      <button
+                        onClick={() => openWorkflow(ord, "pack")}
+                        className="px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold text-xs"
+                      >
+                        Package Barcode
+                      </button>
+                      <button
+                        onClick={() => openWorkflow(ord, "assign")}
+                        className="px-4 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-extrabold text-xs shadow-md"
+                      >
+                        Assign Driver
+                      </button>
                     </div>
                   </div>
                 ))}
 
-                {packingOrders.length === 0 && readyOrders.length === 0 && (
+                {packedOrders.length === 0 && readyOrders.length === 0 && (
                   <div className="col-span-full py-12 text-center text-slate-400 space-y-2">
                     <Box className="w-10 h-10 text-indigo-400 mx-auto" />
                     <p className="font-serif font-bold text-lg text-white">No orders currently waiting for packaging!</p>

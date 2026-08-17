@@ -70,22 +70,15 @@ function MainAppContent() {
   const [maxPrice, setMaxPrice] = useState<number>(1000);
 
   // Initial Load & Realtime Listeners
-  const loadStoreData = async () => {
+  const loadStoreData = () => {
     setLoadingData(true);
+    let unsubBooks = () => {};
+    let unsubAuthors = () => {};
+    let unsubCategories = () => {};
+
     try {
-      // Auto seed if empty or outdated
-      const booksSnap = await getDocs(collection(db, "books"));
-      const hasRealAmharicBooks = booksSnap.docs.some(
-        (docSnap) => docSnap.id === "book-yetoqolefebet-kulf" || docSnap.id === "book-fiqir-eske-mequabir"
-      );
-
-      if (booksSnap.empty || !hasRealAmharicBooks) {
-        console.log("Seeding Firestore with real Amharic books...");
-        await seedBookstoreData(true);
-      }
-
-      // Realtime Books Listener
-      const unsubBooks = onSnapshot(
+      // Realtime Books Listener (Works offline and online)
+      unsubBooks = onSnapshot(
         collection(db, "books"),
         (snap) => {
           if (!snap.empty) {
@@ -100,12 +93,16 @@ function MainAppContent() {
             });
             setBooks(list);
           }
+          setLoadingData(false);
         },
-        (err) => console.warn("Books snapshot error:", err)
+        (err) => {
+          console.warn("Books snapshot notice:", err.message);
+          setLoadingData(false);
+        }
       );
 
       // Fetch Authors
-      const unsubAuthors = onSnapshot(
+      unsubAuthors = onSnapshot(
         collection(db, "authors"),
         (snap) => {
           if (!snap.empty) {
@@ -114,11 +111,11 @@ function MainAppContent() {
             setAuthors(list);
           }
         },
-        (err) => console.warn("Authors snapshot error:", err)
+        (err) => console.warn("Authors snapshot notice:", err.message)
       );
 
       // Fetch Categories
-      const unsubCategories = onSnapshot(
+      unsubCategories = onSnapshot(
         collection(db, "categories"),
         (snap) => {
           if (!snap.empty) {
@@ -127,19 +124,39 @@ function MainAppContent() {
             setCategories(list);
           }
         },
-        (err) => console.warn("Categories snapshot error:", err)
+        (err) => console.warn("Categories snapshot notice:", err.message)
       );
 
-      return () => {
-        unsubBooks();
-        unsubAuthors();
-        unsubCategories();
-      };
+      // Auto seed if empty or outdated (asynchronous background check)
+      (async () => {
+        try {
+          const booksSnap = await getDocs(collection(db, "books"));
+          const hasRealAmharicBooks = booksSnap.docs.some(
+            (docSnap) => docSnap.id === "book-yetoqolefebet-kulf" || docSnap.id === "book-fiqir-eske-mequabir"
+          );
+          const hasOldSvgCovers = booksSnap.docs.some((docSnap) => {
+            const cover = docSnap.data().coverImage;
+            return typeof cover === "string" && cover.startsWith("data:image/svg");
+          });
+
+          if (booksSnap.empty || !hasRealAmharicBooks || hasOldSvgCovers) {
+            console.log("Seeding Firestore with real book photographic covers...");
+            await seedBookstoreData(true);
+          }
+        } catch (seedErr) {
+          console.warn("Firestore seed check notice:", seedErr);
+        }
+      })();
     } catch (err) {
-      console.error("Error loading store data:", err);
-    } finally {
+      console.warn("Firestore listener setup notice:", err);
       setLoadingData(false);
     }
+
+    return () => {
+      unsubBooks();
+      unsubAuthors();
+      unsubCategories();
+    };
   };
 
   useEffect(() => {

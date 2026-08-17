@@ -216,9 +216,9 @@ export const OrderWorkflowModal: React.FC<OrderWorkflowModalProps> = ({
           return;
         }
       }
-      const prepNote = note || `Books collected by ${currentEmployee?.fullName || "Staff"}. Moved to packaging.`;
-      // Transition status to 'packing' so order advances to Stage 3 (Packaging)
-      await onUpdateOrderStatus(order.id, "packing", prepNote, {
+      const prepNote = note || `Books collected by ${currentEmployee?.fullName || "Staff"}. Ready for packaging.`;
+      // Set status to "packed" so order advances from Stage 2 (Prepare) to Stage 3 (Packaging & Ready)
+      await onUpdateOrderStatus(order.id, "packed", prepNote, {
         itemsChecklist
       });
       onClose();
@@ -580,30 +580,6 @@ export const OrderWorkflowModal: React.FC<OrderWorkflowModalProps> = ({
           {/* Mode 2: Item Preparation / Collecting Checklist */}
           {mode === "prepare" && (
             <div className="space-y-6">
-              {order.orderStatus === "confirmed" && (
-                <div className="p-3 bg-blue-50 border border-blue-200 rounded-2xl flex items-center justify-between text-xs text-blue-950">
-                  <div>
-                    <strong className="font-extrabold text-blue-900 block">Status: Confirmed</strong>
-                    <span className="text-[11px] text-blue-800 font-medium">Click to set status to 'Processing' while picking books.</span>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={async () => {
-                      setLoading(true);
-                      try {
-                        await onUpdateOrderStatus(order.id, "processing", "Order marked as Processing by staff during picking", { itemsChecklist });
-                      } finally {
-                        setLoading(false);
-                      }
-                    }}
-                    disabled={loading}
-                    className="px-3.5 py-1.5 bg-blue-600 hover:bg-blue-500 text-white font-extrabold rounded-xl text-xs shrink-0 shadow-sm"
-                  >
-                    Mark as Processing
-                  </button>
-                </div>
-              )}
-
               <div className="flex items-center justify-between">
                 <span className="text-xs font-bold uppercase text-slate-500">
                   Book Picking Checklist ({itemsChecklist.filter((i) => i.collected).length}/{itemsChecklist.length})

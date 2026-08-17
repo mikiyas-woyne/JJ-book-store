@@ -135,169 +135,59 @@ export function generateBookCoverSvg(
 }
 
 export function getValidBookCover(book: Partial<Book>): string {
-  // Return custom non-generic image if available
+  // If book has a valid photographic URL and is not an SVG data URI or broken link, return it
   if (
     book.coverImage &&
     book.coverImage.length > 20 &&
-    !book.coverImage.includes("photo-1544947950") &&
-    !book.coverImage.includes("photo-1512820790") &&
-    !book.coverImage.includes("photo-1544716278") &&
-    !book.coverImage.includes("photo-1457369804")
+    !book.coverImage.startsWith("data:image/svg")
   ) {
     return book.coverImage;
   }
 
   const title = (book.title || "").trim();
   const titleLower = title.toLowerCase();
-  const author = (book.authorName || "Ethiopian Author").split("(")[0].trim();
-  const category = (book.categoryName || "Ethiopian Bookstore").toUpperCase();
+  const slug = (book.slug || "").toLowerCase();
+  const id = (book.id || "").toLowerCase();
 
-  if (titleLower.includes("fiqir") || titleLower.includes("ፍቅር")) {
-    return generateBookCoverSvg(
-      "ፍቅር እስከ መቃብር",
-      "Fiqir Eske Mequabir",
-      author || "ሀዲስ ዓለማየሁ",
-      "Amharic Literature",
-      ["#381002", "#1c0700"],
-      "#F59E0B",
-      "📜"
-    );
+  if (titleLower.includes("fiqir") || titleLower.includes("ፍቅር") || slug.includes("fiqir") || id.includes("fiqir")) {
+    return "https://images.unsplash.com/photo-1544947950-fa07a98d237f?auto=format&fit=crop&w=800&q=80";
   }
-  if (titleLower.includes("oromay") || titleLower.includes("ኦሮማይ")) {
-    return generateBookCoverSvg(
-      "ኦሮማይ",
-      "Oromay",
-      author || "በአሉ ግርማ",
-      "Amharic Literature",
-      ["#180808", "#3f0808"],
-      "#38BDF8",
-      "✒️"
-    );
+  if (titleLower.includes("oromay") || titleLower.includes("ኦሮማይ") || slug.includes("oromay") || id.includes("oromay")) {
+    return "https://images.unsplash.com/photo-1455390582262-044cdead277a?auto=format&fit=crop&w=800&q=80";
   }
-  if (titleLower.includes("yetoqolefebet") || titleLower.includes("ቁልፍ")) {
-    return generateBookCoverSvg(
-      "የተቆለፈበት ቁልፍ",
-      "Yetoqolefebet Kulf",
-      author || "ዶ/ር ምሕረት ደበበ",
-      "Personal Growth",
-      ["#1e1b4b", "#312e81"],
-      "#FBBF24",
-      "🔑"
-    );
+  if (titleLower.includes("yetoqolefebet") || titleLower.includes("ቁልፍ") || slug.includes("kulf") || id.includes("kulf")) {
+    return "https://images.unsplash.com/photo-1516962215378-7fa2e137ae93?auto=format&fit=crop&w=800&q=80";
   }
-  if (titleLower.includes("egre") || titleLower.includes("እግረ")) {
-    return generateBookCoverSvg(
-      "እግረ መንገድ",
-      "Egre Menged",
-      author || "ዶ/ር ምሕረት ደበበ",
-      "Personal Growth",
-      ["#064e3b", "#022c22"],
-      "#34D399",
-      "🧭"
-    );
+  if (titleLower.includes("egre") || titleLower.includes("እግረ") || slug.includes("egre") || id.includes("egre")) {
+    return "https://images.unsplash.com/photo-1506784983877-45594efa4cbe?auto=format&fit=crop&w=800&q=80";
   }
-  if (titleLower.includes("alweledim") || titleLower.includes("አልወለድም")) {
-    return generateBookCoverSvg(
-      "አልወለድም",
-      "Alweledim",
-      author || "ዓቤ ጉበኛ",
-      "Amharic Literature",
-      ["#881337", "#4c0519"],
-      "#FB7185",
-      "✊"
-    );
+  if (titleLower.includes("alweledim") || titleLower.includes("አልወለድም") || slug.includes("alweledim") || id.includes("alweledim")) {
+    return "https://images.unsplash.com/photo-1589829545856-d10d557cf95f?auto=format&fit=crop&w=800&q=80";
   }
-  if (titleLower.includes("bashager") || titleLower.includes("አድማስ")) {
-    return generateBookCoverSvg(
-      "ከአድማስ ባሻገር",
-      "Keadmas Bashager",
-      author || "በአሉ ግርማ",
-      "Amharic Literature",
-      ["#7c2d12", "#431407"],
-      "#F97316",
-      "🌅"
-    );
+  if (titleLower.includes("bashager") || titleLower.includes("አድማስ") || slug.includes("bashager") || id.includes("bashager")) {
+    return "https://images.unsplash.com/photo-1464822759023-fed622ff2c3b?auto=format&fit=crop&w=800&q=80";
   }
-  if (titleLower.includes("derasew") || titleLower.includes("ደራሲው")) {
-    return generateBookCoverSvg(
-      "ደራሲው",
-      "Derasew",
-      author || "በአሉ ግርማ",
-      "Amharic Literature",
-      ["#1e1b4b", "#0f172a"],
-      "#A78BFA",
-      "📖"
-    );
+  if (titleLower.includes("derasew") || titleLower.includes("ደራሲው") || slug.includes("derasew") || id.includes("derasew")) {
+    return "https://images.unsplash.com/photo-1457369804613-52c61a468e7d?auto=format&fit=crop&w=800&q=80";
   }
-  if (titleLower.includes("hiwete") || titleLower.includes("ሕይወቴና")) {
-    return generateBookCoverSvg(
-      "ሕይወቴና የኢትዮጵያ እርምጃ",
-      "Hiwete ena YeEthiopia Erimja",
-      author || "ቀዳማዊ ኃይለ ሥላሴ",
-      "Ethiopian History",
-      ["#14532d", "#052e16"],
-      "#FACC15",
-      "👑"
-    );
+  if (titleLower.includes("hiwete") || titleLower.includes("ሕይወቴና") || slug.includes("hiwete") || id.includes("hiwete")) {
+    return "https://images.unsplash.com/photo-1579783902614-a3fb3927b675?auto=format&fit=crop&w=800&q=80";
   }
-  if (titleLower.includes("yesat") || titleLower.includes("እሳት")) {
-    return generateBookCoverSvg(
-      "የእሳት ወይ አበባ",
-      "Yesat Wey Abeba",
-      author || "ሎሬት ፀጋዬ ገብረመድህን",
-      "Poetry & Anthology",
-      ["#701a75", "#4a044e"],
-      "#F472B6",
-      "🌹"
-    );
+  if (titleLower.includes("yesat") || titleLower.includes("እሳት") || slug.includes("yesat") || id.includes("yesat")) {
+    return "https://images.unsplash.com/photo-1518709268805-4e9042af9f23?auto=format&fit=crop&w=800&q=80";
   }
-  if (titleLower.includes("taytu") || titleLower.includes("ጣይቱ")) {
-    return generateBookCoverSvg(
-      "እቴጌ ጣይቱ - የዓድዋ ድል",
-      "Empress Taytu & Battle of Adwa",
-      author || "ፕሮፌሰር ላፕሶ ጌታሁን",
-      "Ethiopian History",
-      ["#7f1d1d", "#450a0a"],
-      "#FBBF24",
-      "🛡️"
-    );
+  if (titleLower.includes("taytu") || titleLower.includes("ጣይቱ") || slug.includes("taytu") || id.includes("taytu")) {
+    return "https://images.unsplash.com/photo-1599839575945-a9e5af0c3fa5?auto=format&fit=crop&w=800&q=80";
   }
-  if (titleLower.includes("mahlet") || titleLower.includes("ማህሌት")) {
-    return generateBookCoverSvg(
-      "ማህሌት",
-      "Mahlet",
-      author || "ብርሃኑ ዘሪሁን",
-      "Amharic Literature",
-      ["#0284c7", "#0c4a6e"],
-      "#7DD3FC",
-      "🎼"
-    );
+  if (titleLower.includes("mahlet") || titleLower.includes("ማህሌት") || slug.includes("mahlet") || id.includes("mahlet")) {
+    return "https://images.unsplash.com/photo-1507838153414-b4b713384a76?auto=format&fit=crop&w=800&q=80";
   }
-  if (titleLower.includes("lenes") || titleLower.includes("ለእኔስ")) {
-    return generateBookCoverSvg(
-      "ለእኔስ ማነህ",
-      "Lenes Maneh",
-      author || "አዳም ረጣ",
-      "Amharic Literature",
-      ["#111827", "#030712"],
-      "#E11D48",
-      "🎨"
-    );
+  if (titleLower.includes("lenes") || titleLower.includes("ለእኔስ") || slug.includes("lenes") || id.includes("lenes")) {
+    return "https://images.unsplash.com/photo-1541701494587-cb58502866ab?auto=format&fit=crop&w=800&q=80";
   }
 
-  const titleParts = title.split("(");
-  const amharicPart = titleParts[0]?.trim() || title;
-  const englishPart = titleParts[1]?.replace(")", "").trim() || amharicPart;
-
-  return generateBookCoverSvg(
-    amharicPart,
-    englishPart,
-    author || "JJ Bookstore Author",
-    category,
-    ["#1e293b", "#0f172a"],
-    "#F59E0B",
-    "📚"
-  );
+  // Fallback high quality book photography
+  return "https://images.unsplash.com/photo-1544716278-ca5e3f4abd8c?auto=format&fit=crop&w=800&q=80";
 }
 
 export const INITIAL_AUTHORS: Author[] = [
@@ -397,15 +287,7 @@ export const INITIAL_BOOKS: Book[] = [
     price: 450,
     discountPrice: 380,
     currency: "ETB",
-    coverImage: generateBookCoverSvg(
-      "ፍቅር እስከ መቃብር",
-      "Fiqir Eske Mequabir",
-      "ሀዲስ ዓለማየሁ",
-      "Amharic Literature",
-      ["#451a03", "#78350f"],
-      "#F59E0B",
-      "📜"
-    ),
+    coverImage: "https://images.unsplash.com/photo-1544947950-fa07a98d237f?auto=format&fit=crop&w=800&q=80",
     ISBN: "978-99944-0-012-3",
     publisher: "ሜጋ አታሚ ድርጅት (Mega Publishing)",
     publicationDate: "1968-04-12",
@@ -431,15 +313,7 @@ export const INITIAL_BOOKS: Book[] = [
     price: 420,
     discountPrice: 360,
     currency: "ETB",
-    coverImage: generateBookCoverSvg(
-      "ኦሮማይ",
-      "Oromay",
-      "በአሉ ግርማ",
-      "Amharic Literature",
-      ["#0f172a", "#1e293b"],
-      "#38BDF8",
-      "✒️"
-    ),
+    coverImage: "https://images.unsplash.com/photo-1455390582262-044cdead277a?auto=format&fit=crop&w=800&q=80",
     ISBN: "978-99944-1-045-8",
     publisher: "ኩራዝ አታሚ ድርጅት (Kuraz Publishing)",
     publicationDate: "1983-09-01",
@@ -465,15 +339,7 @@ export const INITIAL_BOOKS: Book[] = [
     price: 480,
     discountPrice: 420,
     currency: "ETB",
-    coverImage: generateBookCoverSvg(
-      "የተቆለፈበት ቁልፍ",
-      "Yetoqolefebet Kulf",
-      "ዶ/ር ምሕረት ደበበ",
-      "Personal Growth",
-      ["#1e1b4b", "#312e81"],
-      "#818CF8",
-      "🔑"
-    ),
+    coverImage: "https://images.unsplash.com/photo-1516962215378-7fa2e137ae93?auto=format&fit=crop&w=800&q=80",
     ISBN: "978-99944-3-112-0",
     publisher: "አዲስ ህይወት ማህተም",
     publicationDate: "2013-05-15",
@@ -499,15 +365,7 @@ export const INITIAL_BOOKS: Book[] = [
     price: 460,
     discountPrice: 390,
     currency: "ETB",
-    coverImage: generateBookCoverSvg(
-      "እግረ መንገድ",
-      "Egre Menged",
-      "ዶ/ር ምሕረት ደበበ",
-      "Personal Growth",
-      ["#064e3b", "#047857"],
-      "#34D399",
-      "🧭"
-    ),
+    coverImage: "https://images.unsplash.com/photo-1506784983877-45594efa4cbe?auto=format&fit=crop&w=800&q=80",
     ISBN: "978-99944-3-220-2",
     publisher: "አዲስ ህይወት ማህተም",
     publicationDate: "2018-11-10",
@@ -533,15 +391,7 @@ export const INITIAL_BOOKS: Book[] = [
     price: 390,
     discountPrice: 330,
     currency: "ETB",
-    coverImage: generateBookCoverSvg(
-      "አልወለድም",
-      "Alweledim",
-      "ዓቤ ጉበኛ",
-      "Amharic Literature",
-      ["#881337", "#9f1239"],
-      "#FB7185",
-      "✊"
-    ),
+    coverImage: "https://images.unsplash.com/photo-1589829545856-d10d557cf95f?auto=format&fit=crop&w=800&q=80",
     ISBN: "978-99944-0-334-1",
     publisher: "ብርሃንና ሰላም ማተሚያ ድርጅት",
     publicationDate: "1963-02-20",
@@ -567,15 +417,7 @@ export const INITIAL_BOOKS: Book[] = [
     price: 400,
     discountPrice: 340,
     currency: "ETB",
-    coverImage: generateBookCoverSvg(
-      "ከአድማስ ባሻገር",
-      "Keadmas Bashager",
-      "በአሉ ግርማ",
-      "Amharic Literature",
-      ["#7c2d12", "#9a3412"],
-      "#F97316",
-      "🌅"
-    ),
+    coverImage: "https://images.unsplash.com/photo-1464822759023-fed622ff2c3b?auto=format&fit=crop&w=800&q=80",
     ISBN: "978-99944-1-088-3",
     publisher: "ኩራዝ አታሚ ድርጅት",
     publicationDate: "1970-08-14",
@@ -601,15 +443,7 @@ export const INITIAL_BOOKS: Book[] = [
     price: 410,
     discountPrice: 350,
     currency: "ETB",
-    coverImage: generateBookCoverSvg(
-      "ደራሲው",
-      "Derasew",
-      "በአሉ ግርማ",
-      "Amharic Literature",
-      ["#312e81", "#4338ca"],
-      "#A78BFA",
-      "📖"
-    ),
+    coverImage: "https://images.unsplash.com/photo-1457369804613-52c61a468e7d?auto=format&fit=crop&w=800&q=80",
     ISBN: "978-99944-1-011-2",
     publisher: "ኩራዝ አታሚ ድርጅት",
     publicationDate: "1980-03-10",
@@ -635,15 +469,7 @@ export const INITIAL_BOOKS: Book[] = [
     price: 620,
     discountPrice: 540,
     currency: "ETB",
-    coverImage: generateBookCoverSvg(
-      "ሕይወቴና የኢትዮጵያ እርምጃ",
-      "Hiwete ena YeEthiopia Erimja",
-      "ቀዳማዊ ኃይለ ሥላሴ",
-      "Ethiopian History",
-      ["#14532d", "#15803d"],
-      "#FACC15",
-      "👑"
-    ),
+    coverImage: "https://images.unsplash.com/photo-1579783902614-a3fb3927b675?auto=format&fit=crop&w=800&q=80",
     ISBN: "978-99944-5-001-9",
     publisher: "የብርሃንና ሰላም ማተሚያ ድርጅት",
     publicationDate: "1973-11-02",
@@ -669,15 +495,7 @@ export const INITIAL_BOOKS: Book[] = [
     price: 350,
     discountPrice: 290,
     currency: "ETB",
-    coverImage: generateBookCoverSvg(
-      "የእሳት ወይ አበባ",
-      "Yesat Wey Abeba",
-      "ሎሬት ፀጋዬ ገብረመድህን",
-      "Poetry & Anthology",
-      ["#701a75", "#86198f"],
-      "#F472B6",
-      "🌹"
-    ),
+    coverImage: "https://images.unsplash.com/photo-1518709268805-4e9042af9f23?auto=format&fit=crop&w=800&q=80",
     ISBN: "978-99944-2-005-4",
     publisher: "አዲስ አበባ ዩኒቨርሲቲ ፕረስ",
     publicationDate: "1974-06-01",
@@ -703,15 +521,7 @@ export const INITIAL_BOOKS: Book[] = [
     price: 550,
     discountPrice: 480,
     currency: "ETB",
-    coverImage: generateBookCoverSvg(
-      "እቴጌ ጣይቱ",
-      "Empress Taytu Betul",
-      "ፕሮፌሰር ላፕሶ ጌታሁን",
-      "Ethiopian History",
-      ["#7f1d1d", "#991b1b"],
-      "#FBBF24",
-      "🛡️"
-    ),
+    coverImage: "https://images.unsplash.com/photo-1599839575945-a9e5af0c3fa5?auto=format&fit=crop&w=800&q=80",
     ISBN: "978-99944-8-120-7",
     publisher: "ሜጋ አታሚ ድርጅት",
     publicationDate: "2004-03-01",
@@ -737,15 +547,7 @@ export const INITIAL_BOOKS: Book[] = [
     price: 380,
     discountPrice: 320,
     currency: "ETB",
-    coverImage: generateBookCoverSvg(
-      "ማህሌት",
-      "Mahlet",
-      "ብርሃኑ ዘሪሁን",
-      "Amharic Literature",
-      ["#0284c7", "#0369a1"],
-      "#7DD3FC",
-      "🎼"
-    ),
+    coverImage: "https://images.unsplash.com/photo-1507838153414-b4b713384a76?auto=format&fit=crop&w=800&q=80",
     ISBN: "978-99944-4-019-3",
     publisher: "ኩራዝ አታሚ ድርጅት",
     publicationDate: "1982-10-15",
@@ -771,15 +573,7 @@ export const INITIAL_BOOKS: Book[] = [
     price: 490,
     discountPrice: 430,
     currency: "ETB",
-    coverImage: generateBookCoverSvg(
-      "ለእኔስ ማነህ",
-      "Lenes Maneh",
-      "አዳም ረጣ",
-      "Amharic Literature",
-      ["#111827", "#1f2937"],
-      "#E11D48",
-      "🎨"
-    ),
+    coverImage: "https://images.unsplash.com/photo-1541701494587-cb58502866ab?auto=format&fit=crop&w=800&q=80",
     ISBN: "978-99944-7-002-1",
     publisher: "ጃፍ አታሚ ድርጅት",
     publicationDate: "2020-01-20",
@@ -840,7 +634,7 @@ export const INITIAL_STORE_SETTINGS: StoreSettings = {
   logo: "https://images.unsplash.com/photo-1497633762265-9d179a990aa6?w=200&auto=format&fit=crop&q=80",
   email: "support@jjbookshopping.com",
   phone: "+251 938 014 055",
-  address: "Bole Medhaniallem, Edna Mall Building, 3rd Floor, Addis Ababa, Ethiopia",
+  address: "Bole Medhaniallem, JJ Bookstore Building, Addis Ababa, Ethiopia",
   currency: "ETB",
   shippingFee: 150,
   minFreeShipping: 1500,

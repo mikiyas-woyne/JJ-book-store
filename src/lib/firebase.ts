@@ -1,6 +1,6 @@
 import { initializeApp, getApps, getApp } from "firebase/app";
 import { getAuth, GoogleAuthProvider } from "firebase/auth";
-import { getFirestore, initializeFirestore, doc, getDocFromServer } from "firebase/firestore";
+import { getFirestore, initializeFirestore } from "firebase/firestore";
 import { getStorage } from "firebase/storage";
 import firebaseConfigData from "../../firebase-applet-config.json";
 
@@ -33,20 +33,27 @@ try {
 }
 export const db = firestoreDb;
 
-// Test connection gracefully
-async function testConnection() {
-  try {
-    await getDocFromServer(doc(db, 'test', 'connection'));
-  } catch (error) {
-    if (error instanceof Error && (error.message.includes('offline') || error.message.includes('unavailable'))) {
-      console.warn("Firestore connected in resilient offline cache mode.");
-    }
-  }
-}
-testConnection();
-
 // Firebase Storage
 export const storage = getStorage(app);
+
+/**
+ * Strips all undefined fields recursively from an object before saving to Firestore.
+ * This prevents Firestore "Unsupported field value: undefined" errors.
+ */
+export function cleanFirestoreData<T extends Record<string, any>>(obj: T): Partial<T> {
+  if (!obj || typeof obj !== "object") return obj;
+  const result: any = Array.isArray(obj) ? [] : {};
+  for (const [key, value] of Object.entries(obj)) {
+    if (value !== undefined) {
+      if (value !== null && typeof value === "object" && !(value instanceof Date)) {
+        result[key] = cleanFirestoreData(value);
+      } else {
+        result[key] = value;
+      }
+    }
+  }
+  return result;
+}
 
 export enum OperationType {
   CREATE = 'create',

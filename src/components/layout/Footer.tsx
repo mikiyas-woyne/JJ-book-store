@@ -116,7 +116,7 @@ export const Footer: React.FC<{ onNavigate: (page: string) => void }> = ({ onNav
             <ul className="space-y-3 text-sm">
               <li className="flex items-start gap-2.5">
                 <MapPin className="w-4 h-4 text-amber-400 shrink-0 mt-1" />
-                <span>Bole Medhaniallem, Edna Mall Bldg, 3rd Floor, Addis Ababa, Ethiopia</span>
+                <span>Bole Medhaniallem, JJ Bookstore Building, Addis Ababa, Ethiopia</span>
               </li>
               <li className="flex items-center gap-2.5">
                 <Phone className="w-4 h-4 text-amber-400 shrink-0" />

@@ -1,5 +1,5 @@
 import { doc, collection, addDoc } from "firebase/firestore";
-import { db } from "./firebase";
+import { db, cleanFirestoreData } from "./firebase";
 import { Order, EmailNotificationLog } from "../types";
 
 /**
@@ -266,10 +266,10 @@ export async function sendCustomerOrderEmail(
 
   try {
     // Save to emailNotifications collection in Firestore
-    const docRef = await addDoc(collection(db, "emailNotifications"), logPayload);
+    const docRef = await addDoc(collection(db, "emailNotifications"), cleanFirestoreData(logPayload));
 
     // Also add a store notification record for customer in-app updates
-    await addDoc(collection(db, "notifications"), {
+    await addDoc(collection(db, "notifications"), cleanFirestoreData({
       userId: order.customerId || "guest",
       title: type === "approved" ? "Order Verified & Confirmed" : "Order Payment Declined",
       message: type === "approved"
@@ -278,7 +278,7 @@ export async function sendCustomerOrderEmail(
       type: "order",
       read: false,
       createdAt: now
-    });
+    }));
 
     return {
       id: docRef.id,
