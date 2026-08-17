@@ -45,7 +45,8 @@ import {
   Layers,
   ArrowUpRight,
   Sparkles,
-  Phone
+  Phone,
+  Home
 } from "lucide-react";
 import { OrderWorkflowModal } from "./OrderWorkflowModal";
 import { BarcodeScannerModal } from "./BarcodeScannerModal";
@@ -64,7 +65,8 @@ type TabType =
 export const EmployeePanel: React.FC<{
   books: Book[];
   onRefreshData: () => void;
-}> = ({ books, onRefreshData }) => {
+  onNavigateHome?: () => void;
+}> = ({ books, onRefreshData, onNavigateHome }) => {
   const { currentUser, userProfile, hasPermission } = useAuth();
   const { showToast } = useToast();
 
@@ -440,6 +442,17 @@ export const EmployeePanel: React.FC<{
 
         {/* Right Header Action Controls */}
         <div className="flex items-center gap-2">
+          {onNavigateHome && (
+            <button
+              onClick={onNavigateHome}
+              className="px-3.5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-extrabold text-xs flex items-center gap-1.5 shadow-md shadow-emerald-950/40 border border-emerald-500 transition-all active:scale-95 cursor-pointer"
+              title="Finished operations - Return to bookstore store homepage"
+            >
+              <Home className="w-4 h-4" />
+              <span>Done (Go to Home)</span>
+            </button>
+          )}
+
           <button
             onClick={() => setIsScannerOpen(true)}
             className="px-3 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-extrabold text-xs flex items-center gap-1.5 shadow-md transition-all active:scale-95"
@@ -643,6 +656,16 @@ export const EmployeePanel: React.FC<{
                 <span className="font-bold text-emerald-400">{currentEmployee.ordersProcessedCount || 0}</span>
               </div>
             </div>
+
+            {onNavigateHome && (
+              <button
+                onClick={onNavigateHome}
+                className="w-full px-3.5 py-2.5 rounded-xl bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-300 hover:text-emerald-200 border border-emerald-500/30 font-bold text-xs flex items-center justify-center gap-2 transition-all cursor-pointer"
+              >
+                <Home className="w-4 h-4" />
+                <span>Done • Back to Home</span>
+              </button>
+            )}
           </div>
         </aside>
 
@@ -1171,6 +1194,7 @@ export const EmployeePanel: React.FC<{
         onUpdateOrderStatus={handleUpdateOrderStatus}
         employees={employees}
         currentEmployee={currentEmployee}
+        onNavigateHome={onNavigateHome}
       />
 
       {/* Barcode Scanner Modal */}

@@ -44,6 +44,7 @@ interface OrderWorkflowModalProps {
   ) => Promise<void>;
   employees: Employee[];
   currentEmployee: Employee | null;
+  onNavigateHome?: () => void;
 }
 
 export const OrderWorkflowModal: React.FC<OrderWorkflowModalProps> = ({
@@ -52,7 +53,8 @@ export const OrderWorkflowModal: React.FC<OrderWorkflowModalProps> = ({
   onClose,
   onUpdateOrderStatus,
   employees,
-  currentEmployee
+  currentEmployee,
+  onNavigateHome
 }) => {
   const [loading, setLoading] = useState(false);
   const [note, setNote] = useState("");
@@ -414,10 +416,20 @@ export const OrderWorkflowModal: React.FC<OrderWorkflowModalProps> = ({
                   <span>Resend Email</span>
                 </button>
                 <button
-                  onClick={onClose}
-                  className="px-6 py-2.5 rounded-xl bg-amber-950 text-amber-50 font-extrabold text-xs shadow-md hover:bg-amber-900"
+                  onClick={() => {
+                    onClose();
+                    if (onNavigateHome) onNavigateHome();
+                  }}
+                  className="px-5 py-2.5 rounded-xl bg-emerald-700 hover:bg-emerald-600 text-white font-extrabold text-xs shadow-md flex items-center gap-1.5 transition-all"
                 >
-                  Done & Close Workflow
+                  <Check className="w-4 h-4" />
+                  <span>Done (Go to Home)</span>
+                </button>
+                <button
+                  onClick={onClose}
+                  className="px-5 py-2.5 rounded-xl bg-slate-900 text-slate-100 font-extrabold text-xs shadow-md hover:bg-slate-800"
+                >
+                  Close & Stay in Panel
                 </button>
               </div>
             </div>

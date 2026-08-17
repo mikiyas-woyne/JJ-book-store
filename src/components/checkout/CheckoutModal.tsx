@@ -760,9 +760,9 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
                           : "border-rose-400 bg-rose-50/30 focus:border-rose-500"
                       }`}
                     />
-                    <p className="text-[11px] text-slate-500 mt-1 flex items-center gap-1">
-                      <AlertCircle className="w-3.5 h-3.5 text-amber-600 shrink-0" />
-                      <span>Please copy & paste the confirmation code from your {paymentMethod === "telebirr" ? "Telebirr" : paymentMethod === "cbe_birr" ? "CBE" : "Abyssinia"} SMS message.</span>
+                    <p className="text-[11px] text-amber-800 font-medium mt-1 flex items-center gap-1.5 bg-amber-50/80 px-2.5 py-1.5 rounded-lg border border-amber-200/70">
+                      <AlertCircle className="w-3.5 h-3.5 text-amber-700 shrink-0" />
+                      <span>Copy and paste the transaction number after you pay</span>
                     </p>
                   </div>
                 </div>

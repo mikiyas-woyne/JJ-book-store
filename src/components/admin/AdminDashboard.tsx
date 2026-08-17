@@ -37,7 +37,7 @@ import {
   Activity,
   AlertCircle
 } from "lucide-react";
-import { collection, getDocs, doc, setDoc, updateDoc, deleteDoc, addDoc, onSnapshot } from "firebase/firestore";
+import { collection, getDocs, doc, setDoc, updateDoc, deleteDoc, addDoc, onSnapshot, writeBatch } from "firebase/firestore";
 import { db, cleanFirestoreData } from "../../lib/firebase";
 import { Author, Book, Category, Coupon, Order, OrderStatus } from "../../types";
 import { seedBookstoreData } from "../../lib/seed";
@@ -477,6 +477,87 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
       showToast("Status Updated", `Order updated to ${newStatus}.`, "success");
     } catch (err) {
       showToast("Update Failed", "Could not update order status.", "error");
+    }
+  };
+
+  const [resettingOrders, setResettingOrders] = useState(false);
+
+  const handleResetAllOrders = async () => {
+    const confirmation = window.confirm(
+      "Are you sure you want to RESET all orders from the database?\n\nThis will purge all past and test orders so employees and admin start receiving orders from 0. This cannot be undone."
+    );
+    if (!confirmation) return;
+
+    setResettingOrders(true);
+    try {
+      // 1. Delete all docs in orders collection
+      const orderDocs = await getDocs(collection(db, "orders"));
+      const batches = [];
+      let currentBatch = writeBatch(db);
+      let count = 0;
+
+      for (const d of orderDocs.docs) {
+        currentBatch.delete(d.ref);
+        count++;
+        if (count % 400 === 0) {
+          batches.push(currentBatch.commit());
+          currentBatch = writeBatch(db);
+        }
+      }
+      if (count % 400 !== 0) {
+        batches.push(currentBatch.commit());
+      }
+      await Promise.all(batches);
+
+      // 2. Clear delivery collections
+      const deliveryCols = ["deliveryAssignments", "deliveryHandoffs", "deliveryEvents"];
+      for (const col of deliveryCols) {
+        try {
+          const snap = await getDocs(collection(db, col));
+          for (const d of snap.docs) {
+            await deleteDoc(d.ref);
+          }
+        } catch (e) {
+          console.warn(`Clean ${col} notice:`, e);
+        }
+      }
+
+      // 3. Clear order activity logs
+      try {
+        const actSnap = await getDocs(collection(db, "activity_logs"));
+        for (const d of actSnap.docs) {
+          const actData = d.data();
+          if (actData.category === "orders" || actData.type?.includes("order") || actData.title?.includes("Order")) {
+            await deleteDoc(d.ref);
+          }
+        }
+      } catch (e) {
+        console.warn("Clean activity logs notice:", e);
+      }
+
+      // 4. Clean employee activity logs
+      try {
+        const empLogsSnap = await getDocs(collection(db, "employeeActivityLogs"));
+        for (const d of empLogsSnap.docs) {
+          const data = d.data();
+          if (data.orderId || data.action?.toLowerCase().includes("order")) {
+            await deleteDoc(d.ref);
+          }
+        }
+      } catch (e) {
+        console.warn("Clean employeeActivityLogs notice:", e);
+      }
+
+      // 5. Log system reset
+      await logActivityEvent("Orders Reset to Zero", "Admin purged order queue. Orders now start from 0.", "system");
+
+      setOrders([]);
+      showToast("Orders Reset", "Orders database successfully cleared. Queue starts from 0.", "success");
+    } catch (err: any) {
+      console.error("Reset orders error:", err);
+      showToast("Reset Failed", err.message || "Failed to reset orders.", "error");
+    } finally {
+      setResettingOrders(false);
     }
   };
 
@@ -1499,6 +1580,42 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
       {activeTab === "orders" && (
         <div className="space-y-6">
           <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm space-y-4">
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 border-b border-slate-100 pb-4">
+              <div>
+                <div className="flex items-center gap-2">
+                  <h3 className="font-serif font-bold text-slate-900 text-lg">Customer Orders Queue</h3>
+                  <span className="px-2.5 py-0.5 rounded-full text-[11px] font-extrabold bg-amber-100 text-amber-900">
+                    {orders.length} Total Orders
+                  </span>
+                </div>
+                <p className="text-xs text-slate-500 mt-0.5">
+                  Real-time synchronization with bookstore order fulfillment and delivery
+                </p>
+              </div>
+
+              <div className="flex items-center gap-2 w-full sm:w-auto">
+                <button
+                  onClick={fetchOrders}
+                  disabled={loadingOrders}
+                  className="px-3.5 py-2 rounded-xl border border-slate-200 hover:bg-slate-50 text-slate-700 font-bold text-xs flex items-center gap-1.5 transition-all"
+                  title="Refresh orders from database"
+                >
+                  <RefreshCw className={`w-3.5 h-3.5 ${loadingOrders ? "animate-spin text-amber-600" : ""}`} />
+                  <span>Refresh</span>
+                </button>
+
+                <button
+                  onClick={handleResetAllOrders}
+                  disabled={resettingOrders || orders.length === 0}
+                  className="px-4 py-2 rounded-xl bg-rose-50 hover:bg-rose-100 border border-rose-200 text-rose-700 hover:text-rose-800 font-bold text-xs flex items-center gap-1.5 shadow-xs transition-all disabled:opacity-40 disabled:cursor-not-allowed"
+                  title="Purge all orders from database to restart from 0"
+                >
+                  <Trash2 className="w-3.5 h-3.5" />
+                  <span>{resettingOrders ? "Clearing Orders..." : "Reset Orders to 0"}</span>
+                </button>
+              </div>
+            </div>
+
             <div className="flex flex-col md:flex-row items-stretch md:items-center justify-between gap-4">
               <div className="relative flex-1">
                 <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-3.5" />

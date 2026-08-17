@@ -589,6 +589,7 @@ function MainAppContent() {
           <EmployeePanel
             books={books}
             onRefreshData={loadStoreData}
+            onNavigateHome={() => handleNavigate("home")}
           />
         )}
       </main>
