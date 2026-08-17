@@ -60,6 +60,21 @@ type TabType =
   | "activity"
   | "profile";
 
+function cleanFirestoreData<T extends Record<string, any>>(obj: T): T {
+  const result: any = {};
+  for (const key of Object.keys(obj)) {
+    const val = obj[key];
+    if (val !== undefined) {
+      if (val && typeof val === "object" && !Array.isArray(val) && !(val instanceof Date)) {
+        result[key] = cleanFirestoreData(val);
+      } else {
+        result[key] = val;
+      }
+    }
+  }
+  return result;
+}
+
 export const EmployeePanel: React.FC<{
   books: Book[];
   onRefreshData: () => void;
@@ -208,26 +223,31 @@ export const EmployeePanel: React.FC<{
       const orderRef = doc(db, "orders", orderId);
       const existingOrder = orders.find((o) => o.id === orderId);
 
+      const empUid = currentEmployee?.uid || currentUser?.uid || "staff-001";
+      const empName = currentEmployee?.fullName || userProfile?.displayName || "JJ Staff";
+
       const statusHistory = existingOrder?.statusHistory || [];
       const updatedHistory = [
         ...statusHistory,
         {
           status: newStatus,
           timestamp: now,
-          note,
-          employeeId: currentEmployee?.uid,
-          employeeName: currentEmployee?.fullName
+          note: note || `Order updated to ${newStatus}`,
+          employeeId: empUid,
+          employeeName: empName
         }
       ];
 
-      const updateData: any = {
+      const rawUpdateData: Record<string, any> = {
         orderStatus: newStatus,
         updatedAt: now,
         statusHistory: updatedHistory,
-        lastActionByEmployeeId: currentEmployee?.uid,
-        lastActionByEmployeeName: currentEmployee?.fullName,
-        ...metadata
+        lastActionByEmployeeId: empUid,
+        lastActionByEmployeeName: empName,
+        ...(metadata || {})
       };
+
+      const updateData = cleanFirestoreData(rawUpdateData);
 
       await updateDoc(orderRef, updateData);
 
@@ -701,8 +721,8 @@ export const EmployeePanel: React.FC<{
 
                   <div className="space-y-3">
                     {orders
-                      .filter((o) => o.orderStatus === "pending" || o.orderStatus === "confirmed" || o.orderStatus === "ready_for_delivery")
-                      .slice(0, 6)
+                      .filter((o) => ["pending", "confirmed", "processing", "packing", "packed", "ready_for_delivery"].includes(o.orderStatus))
+                      .slice(0, 8)
                       .map((ord) => (
                         <div
                           key={ord.id}
@@ -721,22 +741,62 @@ export const EmployeePanel: React.FC<{
                             </p>
                           </div>
 
-                          <div className="flex items-center gap-2 w-full sm:w-auto">
+                          <div className="flex items-center flex-wrap gap-2 w-full sm:w-auto">
                             {ord.orderStatus === "pending" && (
                               <button
                                 onClick={() => openWorkflow(ord, "verify")}
                                 className="w-full sm:w-auto px-4 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-extrabold text-xs shadow-md"
                               >
-                                Verify Order
+                                Verify & Confirm
                               </button>
                             )}
                             {ord.orderStatus === "confirmed" && (
-                              <button
-                                onClick={() => openWorkflow(ord, "prepare")}
-                                className="w-full sm:w-auto px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-extrabold text-xs shadow-md"
-                              >
-                                Pick Books
-                              </button>
+                              <>
+                                <button
+                                  onClick={() => handleUpdateOrderStatus(ord.id, "processing", "Order marked as Processing by staff")}
+                                  className="px-3 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-blue-300 text-xs font-bold border border-slate-700"
+                                >
+                                  Set Processing
+                                </button>
+                                <button
+                                  onClick={() => openWorkflow(ord, "prepare")}
+                                  className="px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-extrabold text-xs shadow-md"
+                                >
+                                  Pick Books
+                                </button>
+                              </>
+                            )}
+                            {ord.orderStatus === "processing" && (
+                              <>
+                                <button
+                                  onClick={() => handleUpdateOrderStatus(ord.id, "packing", "Book picking complete. Ready for packaging.")}
+                                  className="px-3 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-indigo-300 text-xs font-bold border border-slate-700"
+                                >
+                                  Move to Packing
+                                </button>
+                                <button
+                                  onClick={() => openWorkflow(ord, "prepare")}
+                                  className="px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-extrabold text-xs shadow-md"
+                                >
+                                  Pick Checklist
+                                </button>
+                              </>
+                            )}
+                            {(ord.orderStatus === "packing" || ord.orderStatus === "packed") && (
+                              <>
+                                <button
+                                  onClick={() => handleUpdateOrderStatus(ord.id, "ready_for_delivery", "Order packed and staged for delivery")}
+                                  className="px-3 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-emerald-300 text-xs font-bold border border-slate-700"
+                                >
+                                  Mark Ready
+                                </button>
+                                <button
+                                  onClick={() => openWorkflow(ord, "pack")}
+                                  className="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-extrabold text-xs shadow-md"
+                                >
+                                  Pack & Label
+                                </button>
+                              </>
                             )}
                             {ord.orderStatus === "ready_for_delivery" && (
                               <button
@@ -902,13 +962,28 @@ export const EmployeePanel: React.FC<{
                       </div>
                     </div>
 
-                    <div className="pt-2 border-t border-slate-800 flex items-center justify-between">
-                      <span className="text-xs text-slate-400 font-medium">Shelf Pick Checklist</span>
+                    <div className="pt-2 border-t border-slate-800 flex items-center justify-between gap-2">
+                      {ord.orderStatus === "confirmed" && (
+                        <button
+                          onClick={() => handleUpdateOrderStatus(ord.id, "processing", "Order marked as Processing by staff")}
+                          className="px-3 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-blue-300 text-xs font-bold border border-slate-700"
+                        >
+                          Set Processing
+                        </button>
+                      )}
+                      {ord.orderStatus === "processing" && (
+                        <button
+                          onClick={() => handleUpdateOrderStatus(ord.id, "packing", "Book picking complete. Moved to packaging.")}
+                          className="px-3 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-indigo-300 text-xs font-bold border border-slate-700"
+                        >
+                          Move to Packing
+                        </button>
+                      )}
                       <button
                         onClick={() => openWorkflow(ord, "prepare")}
-                        className="px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-extrabold text-xs shadow-md"
+                        className="px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-extrabold text-xs shadow-md ml-auto"
                       >
-                        Start Picking Checklist
+                        Pick Checklist
                       </button>
                     </div>
                   </div>

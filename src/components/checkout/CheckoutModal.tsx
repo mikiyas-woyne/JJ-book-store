@@ -46,6 +46,23 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
   const receiptRef = useRef<HTMLDivElement>(null);
   const [capturingScreenshot, setCapturingScreenshot] = useState(false);
 
+  // Form State
+  const [customerName, setCustomerName] = useState(userProfile?.fullName || "");
+  const [customerEmail, setCustomerEmail] = useState(currentUser?.email || "");
+  const [customerPhone, setCustomerPhone] = useState(userProfile?.phone || "+251 9");
+
+  // Address
+  const [region, setRegion] = useState<EthiopianRegion>("Addis Ababa");
+  const [city, setCity] = useState("Addis Ababa");
+  const [subcity, setSubcity] = useState("Bole");
+  const [houseNumber, setHouseNumber] = useState("");
+  const [streetAddress, setStreetAddress] = useState("");
+  const [deliveryNotes, setDeliveryNotes] = useState("");
+
+  // Payment & Delivery
+  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>("telebirr");
+  const [paymentReference, setPaymentReference] = useState("");
+
   if (!isOpen) return null;
 
   const handleDownloadScreenshot = async () => {
@@ -71,23 +88,6 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
       setCapturingScreenshot(false);
     }
   };
-
-  // Form State
-  const [customerName, setCustomerName] = useState(userProfile?.fullName || "");
-  const [customerEmail, setCustomerEmail] = useState(currentUser?.email || "");
-  const [customerPhone, setCustomerPhone] = useState(userProfile?.phone || "+251 9");
-
-  // Address
-  const [region, setRegion] = useState<EthiopianRegion>("Addis Ababa");
-  const [city, setCity] = useState("Addis Ababa");
-  const [subcity, setSubcity] = useState("Bole");
-  const [houseNumber, setHouseNumber] = useState("");
-  const [streetAddress, setStreetAddress] = useState("");
-  const [deliveryNotes, setDeliveryNotes] = useState("");
-
-  // Payment & Delivery
-  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>("telebirr");
-  const [paymentReference, setPaymentReference] = useState("");
 
   const handleNextStep = () => {
     if (step === 1) {
