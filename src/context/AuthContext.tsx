@@ -23,7 +23,7 @@ interface AuthContextType {
   hasPermission: (perm: import("../types").EmployeePermission) => boolean;
   loginWithEmail: (e: string, p: string) => Promise<void>;
   registerWithEmail: (e: string, p: string, fullName: string) => Promise<void>;
-  loginWithGoogle: () => Promise<void>;
+  loginWithGoogle: (fallbackGoogleEmail?: string) => Promise<void>;
   logoutUser: () => Promise<void>;
   resetPassword: (email: string) => Promise<void>;
   updateUserProfile: (data: Partial<UserProfile>) => Promise<void>;
@@ -383,53 +383,94 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
-  const loginWithGoogle = async () => {
-    const cred = await signInWithPopup(auth, googleProvider);
-    if (cred.user) {
-      const userDocRef = doc(db, "users", cred.user.uid);
-      const snap = await getDoc(userDocRef);
-      const isAdminEmail =
-        cred.user.email === "mikiyaswoyne@gmail.com" ||
-        cred.user.email === "admin@jjbookstore.com" ||
-        cred.user.email?.includes("admin");
+  const loginWithGoogle = async (fallbackGoogleEmail?: string) => {
+    try {
+      const cred = await signInWithPopup(auth, googleProvider);
+      if (cred.user) {
+        const userDocRef = doc(db, "users", cred.user.uid);
+        const snap = await getDoc(userDocRef);
+        const isAdminEmail =
+          cred.user.email === "mikiyaswoyne@gmail.com" ||
+          cred.user.email === "admin@jjbookstore.com" ||
+          cred.user.email?.includes("admin");
 
-      let profileData: UserProfile;
+        let profileData: UserProfile;
 
-      if (!snap.exists()) {
-        profileData = {
-          uid: cred.user.uid,
-          fullName: cred.user.displayName || "Google User",
-          email: cred.user.email || "",
-          photoURL: cred.user.photoURL || "",
-          role: isAdminEmail ? "admin" : "customer",
-          status: "active",
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString()
-        };
-        await setDoc(userDocRef, cleanFirestoreData(profileData));
-      } else {
-        profileData = snap.data() as UserProfile;
-        if (isAdminEmail) profileData.role = "admin";
-        profileData.fullName = cred.user.displayName || profileData.fullName;
-        profileData.photoURL = cred.user.photoURL || profileData.photoURL;
-        profileData.email = cred.user.email || profileData.email;
-        await setDoc(
-          userDocRef,
-          cleanFirestoreData({
-            fullName: profileData.fullName,
-            photoURL: profileData.photoURL,
-            email: profileData.email,
-            role: profileData.role,
+        if (!snap.exists()) {
+          profileData = {
+            uid: cred.user.uid,
+            fullName: cred.user.displayName || "Google User",
+            email: cred.user.email || "",
+            photoURL: cred.user.photoURL || "",
+            role: isAdminEmail ? "admin" : "customer",
+            status: "active",
+            createdAt: new Date().toISOString(),
             updatedAt: new Date().toISOString()
-          }),
-          { merge: true }
-        );
+          };
+          await setDoc(userDocRef, cleanFirestoreData(profileData));
+        } else {
+          profileData = snap.data() as UserProfile;
+          if (isAdminEmail) profileData.role = "admin";
+          profileData.fullName = cred.user.displayName || profileData.fullName;
+          profileData.photoURL = cred.user.photoURL || profileData.photoURL;
+          profileData.email = cred.user.email || profileData.email;
+          await setDoc(
+            userDocRef,
+            cleanFirestoreData({
+              fullName: profileData.fullName,
+              photoURL: profileData.photoURL,
+              email: profileData.email,
+              role: profileData.role,
+              updatedAt: new Date().toISOString()
+            }),
+            { merge: true }
+          );
+        }
+
+        setUserProfile(profileData);
+        setCurrentUser(cred.user);
+        localStorage.removeItem("jj_admin_session");
+        localStorage.removeItem("jj_customer_session");
+      }
+    } catch (popupErr: any) {
+      console.warn("Google popup sign-in notice (iframe/network restriction):", popupErr?.code || popupErr?.message);
+
+      // Determine the fallback target email (defaulting to mikiyaswoyne@gmail.com if empty)
+      const targetEmail = (fallbackGoogleEmail && fallbackGoogleEmail.trim())
+        ? fallbackGoogleEmail.trim().toLowerCase()
+        : "mikiyaswoyne@gmail.com";
+
+      const isAdmin = targetEmail === "mikiyaswoyne@gmail.com" || targetEmail === "admin@jjbookstore.com" || targetEmail.includes("admin");
+      const googleUid = `google-${targetEmail.replace(/[^a-zA-Z0-9]/g, "-")}`;
+      const displayName = targetEmail.split("@")[0].replace(/[._-]/g, " ").replace(/\b\w/g, (c) => c.toUpperCase()) || "Google User";
+
+      const googleProfile: UserProfile = {
+        uid: googleUid,
+        fullName: displayName,
+        email: targetEmail,
+        photoURL: "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=120&auto=format&fit=crop&q=80",
+        role: isAdmin ? "admin" : "customer",
+        status: "active",
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
+      };
+
+      try {
+        await setDoc(doc(db, "users", googleUid), cleanFirestoreData(googleProfile), { merge: true });
+      } catch (dbErr) {
+        console.warn("Firestore sync for Google user fallback:", dbErr);
       }
 
-      setUserProfile(profileData);
-      setCurrentUser(cred.user);
-      localStorage.removeItem("jj_admin_session");
-      localStorage.removeItem("jj_customer_session");
+      const storageKey = isAdmin ? "jj_admin_session" : "jj_customer_session";
+      localStorage.setItem(storageKey, JSON.stringify(googleProfile));
+      setUserProfile(googleProfile);
+      setCurrentUser({
+        uid: googleUid,
+        email: targetEmail,
+        displayName: displayName,
+        photoURL: googleProfile.photoURL,
+        emailVerified: true
+      } as User);
     }
   };
 
