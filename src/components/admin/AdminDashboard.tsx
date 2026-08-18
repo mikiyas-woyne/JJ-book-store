@@ -42,7 +42,7 @@ import { collection, getDocs, doc, setDoc, updateDoc, deleteDoc, addDoc, onSnaps
 import { db, cleanFirestoreData } from "../../lib/firebase";
 import { Author, Book, Category, Coupon, Order, OrderStatus } from "../../types";
 import { seedBookstoreData } from "../../lib/seed";
-import { sendTestEmail } from "../../lib/emailService";
+import { sendTestEmail, getSmtpConfig, saveSmtpConfig } from "../../lib/emailService";
 import { useToast } from "../ui/Toast";
 import { useAuth } from "../../context/AuthContext";
 import { getValidBookCover } from "../../lib/sampleData";
@@ -81,7 +81,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     "overview" | "books" | "orders" | "authors" | "categories" | "coupons" | "employees" | "email" | "security"
   >("overview");
 
-  // Test Email State
+  // Test Email & SMTP Configuration State
   const [testTargetEmail, setTestTargetEmail] = useState("mikiyaswoyne@gmail.com");
   const [testingEmail, setTestingEmail] = useState(false);
   const [testResult, setTestResult] = useState<{
@@ -90,6 +90,135 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     hint?: string;
     details?: any;
   } | null>(null);
+
+  // SMTP Config Form State
+  const [smtpPreset, setSmtpPreset] = useState<"gmail" | "sendgrid" | "brevo" | "mailgun" | "outlook" | "yahoo" | "custom">("gmail");
+  const [smtpHost, setSmtpHost] = useState("smtp.gmail.com");
+  const [smtpPort, setSmtpPort] = useState(587);
+  const [smtpUser, setSmtpUser] = useState("");
+  const [smtpPass, setSmtpPass] = useState("");
+  const [smtpSecure, setSmtpSecure] = useState(false);
+  const [adminReceiverEmail, setAdminReceiverEmail] = useState("mikiyaswoyne@gmail.com");
+  const [isSmtpConfigured, setIsSmtpConfigured] = useState(false);
+  const [hasPassSaved, setHasPassSaved] = useState(false);
+  const [savingSmtp, setSavingSmtp] = useState(false);
+  const [loadingSmtpConfig, setLoadingSmtpConfig] = useState(false);
+
+  // Load existing SMTP config from backend
+  const fetchSmtpConfig = async () => {
+    setLoadingSmtpConfig(true);
+    try {
+      const config = await getSmtpConfig();
+      if (config.success) {
+        if (config.host) setSmtpHost(config.host);
+        if (config.port) setSmtpPort(config.port);
+        if (config.user) setSmtpUser(config.user);
+        if (config.adminEmail) {
+          setAdminReceiverEmail(config.adminEmail);
+          setTestTargetEmail(config.adminEmail);
+        }
+        setSmtpSecure(config.secure);
+        setIsSmtpConfigured(config.configured);
+        setHasPassSaved(config.hasPass);
+
+        // Detect preset from host
+        const h = (config.host || "").toLowerCase();
+        if (h.includes("gmail")) setSmtpPreset("gmail");
+        else if (h.includes("sendgrid")) setSmtpPreset("sendgrid");
+        else if (h.includes("brevo") || h.includes("sendinblue")) setSmtpPreset("brevo");
+        else if (h.includes("mailgun")) setSmtpPreset("mailgun");
+        else if (h.includes("office365") || h.includes("outlook")) setSmtpPreset("outlook");
+        else if (h.includes("yahoo")) setSmtpPreset("yahoo");
+        else if (h) setSmtpPreset("custom");
+      }
+    } catch (err) {
+      console.warn("Failed to load SMTP config:", err);
+    } finally {
+      setLoadingSmtpConfig(false);
+    }
+  };
+
+  useEffect(() => {
+    if (activeTab === "email") {
+      fetchSmtpConfig();
+    }
+  }, [activeTab]);
+
+  const handleApplyPreset = (preset: "gmail" | "sendgrid" | "brevo" | "mailgun" | "outlook" | "yahoo" | "custom") => {
+    setSmtpPreset(preset);
+    switch (preset) {
+      case "gmail":
+        setSmtpHost("smtp.gmail.com");
+        setSmtpPort(587);
+        setSmtpSecure(false);
+        break;
+      case "sendgrid":
+        setSmtpHost("smtp.sendgrid.net");
+        setSmtpPort(587);
+        setSmtpSecure(false);
+        setSmtpUser("apikey");
+        break;
+      case "brevo":
+        setSmtpHost("smtp-relay.brevo.com");
+        setSmtpPort(587);
+        setSmtpSecure(false);
+        break;
+      case "mailgun":
+        setSmtpHost("smtp.mailgun.org");
+        setSmtpPort(587);
+        setSmtpSecure(false);
+        break;
+      case "outlook":
+        setSmtpHost("smtp.office365.com");
+        setSmtpPort(587);
+        setSmtpSecure(false);
+        break;
+      case "yahoo":
+        setSmtpHost("smtp.mail.yahoo.com");
+        setSmtpPort(465);
+        setSmtpSecure(true);
+        break;
+      case "custom":
+        break;
+    }
+  };
+
+  const handleSaveSmtpSettings = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!smtpHost.trim()) {
+      showToast("Host Required", "Please specify an SMTP host server address.", "error");
+      return;
+    }
+    if (!smtpUser.trim()) {
+      showToast("User Required", "Please specify an SMTP username or sender email address.", "error");
+      return;
+    }
+
+    setSavingSmtp(true);
+    try {
+      const res = await saveSmtpConfig({
+        host: smtpHost.trim(),
+        port: Number(smtpPort) || 587,
+        user: smtpUser.trim(),
+        pass: smtpPass.trim() || undefined,
+        secure: smtpSecure,
+        adminEmail: adminReceiverEmail.trim()
+      });
+
+      if (res.success) {
+        setIsSmtpConfigured(res.configured);
+        if (smtpPass.trim()) setHasPassSaved(true);
+        setSmtpPass("");
+        showToast("SMTP Configured!", res.message, "success");
+      } else {
+        showToast("Configuration Error", res.message, "error");
+      }
+    } catch (err: any) {
+      showToast("Save Failed", err?.message || "Failed to save SMTP settings.", "error");
+    } finally {
+      setSavingSmtp(false);
+    }
+  };
 
   const handleRunEmailTest = async () => {
     if (!testTargetEmail.trim() || !testTargetEmail.includes("@")) {
@@ -103,9 +232,9 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
       const res = await sendTestEmail(testTargetEmail.trim());
       setTestResult(res);
       if (res.success) {
-        showToast("Test Email Sent", res.message, "success");
+        showToast("Test Email Sent!", res.message, "success");
       } else {
-        showToast("Email Sending Issue", res.message || "Failed to send test email.", "error");
+        showToast("Email Test Alert", res.message || "Failed to send test email.", "error");
       }
     } catch (err: any) {
       const errRes = {
@@ -2078,48 +2207,209 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
       {/* TAB: EMAIL SERVICE & DIAGNOSTICS */}
       {activeTab === "email" && (
-        <div className="max-w-3xl bg-white p-6 sm:p-8 rounded-3xl border border-slate-200 shadow-sm space-y-6">
-          <div className="flex items-center gap-3 border-b border-slate-100 pb-4">
-            <div className="p-3 bg-amber-100 text-amber-900 rounded-2xl">
-              <Mail className="w-6 h-6" />
+        <div className="max-w-4xl bg-white p-6 sm:p-8 rounded-3xl border border-slate-200 shadow-sm space-y-8">
+          <div className="flex items-center justify-between border-b border-slate-100 pb-4">
+            <div className="flex items-center gap-3">
+              <div className="p-3 bg-amber-100 text-amber-900 rounded-2xl">
+                <Mail className="w-6 h-6" />
+              </div>
+              <div>
+                <h3 className="font-serif font-bold text-slate-900 text-xl">Email Service & SMTP Configuration</h3>
+                <p className="text-xs text-slate-500">Configure mail server credentials and test live inbox notification delivery</p>
+              </div>
             </div>
-            <div>
-              <h3 className="font-serif font-bold text-slate-900 text-xl">Email Service & SMTP Diagnostics</h3>
-              <p className="text-xs text-slate-500">Test backend SMTP email delivery and verify server configuration</p>
-            </div>
+
+            <span
+              className={`px-3 py-1 rounded-full text-xs font-black uppercase tracking-wider border flex items-center gap-1.5 ${
+                isSmtpConfigured
+                  ? "bg-emerald-50 text-emerald-800 border-emerald-200"
+                  : "bg-amber-50 text-amber-800 border-amber-200"
+              }`}
+            >
+              <span className={`w-2 h-2 rounded-full ${isSmtpConfigured ? "bg-emerald-500 animate-pulse" : "bg-amber-500"}`} />
+              {isSmtpConfigured ? "SMTP Configured" : "Needs Credentials"}
+            </span>
           </div>
 
-          {/* Overview Card */}
+          {/* Quick Overview Card */}
           <div className="bg-slate-900 text-white p-5 rounded-2xl border border-slate-800 space-y-3">
             <div className="flex items-center justify-between">
               <h4 className="text-xs font-bold uppercase tracking-wider text-amber-400 flex items-center gap-2">
-                <Zap className="w-4 h-4" /> Nodemailer Express SMTP Service
+                <Zap className="w-4 h-4" /> Nodemailer Express SMTP Integration
               </h4>
               <span className="px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-wider bg-slate-800 text-slate-300 border border-slate-700">
-                Backend API
+                Backend API Active
               </span>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs pt-1">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs pt-1">
               <div className="bg-slate-950 p-3 rounded-xl border border-slate-800">
-                <span className="text-[10px] uppercase text-slate-400 font-bold block">Service Transport</span>
-                <span className="font-bold text-slate-200">Nodemailer (Express Backend)</span>
+                <span className="text-[10px] uppercase text-slate-400 font-bold block">Active Host</span>
+                <span className="font-bold text-slate-200 truncate block">{smtpHost || "Unconfigured"}</span>
               </div>
               <div className="bg-slate-950 p-3 rounded-xl border border-slate-800">
-                <span className="text-[10px] uppercase text-slate-400 font-bold block">Default Recipient</span>
-                <span className="font-bold text-amber-300">mikiyaswoyne@gmail.com</span>
+                <span className="text-[10px] uppercase text-slate-400 font-bold block">Active Sender User</span>
+                <span className="font-bold text-amber-300 truncate block">{smtpUser || "Not set"}</span>
+              </div>
+              <div className="bg-slate-950 p-3 rounded-xl border border-slate-800">
+                <span className="text-[10px] uppercase text-slate-400 font-bold block">Admin Recipient</span>
+                <span className="font-bold text-slate-200 truncate block">{adminReceiverEmail || "mikiyaswoyne@gmail.com"}</span>
               </div>
             </div>
           </div>
 
-          {/* Interactive Test Email Tool */}
-          <div className="border border-slate-200 rounded-2xl p-5 bg-slate-50 space-y-4">
+          {/* Provider Presets & Configuration Form */}
+          <form onSubmit={handleSaveSmtpSettings} className="border border-slate-200 rounded-2xl p-6 bg-slate-50 space-y-6">
             <div>
-              <h4 className="font-bold text-slate-900 text-sm flex items-center gap-2">
-                <Sparkles className="w-4 h-4 text-amber-600" /> Test Email Delivery
+              <h4 className="font-bold text-slate-900 text-base flex items-center gap-2">
+                <Shield className="w-5 h-5 text-amber-600" /> Configure Mail Provider
+              </h4>
+              <p className="text-xs text-slate-500 mt-1">
+                Choose an email provider preset or specify your custom SMTP credentials below.
+              </p>
+            </div>
+
+            {/* Provider Preset Buttons */}
+            <div>
+              <label className="block text-xs font-bold text-slate-700 mb-2 uppercase tracking-wider">Select Mail Provider Preset</label>
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                {[
+                  { id: "gmail", label: "Google Gmail", icon: "📧" },
+                  { id: "sendgrid", label: "SendGrid", icon: "⚡" },
+                  { id: "brevo", label: "Brevo (Sendinblue)", icon: "🚀" },
+                  { id: "mailgun", label: "Mailgun", icon: "🎯" },
+                  { id: "outlook", label: "Microsoft Outlook", icon: "💼" },
+                  { id: "yahoo", label: "Yahoo Mail", icon: "💌" },
+                  { id: "custom", label: "Custom SMTP", icon: "⚙️" }
+                ].map((item) => (
+                  <button
+                    key={item.id}
+                    type="button"
+                    onClick={() => handleApplyPreset(item.id as any)}
+                    className={`px-3 py-2.5 rounded-xl border text-xs font-bold transition-all flex items-center gap-2 ${
+                      smtpPreset === item.id
+                        ? "bg-amber-500 text-slate-950 border-amber-600 shadow-sm"
+                        : "bg-white text-slate-700 border-slate-200 hover:bg-slate-100"
+                    }`}
+                  >
+                    <span>{item.icon}</span>
+                    <span className="truncate">{item.label}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Form Fields */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1">SMTP Host Server *</label>
+                <input
+                  type="text"
+                  value={smtpHost}
+                  onChange={(e) => {
+                    setSmtpHost(e.target.value);
+                    setSmtpPreset("custom");
+                  }}
+                  placeholder="e.g. smtp.gmail.com"
+                  className="w-full px-4 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:border-amber-500 text-xs font-bold text-slate-900 bg-white"
+                  required
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1">SMTP Port *</label>
+                <input
+                  type="number"
+                  value={smtpPort}
+                  onChange={(e) => setSmtpPort(Number(e.target.value))}
+                  placeholder="587 or 465"
+                  className="w-full px-4 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:border-amber-500 text-xs font-bold text-slate-900 bg-white"
+                  required
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1">Sender Email / Username *</label>
+                <input
+                  type="text"
+                  value={smtpUser}
+                  onChange={(e) => setSmtpUser(e.target.value)}
+                  placeholder="e.g. mikiyaswoyne@gmail.com or apikey"
+                  className="w-full px-4 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:border-amber-500 text-xs font-bold text-slate-900 bg-white"
+                  required
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1">
+                  App Password / API Key {hasPassSaved ? "(Key Saved)" : "*"}
+                </label>
+                <input
+                  type="password"
+                  value={smtpPass}
+                  onChange={(e) => setSmtpPass(e.target.value)}
+                  placeholder={hasPassSaved ? "•••••••••••• (Leave blank to keep current)" : "Google App Password or API Key"}
+                  className="w-full px-4 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:border-amber-500 text-xs font-bold text-slate-900 bg-white"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1">Admin Notification Recipient Email</label>
+                <input
+                  type="email"
+                  value={adminReceiverEmail}
+                  onChange={(e) => setAdminReceiverEmail(e.target.value)}
+                  placeholder="e.g. mikiyaswoyne@gmail.com"
+                  className="w-full px-4 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:border-amber-500 text-xs font-bold text-slate-900 bg-white"
+                />
+              </div>
+
+              <div className="flex items-center pt-5">
+                <label className="flex items-center gap-2 cursor-pointer text-xs font-bold text-slate-700">
+                  <input
+                    type="checkbox"
+                    checked={smtpSecure}
+                    onChange={(e) => setSmtpSecure(e.target.checked)}
+                    className="w-4 h-4 rounded text-amber-600 focus:ring-amber-500 border-slate-300"
+                  />
+                  <span>Use SSL Security (Port 465)</span>
+                </label>
+              </div>
+            </div>
+
+            {/* Google Gmail Quick Setup Guide Box */}
+            {smtpPreset === "gmail" && (
+              <div className="bg-amber-50/70 border border-amber-200 rounded-xl p-4 text-xs text-amber-950 space-y-1.5">
+                <div className="font-bold flex items-center gap-1.5 text-amber-900">
+                  <span>💡</span> How to configure Gmail with App Password:
+                </div>
+                <ol className="list-decimal list-inside space-y-1 text-[11px] text-amber-900/90 font-medium">
+                  <li>Enable <strong>2-Step Verification</strong> on your Google Account (<a href="https://myaccount.google.com/security" target="_blank" rel="noreferrer" className="underline font-bold text-amber-800">myaccount.google.com/security</a>).</li>
+                  <li>Search for <strong>"App passwords"</strong> in your Google Account search bar.</li>
+                  <li>Create a new App Password named <strong>"JJ Bookstore"</strong> and copy the 16-character code.</li>
+                  <li>Paste the code into the <strong>App Password</strong> field above and click Save SMTP Settings!</li>
+                </ol>
+              </div>
+            )}
+
+            <button
+              type="submit"
+              disabled={savingSmtp}
+              className="px-6 py-3 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs shadow-md transition-all flex items-center gap-2 disabled:opacity-50"
+            >
+              <RefreshCw className={`w-4 h-4 ${savingSmtp ? "animate-spin" : ""}`} />
+              <span>{savingSmtp ? "Saving Configuration..." : "Save SMTP Settings"}</span>
+            </button>
+          </form>
+
+          {/* Interactive Test Email Tool */}
+          <div className="border border-slate-200 rounded-2xl p-6 bg-slate-50 space-y-4">
+            <div>
+              <h4 className="font-bold text-slate-900 text-base flex items-center gap-2">
+                <Sparkles className="w-5 h-5 text-amber-600" /> Verify Live Email Delivery
               </h4>
               <p className="text-xs text-slate-500 mt-0.5">
-                Send a test email through the server's Nodemailer SMTP endpoint to verify live inbox delivery.
+                Send a test email through the configured server endpoint to verify live inbox delivery.
               </p>
             </div>
 

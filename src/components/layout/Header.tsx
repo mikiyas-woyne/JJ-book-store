@@ -164,12 +164,21 @@ export const Header: React.FC<HeaderProps> = ({
           <div className="relative">
             <button
               onClick={() => setUserDropdownOpen(!userDropdownOpen)}
-              className="p-2.5 rounded-xl bg-amber-900/60 hover:bg-amber-800/80 text-amber-100 transition-colors flex items-center gap-2 border border-amber-800/40"
+              className="p-2 sm:px-3 sm:py-2 rounded-xl bg-amber-900/60 hover:bg-amber-800/80 text-amber-100 transition-colors flex items-center gap-2 border border-amber-800/40"
             >
-              <UserIcon className="w-5 h-5 text-amber-300" />
+              {userProfile?.photoURL || currentUser?.photoURL ? (
+                <img
+                  src={userProfile?.photoURL || currentUser?.photoURL || ""}
+                  alt={userProfile?.fullName || "Google User Profile"}
+                  className="w-6 h-6 rounded-full object-cover border border-amber-400/60 shrink-0"
+                  referrerPolicy="no-referrer"
+                />
+              ) : (
+                <UserIcon className="w-5 h-5 text-amber-300" />
+              )}
               {currentUser && (
                 <span className="hidden sm:inline text-xs font-semibold max-w-[100px] truncate">
-                  {userProfile?.fullName || currentUser.email?.split("@")[0]}
+                  {userProfile?.fullName || currentUser.displayName || currentUser.email?.split("@")[0]}
                 </span>
               )}
             </button>
@@ -179,11 +188,21 @@ export const Header: React.FC<HeaderProps> = ({
               <div className="absolute right-0 mt-2 w-64 bg-amber-950 border border-amber-800/80 rounded-2xl shadow-2xl py-2 z-50 text-amber-100 text-sm animate-in fade-in slide-in-from-top-2">
                 {currentUser ? (
                   <>
-                    <div className="px-4 py-3 border-b border-amber-900/60">
-                      <p className="font-bold text-white truncate">{userProfile?.fullName || "User Account"}</p>
-                      <p className="text-xs text-amber-300/80 truncate">{currentUser.email}</p>
-                      <div className="mt-2 inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-amber-900 text-amber-300 text-[10px] font-semibold uppercase tracking-wider">
-                        Role: {userProfile?.role || "customer"}
+                    <div className="px-4 py-3 border-b border-amber-900/60 flex items-center gap-3">
+                      {userProfile?.photoURL || currentUser?.photoURL ? (
+                        <img
+                          src={userProfile?.photoURL || currentUser?.photoURL || ""}
+                          alt="Google Profile"
+                          className="w-10 h-10 rounded-full object-cover border-2 border-amber-400 shrink-0 shadow-md"
+                          referrerPolicy="no-referrer"
+                        />
+                      ) : null}
+                      <div className="min-w-0 flex-1">
+                        <p className="font-bold text-white truncate">{userProfile?.fullName || currentUser.displayName || "User Account"}</p>
+                        <p className="text-xs text-amber-300/80 truncate">{currentUser.email}</p>
+                        <div className="mt-1 inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-amber-900 text-amber-300 text-[10px] font-semibold uppercase tracking-wider">
+                          Role: {userProfile?.role || "customer"}
+                        </div>
                       </div>
                     </div>
 

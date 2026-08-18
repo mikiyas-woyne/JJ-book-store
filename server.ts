@@ -18,19 +18,32 @@ async function startServer() {
     res.json({ status: "ok", service: "JJ Book Shopping API", timestamp: new Date().toISOString() });
   });
 
+  // Server runtime SMTP configuration memory (defaults to environment variables)
+  let runtimeSmtpConfig = {
+    host: process.env.SMTP_HOST || "",
+    port: Number(process.env.SMTP_PORT) || 587,
+    user: process.env.SMTP_USER || "",
+    pass: process.env.SMTP_PASS || "",
+    secure: process.env.SMTP_SECURE === "true",
+    adminEmail: process.env.ADMIN_EMAIL || "mikiyaswoyne@gmail.com"
+  };
+
   // Helper to retrieve configured SMTP transporter or unconfigured status
   function getSmtpTransporter() {
-    const smtpHost = process.env.SMTP_HOST ? process.env.SMTP_HOST.trim().replace(/^smpt\./i, "smtp.") : "";
-    const smtpUser = process.env.SMTP_USER ? process.env.SMTP_USER.trim() : "";
-    const smtpPass = process.env.SMTP_PASS ? process.env.SMTP_PASS.trim() : "";
-    const smtpPort = Number(process.env.SMTP_PORT) || 587;
-    const smtpSecure = process.env.SMTP_SECURE === "true" || smtpPort === 465;
+    const smtpHost = (runtimeSmtpConfig.host || process.env.SMTP_HOST || "").trim().replace(/^smpt\./i, "smtp.");
+    const smtpUser = (runtimeSmtpConfig.user || process.env.SMTP_USER || "").trim();
+    const smtpPass = (runtimeSmtpConfig.pass || process.env.SMTP_PASS || "").trim();
+    const smtpPort = Number(runtimeSmtpConfig.port || process.env.SMTP_PORT) || 587;
+    const smtpSecure = runtimeSmtpConfig.secure || process.env.SMTP_SECURE === "true" || smtpPort === 465;
 
     if (smtpHost && smtpUser && smtpPass) {
       return {
         configured: true,
         host: smtpHost,
         user: smtpUser,
+        port: smtpPort,
+        secure: smtpSecure,
+        adminEmail: runtimeSmtpConfig.adminEmail || process.env.ADMIN_EMAIL || "mikiyaswoyne@gmail.com",
         transporter: nodemailer.createTransport({
           host: smtpHost,
           port: smtpPort,
@@ -50,6 +63,9 @@ async function startServer() {
       configured: false,
       host: smtpHost || "Unconfigured",
       user: smtpUser || "Unconfigured",
+      port: smtpPort,
+      secure: smtpSecure,
+      adminEmail: runtimeSmtpConfig.adminEmail || process.env.ADMIN_EMAIL || "mikiyaswoyne@gmail.com",
       transporter: null
     };
   }
@@ -294,6 +310,50 @@ async function startServer() {
     } catch (err: any) {
       console.warn("Order notification error handler:", err?.message);
       res.json({ success: true, message: "Order notification processed with fallback." });
+    }
+  });
+
+  // GET current SMTP configuration
+  app.get("/api/admin/smtp-config", (_req, res) => {
+    const smtpConfig = getSmtpTransporter();
+    res.json({
+      success: true,
+      configured: smtpConfig.configured,
+      host: smtpConfig.host,
+      port: smtpConfig.port,
+      user: smtpConfig.user,
+      hasPass: !!(runtimeSmtpConfig.pass || process.env.SMTP_PASS),
+      secure: smtpConfig.secure,
+      adminEmail: smtpConfig.adminEmail
+    });
+  });
+
+  // POST update runtime SMTP configuration
+  app.post("/api/admin/save-smtp-config", (req, res) => {
+    try {
+      const { host, port, user, pass, secure, adminEmail } = req.body;
+
+      if (host !== undefined) runtimeSmtpConfig.host = (host || "").trim();
+      if (port !== undefined) runtimeSmtpConfig.port = Number(port) || 587;
+      if (user !== undefined) runtimeSmtpConfig.user = (user || "").trim();
+      if (pass !== undefined && pass !== "") runtimeSmtpConfig.pass = (pass || "").trim();
+      if (secure !== undefined) runtimeSmtpConfig.secure = !!secure;
+      if (adminEmail !== undefined) runtimeSmtpConfig.adminEmail = (adminEmail || "").trim();
+
+      const newConfig = getSmtpTransporter();
+
+      res.json({
+        success: true,
+        configured: newConfig.configured,
+        message: newConfig.configured ? "SMTP Configuration updated successfully!" : "SMTP configuration saved, but fields are missing or incomplete.",
+        host: newConfig.host,
+        port: newConfig.port,
+        user: newConfig.user,
+        secure: newConfig.secure,
+        adminEmail: newConfig.adminEmail
+      });
+    } catch (err: any) {
+      res.status(500).json({ success: false, message: err?.message || "Failed to update SMTP configuration" });
     }
   });
 

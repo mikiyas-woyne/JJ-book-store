@@ -319,6 +319,72 @@ export async function sendCustomerOrderEmail(
 }
 
 /**
+ * Fetches current active SMTP configuration from the server.
+ */
+export async function getSmtpConfig(): Promise<{
+  success: boolean;
+  configured: boolean;
+  host: string;
+  port: number;
+  user: string;
+  hasPass: boolean;
+  secure: boolean;
+  adminEmail: string;
+}> {
+  try {
+    const res = await fetch("/api/admin/smtp-config");
+    return await res.json();
+  } catch (err: any) {
+    return {
+      success: false,
+      configured: false,
+      host: "",
+      port: 587,
+      user: "",
+      hasPass: false,
+      secure: false,
+      adminEmail: "mikiyaswoyne@gmail.com"
+    };
+  }
+}
+
+/**
+ * Saves updated SMTP configuration to the server.
+ */
+export async function saveSmtpConfig(config: {
+  host: string;
+  port: number;
+  user: string;
+  pass?: string;
+  secure: boolean;
+  adminEmail: string;
+}): Promise<{
+  success: boolean;
+  configured: boolean;
+  message: string;
+  host?: string;
+  port?: number;
+  user?: string;
+  secure?: boolean;
+  adminEmail?: string;
+}> {
+  try {
+    const res = await fetch("/api/admin/save-smtp-config", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(config)
+    });
+    return await res.json();
+  } catch (err: any) {
+    return {
+      success: false,
+      configured: false,
+      message: err?.message || "Failed to update SMTP configuration"
+    };
+  }
+}
+
+/**
  * Sends a test verification email via the backend /api/admin/test-email endpoint.
  */
 export async function sendTestEmail(toEmail?: string, subject?: string, textMessage?: string): Promise<{
