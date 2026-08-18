@@ -138,14 +138,14 @@ export function generateOrderRejectionEmailHtml(
   verifiedByEmployeeName: string,
   reasonNote?: string
 ): { subject: string; htmlBody: string } {
-  const subject = `⚠️ [JJ Bookstore] Payment Verification Issue for Order #${order.orderId}`;
+  const subject = `⚠️ [JJ Bookstore] Payment Verification Alert for Order #${order.orderId}`;
 
   const htmlBody = `
     <!DOCTYPE html>
     <html>
     <head>
       <meta charset="utf-8"/>
-      <title>Order Verification Issue</title>
+      <title>Incorrect Transaction Reference Alert</title>
     </head>
     <body style="font-family: Arial, sans-serif; background-color: #f8fafc; margin: 0; padding: 20px; color: #334155;">
       <div style="max-width: 600px; margin: 0 auto; background-color: #ffffff; border-radius: 16px; overflow: hidden; box-shadow: 0 4px 20px rgba(0,0,0,0.08); border: 1px solid #e2e8f0;">
@@ -160,10 +160,26 @@ export function generateOrderRejectionEmailHtml(
         <div style="padding: 24px;">
           <div style="background-color: #fef2f2; border: 1px solid #fecaca; border-radius: 12px; padding: 16px; margin-bottom: 20px;">
             <h2 style="margin: 0 0 6px; font-size: 16px; color: #991b1b; font-weight: bold;">
-              ❌ Payment Verification Declined
+              ⚠️ Incorrect or Missing Transaction Reference
             </h2>
             <p style="margin: 0; font-size: 13px; color: #b91c1c; line-height: 1.5;">
-              Dear <strong>${order.customerName}</strong>, our staff (${verifiedByEmployeeName}) reviewed order <strong>${order.orderId}</strong> payment reference and was unable to confirm the transaction receipt.
+              Dear <strong>${order.customerName}</strong>, our verification staff (${verifiedByEmployeeName}) checked your order <strong>#${order.orderId}</strong> and found that the transaction reference provided is incorrect or does not exist in our payment logs.
+            </p>
+          </div>
+
+          <!-- Direct Action Message required by Store Policy -->
+          <div style="background-color: #fffbeb; border: 1px solid #fde68a; border-radius: 12px; padding: 16px; margin-bottom: 20px; font-size: 13px; color: #78350f; line-height: 1.6;">
+            <p style="margin: 0 0 8px; font-weight: bold; font-size: 14px; color: #92400e;">
+              📞 Action Required to Confirm Your Books:
+            </p>
+            <p style="margin: 0 0 8px;">
+              <strong>Incorrect transaction number!</strong> Please contact our support team directly by calling or messaging:
+            </p>
+            <p style="margin: 4px 0 8px; font-size: 15px; font-weight: bold; color: #b45309; font-family: monospace;">
+              📱 +251 911 234 567 / +251 922 345 678
+            </p>
+            <p style="margin: 0;">
+              Or upload / email the official payment transfer <strong>screenshot from Telebirr or Bank App (CBE / BOA / Awash)</strong> to confirm your payment and dispatch your books.
             </p>
           </div>
 
@@ -171,7 +187,7 @@ export function generateOrderRejectionEmailHtml(
           <div style="background-color: #f8fafc; border-left: 4px solid #ef4444; border-radius: 4px; padding: 14px; margin-bottom: 20px; font-size: 13px;">
             <strong style="color: #0f172a; display: block; margin-bottom: 4px;">Staff Verification Feedback:</strong>
             <span style="color: #475569; font-style: italic;">
-              "${reasonNote || "Payment receipt code did not match bank deposit or transaction was unconfirmed."}"
+              "${reasonNote || "Incorrect transaction number. Please contact us at +251 911 234 567 or upload the screenshot from Telebirr/Bank."}"
             </span>
           </div>
 
@@ -183,21 +199,17 @@ export function generateOrderRejectionEmailHtml(
             </tr>
             <tr>
               <td style="padding: 10px 14px; color: #64748b;">Order Status:</td>
-              <td style="padding: 10px 14px; font-weight: bold; color: #dc2626; text-align: right;">CANCELLED / UNVERIFIED</td>
+              <td style="padding: 10px 14px; font-weight: bold; color: #dc2626; text-align: right;">ACTION REQUIRED / UNVERIFIED</td>
             </tr>
             <tr>
-              <td style="padding: 10px 14px; color: #64748b;">Total Amount:</td>
+              <td style="padding: 10px 14px; color: #64748b;">Total Order Amount:</td>
               <td style="padding: 10px 14px; font-weight: bold; color: #0f172a; text-align: right;">${order.grandTotal} ETB</td>
             </tr>
             <tr>
-              <td style="padding: 10px 14px; color: #64748b;">Reviewed By Staff:</td>
+              <td style="padding: 10px 14px; color: #64748b;">Verifying Employee:</td>
               <td style="padding: 10px 14px; font-weight: bold; color: #0f172a; text-align: right;">${verifiedByEmployeeName}</td>
             </tr>
           </table>
-
-          <div style="background-color: #fffbeb; border: 1px solid #fef3c7; border-radius: 8px; padding: 14px; margin-bottom: 20px; font-size: 12px; color: #92400e;">
-            <strong>Need Assistance?</strong> You can re-submit your correct bank transaction screenshot or telebirr receipt number by contacting customer support at <strong>+251 911 234 567</strong> or emailing <strong>support@jjbookshopping.com</strong>.
-          </div>
         </div>
 
         <!-- Footer -->

@@ -106,6 +106,7 @@ export const OrderWorkflowModal: React.FC<OrderWorkflowModalProps> = ({
 
   // Email Dispatch State
   const [dispatchedEmailLog, setDispatchedEmailLog] = useState<EmailNotificationLog | null>(null);
+  const [mismatchError, setMismatchError] = useState<string | null>(null);
 
   const drivers = employees.filter((e) => e.assignedRoles?.includes("delivery_personnel"));
 
@@ -164,10 +165,32 @@ export const OrderWorkflowModal: React.FC<OrderWorkflowModalProps> = ({
   };
 
   const handleConfirmVerification = async (approved: boolean) => {
+    setMismatchError(null);
+    const customerRef = (order.paymentReference || "").trim();
+    const employeeRef = receiptNumber.trim();
+
+    if (approved) {
+      // 1. Strict Validation: Check if employee transaction reference matches customer entry
+      if (customerRef) {
+        if (employeeRef.toUpperCase() !== customerRef.toUpperCase()) {
+          const msg = `⚠️ Transaction reference mismatch! The customer (${order.customerName}) submitted transaction number "${customerRef}", but you typed "${employeeRef}". Please enter the exact transaction number ("${customerRef}") under customer "${order.customerName}" to verify this order.`;
+          setMismatchError(msg);
+          return;
+        }
+      } else {
+        // Customer did not submit a transaction reference
+        if (!employeeRef) {
+          const msg = `⚠️ Transaction number missing! Customer (${order.customerName}) did not submit a transaction reference. If the transaction reference does not exist, please click "Send Incorrect Transaction Email" below.`;
+          setMismatchError(msg);
+          return;
+        }
+      }
+    }
+
     setLoading(true);
     try {
       const status: OrderStatus = approved ? "confirmed" : "cancelled";
-      const finalReceipt = receiptNumber.trim() || order.paymentReference || "N/A";
+      const finalReceipt = employeeRef || customerRef || "N/A";
       const finalVerifierName = verifierName.trim() || currentEmployee?.fullName || "Store Staff";
 
       const statusNote = note || (
@@ -203,8 +226,44 @@ export const OrderWorkflowModal: React.FC<OrderWorkflowModalProps> = ({
       );
 
       setDispatchedEmailLog(emailLog);
+      setMismatchError(null);
     } catch (err) {
       console.error("Failed verification workflow:", err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleSendIncorrectTxnEmail = async () => {
+    const finalVerifierName = verifierName.trim() || currentEmployee?.fullName || "Store Staff";
+    const customReason = note.trim() || "Incorrect transaction number. Please contact us by calling +251 911 234 567 / +251 922 345 678 or upload the screenshot from Telebirr/Bank.";
+
+    if (!confirm(`Send incorrect transaction reference email notification to ${order.customerName} (${order.customerEmail || "customer"})?`)) {
+      return;
+    }
+
+    setLoading(true);
+    try {
+      await onUpdateOrderStatus(order.id, "cancelled", customReason, {
+        isReceiptVerified: false,
+        verificationIssue: "INCORRECT_TRANSACTION_NUMBER",
+        verifiedByEmployeeName: finalVerifierName,
+        rejectedAt: new Date().toISOString()
+      });
+
+      const emailLog = await sendCustomerOrderEmail(
+        order,
+        "rejected",
+        finalVerifierName,
+        receiptNumber || order.paymentReference || "INVALID",
+        customReason
+      );
+
+      setDispatchedEmailLog(emailLog);
+      setMismatchError(null);
+      alert(`Email sent to ${order.customerName} requesting correct transaction reference or Telebirr/Bank screenshot.`);
+    } catch (err) {
+      console.error("Failed to send incorrect transaction email:", err);
     } finally {
       setLoading(false);
     }
@@ -474,6 +533,20 @@ export const OrderWorkflowModal: React.FC<OrderWorkflowModalProps> = ({
                 )}
               </div>
 
+              {/* Transaction Mismatch Error Banner */}
+              {mismatchError && (
+                <div className="p-4 rounded-2xl bg-rose-50 border-2 border-rose-300 text-rose-950 text-xs shadow-sm space-y-2">
+                  <div className="flex items-center gap-2 text-rose-800 font-extrabold text-sm">
+                    <AlertTriangle className="w-5 h-5 text-rose-600 shrink-0" />
+                    <span>Verification Mismatch Error</span>
+                  </div>
+                  <p className="font-semibold leading-relaxed text-rose-900">{mismatchError}</p>
+                  <p className="text-[11px] text-rose-700 font-medium">
+                    Please correct the transaction number to match <strong>{order.paymentReference}</strong> or click <strong>"Send Incorrect Txn Email"</strong> to notify {order.customerName}.
+                  </p>
+                </div>
+              )}
+
               {/* Employee Verifier Field */}
               <div className="bg-amber-50/60 border border-amber-200 p-4 rounded-2xl space-y-3">
                 <label className="block text-xs font-bold text-amber-950 flex items-center justify-between">
@@ -511,7 +584,11 @@ export const OrderWorkflowModal: React.FC<OrderWorkflowModalProps> = ({
               </div>
 
               {/* Receipt / Transaction Reference Number Input */}
-              <div className="bg-slate-900 text-white p-4 rounded-2xl space-y-3 shadow-md">
+              <div className={`p-4 rounded-2xl space-y-3 shadow-md border ${
+                order.paymentReference && receiptNumber.trim() && receiptNumber.trim().toUpperCase() !== order.paymentReference.trim().toUpperCase()
+                  ? "bg-rose-950 border-rose-500 text-white"
+                  : "bg-slate-900 border-slate-800 text-white"
+              }`}>
                 <div className="flex items-center justify-between">
                   <label className="block text-xs font-bold text-amber-400 flex items-center gap-1.5">
                     <FileText className="w-4 h-4" />
@@ -520,10 +597,13 @@ export const OrderWorkflowModal: React.FC<OrderWorkflowModalProps> = ({
                   {order.paymentReference && (
                     <button
                       type="button"
-                      onClick={() => setReceiptNumber(order.paymentReference || "")}
+                      onClick={() => {
+                        setReceiptNumber(order.paymentReference || "");
+                        setMismatchError(null);
+                      }}
                       className="text-[10px] font-bold text-amber-300 hover:text-amber-200 underline"
                     >
-                      Use Customer Ref ({order.paymentReference})
+                      Fill Customer Ref ({order.paymentReference})
                     </button>
                   )}
                 </div>
@@ -532,24 +612,51 @@ export const OrderWorkflowModal: React.FC<OrderWorkflowModalProps> = ({
                   <input
                     type="text"
                     value={receiptNumber}
-                    onChange={(e) => setReceiptNumber(e.target.value)}
-                    placeholder="e.g. TXN-987654321, FT260812999 or Bank Slip #"
-                    className="flex-1 p-2.5 rounded-xl border border-slate-700 bg-slate-800 text-amber-300 font-mono font-bold text-xs focus:outline-none focus:border-amber-400"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => {
-                      const autoRef = `REC-${order.orderId.replace("#", "")}-${Math.floor(1000 + Math.random() * 9000)}`;
-                      setReceiptNumber(autoRef);
+                    onChange={(e) => {
+                      setReceiptNumber(e.target.value);
+                      if (mismatchError) setMismatchError(null);
                     }}
-                    className="px-3 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold rounded-xl text-[11px] shrink-0 border border-slate-700"
-                  >
-                    Auto Generate
-                  </button>
+                    placeholder="Enter transaction number submitted by customer"
+                    className={`flex-1 p-2.5 rounded-xl border font-mono font-bold text-xs focus:outline-none ${
+                      order.paymentReference && receiptNumber.trim() && receiptNumber.trim().toUpperCase() !== order.paymentReference.trim().toUpperCase()
+                        ? "bg-rose-900 border-rose-400 text-amber-200 focus:border-amber-300"
+                        : "bg-slate-800 border-slate-700 text-amber-300 focus:border-amber-400"
+                    }`}
+                  />
+                  {order.paymentReference && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setReceiptNumber(order.paymentReference || "");
+                        setMismatchError(null);
+                      }}
+                      className="px-3 py-2 bg-amber-500 hover:bg-amber-400 text-slate-950 font-extrabold rounded-xl text-[11px] shrink-0 shadow"
+                    >
+                      Match Customer Ref
+                    </button>
+                  )}
                 </div>
-                <p className="text-[10px] text-slate-400">
-                  Enter or verify the Telebirr / CBE / Bank transfer transaction slip or receipt number.
-                </p>
+
+                {order.paymentReference ? (
+                  <div className="flex items-center justify-between text-[11px] pt-1">
+                    <span className="text-slate-300">Customer Submitted Ref: <strong className="font-mono text-amber-300">{order.paymentReference}</strong></span>
+                    {receiptNumber.trim() ? (
+                      receiptNumber.trim().toUpperCase() === order.paymentReference.trim().toUpperCase() ? (
+                        <span className="text-emerald-400 font-bold flex items-center gap-1">
+                          <CheckCircle2 className="w-3.5 h-3.5" /> Matched Customer Entry
+                        </span>
+                      ) : (
+                        <span className="text-rose-400 font-bold flex items-center gap-1">
+                          <XCircle className="w-3.5 h-3.5" /> Transaction Ref Mismatch!
+                        </span>
+                      )
+                    ) : null}
+                  </div>
+                ) : (
+                  <p className="text-[10px] text-amber-400 font-medium">
+                    ⚠️ Customer did not submit a transaction reference during checkout.
+                  </p>
+                )}
               </div>
 
               {/* Verification Notes */}
@@ -566,20 +673,34 @@ export const OrderWorkflowModal: React.FC<OrderWorkflowModalProps> = ({
                 />
               </div>
 
-              <div className="flex items-center justify-between pt-4 border-t border-slate-100">
+              <div className="flex flex-wrap items-center justify-between gap-3 pt-4 border-t border-slate-100">
                 <div className="text-[11px] text-slate-500 font-medium">
                   Verified By: <strong className="text-slate-900">{verifierName}</strong>
                 </div>
 
-                <div className="flex items-center gap-2">
+                <div className="flex flex-wrap items-center gap-2">
                   <button
+                    type="button"
+                    onClick={handleSendIncorrectTxnEmail}
+                    disabled={loading}
+                    className="px-4 py-2.5 rounded-xl bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-300 font-bold text-xs flex items-center gap-1.5 shadow-sm"
+                    title="Send email requesting customer to contact support (+251 911 234 567 / +251 922 345 678) or send screenshot"
+                  >
+                    <Mail className="w-4 h-4 text-amber-700" />
+                    <span>Send Incorrect Txn Email</span>
+                  </button>
+
+                  <button
+                    type="button"
                     onClick={() => handleConfirmVerification(false)}
                     disabled={loading}
-                    className="px-4 py-2.5 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-700 font-bold text-xs"
+                    className="px-4 py-2.5 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-700 font-bold text-xs border border-rose-200"
                   >
                     Reject Order
                   </button>
+
                   <button
+                    type="button"
                     onClick={() => handleConfirmVerification(true)}
                     disabled={loading}
                     className="px-6 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-extrabold text-xs shadow-md flex items-center gap-1.5"
