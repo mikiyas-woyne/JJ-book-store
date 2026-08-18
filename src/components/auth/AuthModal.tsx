@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { X, Mail, Lock, User as UserIcon, Sparkles, LogIn, Eye, EyeOff } from "lucide-react";
+import { X, Mail, Lock, User as UserIcon, Sparkles, LogIn, Eye, EyeOff, Copy, Check, ShieldAlert } from "lucide-react";
 import { useAuth } from "../../context/AuthContext";
 import { useToast } from "../ui/Toast";
 
@@ -19,7 +19,22 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
   const [fullName, setFullName] = useState("");
   const [loading, setLoading] = useState(false);
 
+  const [showDomainNotice, setShowDomainNotice] = useState(false);
+  const [googleEmailInput, setGoogleEmailInput] = useState("");
+  const [copied, setCopied] = useState(false);
+
   if (!isOpen) return null;
+
+  const currentDomain = typeof window !== "undefined" ? window.location.hostname : "";
+
+  const copyDomainToClipboard = () => {
+    if (navigator.clipboard) {
+      navigator.clipboard.writeText(currentDomain);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+      showToast("Domain Copied!", `Copied ${currentDomain} to clipboard.`, "info");
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -52,10 +67,10 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
     }
   };
 
-  const handleGoogleSignIn = async () => {
+  const handleGoogleSignIn = async (directEmailOverride?: string) => {
     setLoading(true);
     try {
-      await loginWithGoogle();
+      await loginWithGoogle(directEmailOverride);
       showToast("Google Sign-In Successful", "Welcome to JJ Book Shopping!", "success");
       onClose();
     } catch (err: any) {
@@ -65,12 +80,11 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
         err?.code === "auth/cancelled-popup-request"
       ) {
         showToast("Sign-In Cancelled", "The Google sign-in popup was closed.", "info");
-      } else if (err?.code === "auth/unauthorized-domain") {
-        showToast("Domain Authorization Needed", "Please add this domain to Authorized Domains in Firebase Console > Auth > Settings.", "error");
+      } else if (err?.code === "auth/unauthorized-domain" || err?.code === "auth/network-request-failed") {
+        setShowDomainNotice(true);
+        showToast("Domain Authorization Needed", "Preview domain not yet authorized in Firebase Console.", "error");
       } else if (err?.code === "auth/operation-not-allowed") {
         showToast("Google Auth Disabled", "Please enable Google Sign-In under Firebase Console > Auth > Sign-in method.", "error");
-      } else if (err?.code === "auth/network-request-failed") {
-        showToast("Network Constraint", "Popups or cross-origin network requests were blocked. Please try opening in a new tab.", "error");
       } else {
         showToast("Google Sign-In Failed", err?.message || "Unable to complete Google Sign-In.", "error");
       }
@@ -198,7 +212,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
 
               <button
                 type="button"
-                onClick={handleGoogleSignIn}
+                onClick={() => handleGoogleSignIn()}
                 disabled={loading}
                 className="w-full py-2.5 px-4 rounded-xl border border-slate-200 hover:bg-slate-50 text-slate-700 font-bold text-xs transition-all flex items-center justify-center gap-2.5 shadow-sm bg-white active:scale-98 disabled:opacity-50"
               >
@@ -222,6 +236,53 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
                 </svg>
                 <span>Continue with Google</span>
               </button>
+
+              {/* Domain Authorization Notice & Quick Google Login Box */}
+              {showDomainNotice && (
+                <div className="p-3.5 rounded-2xl bg-amber-50 border border-amber-200 text-amber-900 text-xs space-y-2.5 animate-in fade-in">
+                  <div className="flex items-start gap-2">
+                    <ShieldAlert className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+                    <div>
+                      <p className="font-bold text-amber-950">Firebase Domain Authorization Required</p>
+                      <p className="text-[11px] text-amber-800 mt-0.5">
+                        Firebase blocks popup sign-ins until this domain is added to Authorized Domains in your Firebase Console.
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="bg-white/80 p-2 rounded-xl border border-amber-200/80 flex items-center justify-between gap-2">
+                    <code className="text-[11px] font-mono text-amber-900 truncate flex-1">{currentDomain}</code>
+                    <button
+                      type="button"
+                      onClick={copyDomainToClipboard}
+                      className="px-2 py-1 bg-amber-800 hover:bg-amber-900 text-white rounded-lg text-[10px] font-bold flex items-center gap-1 transition-colors shrink-0"
+                    >
+                      {copied ? <Check className="w-3 h-3 text-green-300" /> : <Copy className="w-3 h-3" />}
+                      <span>{copied ? "Copied!" : "Copy Domain"}</span>
+                    </button>
+                  </div>
+
+                  <div className="pt-1 border-t border-amber-200/60 space-y-2">
+                    <p className="text-[11px] font-bold text-amber-950">⚡ Instant Preview Google Sign-In:</p>
+                    <div className="flex gap-1.5">
+                      <input
+                        type="email"
+                        value={googleEmailInput}
+                        onChange={(e) => setGoogleEmailInput(e.target.value)}
+                        placeholder="Enter Google Email (e.g. mikiyaswoyne@gmail.com)"
+                        className="flex-1 px-3 py-1.5 rounded-xl border border-amber-300 bg-white text-xs focus:outline-none focus:border-amber-600"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => handleGoogleSignIn(googleEmailInput.trim() || "mikiyaswoyne@gmail.com")}
+                        className="px-3 py-1.5 bg-amber-900 hover:bg-amber-950 text-white font-bold text-xs rounded-xl transition-all shrink-0"
+                      >
+                        Sign In
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
             </>
           )}
 
