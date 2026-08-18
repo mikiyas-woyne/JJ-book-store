@@ -27,10 +27,10 @@ async function startServer() {
         return;
       }
 
-      const recipientEmail = "mikiyaswoyne@gmail.com";
-      const customerEmail = order.customerEmail || recipientEmail;
+      const adminEmail = process.env.ADMIN_EMAIL || "mikiyaswoyne@gmail.com";
+      const customerEmail = (order.customerEmail || "").trim();
 
-      let transporter;
+      let transporter: any;
       let smtpHost = process.env.SMTP_HOST ? process.env.SMTP_HOST.trim().replace(/^smpt\./i, "smtp.") : "";
 
       if (smtpHost && process.env.SMTP_USER) {
@@ -63,48 +63,46 @@ async function startServer() {
         .map(
           (item: any) => `
           <tr>
-            <td style="padding: 8px; border-bottom: 1px solid #eee;">
+            <td style="padding: 10px; border-bottom: 1px solid #e2e8f0; font-size: 13px;">
               <strong>${item.title}</strong><br>
-              <span style="color: #666; font-size: 12px;">by ${item.authorName || "Unknown"}</span>
+              <span style="color: #64748b; font-size: 11px;">Author: ${item.authorName || "Ethiopian Literature"}</span>
             </td>
-            <td style="padding: 8px; border-bottom: 1px solid #eee; text-align: center;">${item.quantity}</td>
-            <td style="padding: 8px; border-bottom: 1px solid #eee; text-align: right;">${item.price} ETB</td>
-            <td style="padding: 8px; border-bottom: 1px solid #eee; text-align: right;"><strong>${item.total} ETB</strong></td>
+            <td style="padding: 10px; border-bottom: 1px solid #e2e8f0; text-align: center; font-size: 13px;">${item.quantity}</td>
+            <td style="padding: 10px; border-bottom: 1px solid #e2e8f0; text-align: right; font-size: 13px;">${item.price} ETB</td>
+            <td style="padding: 10px; border-bottom: 1px solid #e2e8f0; text-align: right; font-weight: bold; font-size: 13px;">${item.total || item.price * item.quantity} ETB</td>
           </tr>
         `
         )
         .join("");
 
-      const emailSubject = `[JJ Bookstore Order] New Order Confirmed #${order.orderId} - ${order.grandTotal} ETB`;
-      const emailBody = `
-        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; color: #333; line-height: 1.5; border: 1px solid #e0e0e0; border-radius: 12px; overflow: hidden;">
-          <div style="background-color: #451a03; color: #fef3c7; padding: 20px; text-align: center;">
-            <h1 style="margin: 0; font-size: 24px;">JJ Book Shopping</h1>
-            <p style="margin: 5px 0 0; font-size: 14px;">Order Confirmation & Receipt</p>
+      // 1. ADMIN EMAIL TEMPLATE
+      const adminSubject = `🚨 [NEW ORDER RECEIVED] Order #${order.orderId} - ${order.customerName} (${order.grandTotal} ETB)`;
+      const adminBody = `
+        <div style="font-family: Arial, sans-serif; max-width: 620px; margin: 0 auto; color: #1e293b; line-height: 1.5; border: 1px solid #cbd5e1; border-radius: 16px; overflow: hidden; background-color: #ffffff;">
+          <div style="background-color: #451a03; color: #fef3c7; padding: 22px; text-align: center;">
+            <h1 style="margin: 0; font-size: 22px; color: #fbbf24;">JJ BOOKSTORE ADMIN ALERT</h1>
+            <p style="margin: 4px 0 0; font-size: 12px; color: #fde68a;">New Customer Order Pending Action</p>
           </div>
           
           <div style="padding: 24px;">
-            <h2 style="color: #451a03; margin-top: 0;">New Order #${order.orderId}</h2>
-            <p>A new order has been successfully placed on <strong>JJ Book Shopping</strong>.</p>
-
-            <div style="background-color: #fffbeb; padding: 16px; border-radius: 8px; margin-bottom: 20px; border: 1px solid #fde68a;">
-              <h3 style="margin-top: 0; color: #78350f; font-size: 15px;">Customer & Delivery Details</h3>
-              <p style="margin: 4px 0;"><strong>Customer Name:</strong> ${order.customerName}</p>
-              <p style="margin: 4px 0;"><strong>Customer Email:</strong> ${order.customerEmail}</p>
-              <p style="margin: 4px 0;"><strong>Phone Number:</strong> ${order.customerPhone}</p>
-              <p style="margin: 4px 0;"><strong>Address:</strong> ${order.shippingAddress?.streetAddress || ""}, ${order.shippingAddress?.subcity ? order.shippingAddress.subcity + ", " : ""}${order.shippingAddress?.region || ""}</p>
-              <p style="margin: 4px 0;"><strong>Payment Method:</strong> ${String(order.paymentMethod).toUpperCase()} (${order.paymentStatus})</p>
-              ${order.paymentReference ? `<p style="margin: 4px 0;"><strong>Transaction Ref:</strong> ${order.paymentReference}</p>` : ""}
+            <div style="background-color: #fffbeb; border: 1px solid #fde68a; border-radius: 12px; padding: 16px; margin-bottom: 20px;">
+              <h2 style="margin: 0 0 8px; color: #78350f; font-size: 16px;">Order #${order.orderId} Summary</h2>
+              <p style="margin: 3px 0; font-size: 13px;"><strong>Customer Name:</strong> ${order.customerName}</p>
+              <p style="margin: 3px 0; font-size: 13px;"><strong>Customer Email:</strong> ${order.customerEmail || "N/A"}</p>
+              <p style="margin: 3px 0; font-size: 13px;"><strong>Phone Number:</strong> ${order.customerPhone}</p>
+              <p style="margin: 3px 0; font-size: 13px;"><strong>Delivery Neighborhood / Street:</strong> ${order.shippingAddress?.streetAddress || ""}, ${order.shippingAddress?.subcity ? order.shippingAddress.subcity + ", " : ""}${order.shippingAddress?.region || "Addis Ababa"}</p>
+              <p style="margin: 3px 0; font-size: 13px;"><strong>Payment Method:</strong> <span style="text-transform: uppercase; font-weight: bold;">${order.paymentMethod}</span> (${order.paymentStatus})</p>
+              ${order.paymentReference ? `<p style="margin: 3px 0; font-size: 13px; color: #b45309;"><strong>Payment Transaction Ref #:</strong> ${order.paymentReference}</p>` : ""}
             </div>
 
-            <h3 style="color: #451a03; font-size: 16px;">Order Items</h3>
-            <table style="width: 100%; border-collapse: collapse; font-size: 14px; margin-bottom: 20px;">
+            <h3 style="color: #0f172a; font-size: 14px; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 10px;">Items Ordered (${order.items?.length || 0})</h3>
+            <table style="width: 100%; border-collapse: collapse; margin-bottom: 20px;">
               <thead>
-                <tr style="background-color: #f8fafc; text-align: left;">
-                  <th style="padding: 8px; border-bottom: 2px solid #ddd;">Book Title</th>
-                  <th style="padding: 8px; border-bottom: 2px solid #ddd; text-align: center;">Qty</th>
-                  <th style="padding: 8px; border-bottom: 2px solid #ddd; text-align: right;">Price</th>
-                  <th style="padding: 8px; border-bottom: 2px solid #ddd; text-align: right;">Total</th>
+                <tr style="background-color: #f1f5f9; text-align: left; font-size: 11px; color: #475569; text-transform: uppercase;">
+                  <th style="padding: 8px 10px;">Book</th>
+                  <th style="padding: 8px 10px; text-align: center;">Qty</th>
+                  <th style="padding: 8px 10px; text-align: right;">Unit Price</th>
+                  <th style="padding: 8px 10px; text-align: right;">Total</th>
                 </tr>
               </thead>
               <tbody>
@@ -112,56 +110,111 @@ async function startServer() {
               </tbody>
             </table>
 
-            <div style="border-top: 2px solid #eee; padding-top: 12px; text-align: right; font-size: 14px;">
-              <p style="margin: 4px 0;">Subtotal: ${order.subtotal} ETB</p>
-              ${order.discount ? `<p style="margin: 4px 0; color: #15803d;">Discount: -${order.discount} ETB</p>` : ""}
-              <p style="margin: 4px 0;">Shipping Fee: ${order.shippingFee === 0 ? "FREE" : `${order.shippingFee} ETB`}</p>
-              <p style="margin: 4px 0;">15% VAT: ${order.tax} ETB</p>
-              <h3 style="margin: 8px 0 0; color: #451a03; font-size: 18px;">Grand Total: ${order.grandTotal} ETB</h3>
+            <div style="border-top: 2px solid #e2e8f0; padding-top: 12px; text-align: right; font-size: 13px;">
+              <p style="margin: 3px 0; color: #64748b;">Subtotal: ${order.subtotal} ETB</p>
+              ${order.discount ? `<p style="margin: 3px 0; color: #16a34a;">Discount: -${order.discount} ETB</p>` : ""}
+              <p style="margin: 3px 0; color: #64748b;">Shipping Fee: ${order.shippingFee === 0 ? "FREE" : `${order.shippingFee} ETB`}</p>
+              <p style="margin: 3px 0; color: #64748b;">15% VAT: ${order.tax} ETB</p>
+              <h3 style="margin: 8px 0 0; color: #78350f; font-size: 18px;">Grand Total: ${order.grandTotal} ETB</h3>
             </div>
           </div>
 
-          <div style="background-color: #f8fafc; padding: 16px; text-align: center; font-size: 12px; color: #64748b; border-top: 1px solid #e2e8f0;">
-            JJ Book Shopping • Addis Ababa, Ethiopia • Thank you for reading with us!
+          <div style="background-color: #f8fafc; padding: 16px; text-align: center; font-size: 11px; color: #64748b; border-top: 1px solid #e2e8f0;">
+            JJ Book Shopping Admin Portal • Action Required: Verify payment reference and assign delivery staff.
           </div>
         </div>
       `;
 
-      const recipients = Array.from(new Set([recipientEmail, customerEmail])).join(", ");
+      // 2. CUSTOMER EMAIL TEMPLATE
+      const customerSubject = `📚 [JJ Bookstore] Order #${order.orderId} Confirmed - Thank You!`;
+      const customerBody = `
+        <div style="font-family: Arial, sans-serif; max-width: 620px; margin: 0 auto; color: #1e293b; line-height: 1.5; border: 1px solid #cbd5e1; border-radius: 16px; overflow: hidden; background-color: #ffffff;">
+          <div style="background-color: #451a03; color: #fef3c7; padding: 22px; text-align: center;">
+            <h1 style="margin: 0; font-size: 22px; color: #fbbf24;">JJ BOOKSTORE</h1>
+            <p style="margin: 4px 0 0; font-size: 12px; color: #fde68a;">Ethiopia's Premier Online Bookstore</p>
+          </div>
+          
+          <div style="padding: 24px;">
+            <div style="background-color: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 12px; padding: 16px; margin-bottom: 20px;">
+              <h2 style="margin: 0 0 6px; font-size: 16px; color: #166534;">🎉 Thank You for Your Order, ${order.customerName}!</h2>
+              <p style="margin: 0; font-size: 13px; color: #15803d;">
+                We have received your order <strong>${order.orderId}</strong>. Our warehouse staff is currently reviewing your payment reference and preparing your books for express delivery.
+              </p>
+            </div>
 
-      let info: any = null;
-      let previewUrl: string | false = false;
+            <div style="background-color: #f8fafc; border-radius: 10px; padding: 14px; margin-bottom: 20px; font-size: 13px;">
+              <p style="margin: 3px 0;"><strong>Order Reference:</strong> ${order.orderId}</p>
+              <p style="margin: 3px 0;"><strong>Payment Method:</strong> <span style="text-transform: uppercase;">${order.paymentMethod}</span></p>
+              ${order.paymentReference ? `<p style="margin: 3px 0;"><strong>Transaction Reference Number:</strong> <span style="font-family: monospace; color: #b45309; font-weight: bold;">${order.paymentReference}</span></p>` : ""}
+              <p style="margin: 3px 0;"><strong>Delivery Address:</strong> ${order.shippingAddress?.streetAddress || ""}, ${order.shippingAddress?.subcity ? order.shippingAddress.subcity + ", " : ""}${order.shippingAddress?.city || "Addis Ababa"}</p>
+            </div>
 
-      try {
-        if (transporter) {
-          info = await Promise.race([
-            transporter.sendMail({
-              from: `"JJ Book Shopping" <noreply@jjbookshopping.com>`,
-              to: recipients,
-              subject: emailSubject,
-              html: emailBody,
-            }),
-            new Promise((_, reject) => setTimeout(() => reject(new Error("Email dispatch timeout")), 3500))
-          ]);
-          previewUrl = nodemailer.getTestMessageUrl(info);
+            <h3 style="color: #0f172a; font-size: 14px; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 10px;">Ordered Books</h3>
+            <table style="width: 100%; border-collapse: collapse; margin-bottom: 20px;">
+              <thead>
+                <tr style="background-color: #f1f5f9; text-align: left; font-size: 11px; color: #475569; text-transform: uppercase;">
+                  <th style="padding: 8px 10px;">Book</th>
+                  <th style="padding: 8px 10px; text-align: center;">Qty</th>
+                  <th style="padding: 8px 10px; text-align: right;">Total</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${itemsHtml}
+              </tbody>
+            </table>
+
+            <div style="border-top: 2px solid #e2e8f0; padding-top: 12px; text-align: right; font-size: 13px;">
+              <p style="margin: 3px 0; color: #64748b;">Subtotal: ${order.subtotal} ETB</p>
+              ${order.discount ? `<p style="margin: 3px 0; color: #16a34a;">Discount: -${order.discount} ETB</p>` : ""}
+              <p style="margin: 3px 0; color: #64748b;">Shipping Fee: ${order.shippingFee === 0 ? "FREE" : `${order.shippingFee} ETB`}</p>
+              <p style="margin: 3px 0; color: #64748b;">15% VAT: ${order.tax} ETB</p>
+              <h3 style="margin: 8px 0 0; color: #b45309; font-size: 18px;">Total: ${order.grandTotal} ETB</h3>
+            </div>
+          </div>
+
+          <div style="background-color: #f8fafc; padding: 16px; text-align: center; font-size: 11px; color: #64748b; border-top: 1px solid #e2e8f0;">
+            JJ Book Shopping • Customer Support Helpline: +251 938 014 055 • Thank you for reading with us!
+          </div>
+        </div>
+      `;
+
+      // Dispatch to Admin
+      if (transporter) {
+        try {
+          await transporter.sendMail({
+            from: `"JJ Book Shopping" <noreply@jjbookshopping.com>`,
+            to: adminEmail,
+            subject: adminSubject,
+            html: adminBody,
+          });
+          console.log(`[Admin Email Sent] Order #${order.orderId} dispatched to ${adminEmail}`);
+        } catch (adminErr: any) {
+          console.warn(`[Admin Email Notice] ${adminErr?.message}`);
         }
-      } catch (smtpError: any) {
-        console.warn(`[Email Notification Notice] Mail transport skipped or timed out (${smtpError?.message}). Order logged successfully for ${recipients}.`);
-      }
 
-      console.log(`[Order Email Logged] Order #${order.orderId} for ${recipients}`);
-      if (previewUrl) {
-        console.log(`[Ethereal Email Preview URL]: ${previewUrl}`);
+        // Dispatch to Customer if customer email exists and is different from admin email
+        if (customerEmail && customerEmail.toLowerCase() !== adminEmail.toLowerCase()) {
+          try {
+            await transporter.sendMail({
+              from: `"JJ Book Shopping" <noreply@jjbookshopping.com>`,
+              to: customerEmail,
+              subject: customerSubject,
+              html: customerBody,
+            });
+            console.log(`[Customer Email Sent] Order #${order.orderId} dispatched to ${customerEmail}`);
+          } catch (custErr: any) {
+            console.warn(`[Customer Email Notice] ${custErr?.message}`);
+          }
+        }
       }
 
       res.json({
         success: true,
-        message: `Order notification email dispatched for ${recipients}`,
-        previewUrl: previewUrl || undefined,
+        message: `Order email notifications sent to admin (${adminEmail}) and customer (${customerEmail || adminEmail})`
       });
     } catch (err: any) {
-      console.warn("Order notification fallback:", err?.message);
-      res.json({ success: true, message: "Order notification queued and processed." });
+      console.warn("Order notification error handler:", err?.message);
+      res.json({ success: true, message: "Order notification processed." });
     }
   });
 

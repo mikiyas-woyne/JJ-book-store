@@ -468,6 +468,17 @@ export const EmployeePanel: React.FC<{
           >
             <RefreshCw className="w-4 h-4" />
           </button>
+
+          {onNavigateHome && (
+            <button
+              onClick={onNavigateHome}
+              className="p-2.5 rounded-xl bg-rose-950/80 hover:bg-rose-900 text-rose-200 hover:text-white border border-rose-800/80 transition-all cursor-pointer shadow-md active:scale-95 flex items-center justify-center shrink-0"
+              title="Close Employee Panel - Exit to store home"
+              aria-label="Close Employee Panel"
+            >
+              <X className="w-5 h-5 stroke-[2.5]" />
+            </button>
+          )}
         </div>
       </header>
 
