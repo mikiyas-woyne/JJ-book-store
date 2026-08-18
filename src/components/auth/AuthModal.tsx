@@ -55,14 +55,25 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
   const handleGoogleSignIn = async () => {
     setLoading(true);
     try {
-      const targetEmail = email.trim() || "mikiyaswoyne@gmail.com";
-      await loginWithGoogle(targetEmail);
-      showToast("Signed In with Google", `Welcome to JJ Book Shopping! (${targetEmail})`, "success");
+      await loginWithGoogle();
+      showToast("Google Sign-In Successful", "Welcome to JJ Book Shopping!", "success");
       onClose();
     } catch (err: any) {
       console.error("Google auth error:", err);
-      showToast("Signed In with Google", "Welcome to JJ Book Shopping!", "success");
-      onClose();
+      if (
+        err?.code === "auth/popup-closed-by-user" ||
+        err?.code === "auth/cancelled-popup-request"
+      ) {
+        showToast("Sign-In Cancelled", "The Google sign-in popup was closed.", "info");
+      } else if (err?.code === "auth/unauthorized-domain") {
+        showToast("Domain Authorization Needed", "Please add this domain to Authorized Domains in Firebase Console > Auth > Settings.", "error");
+      } else if (err?.code === "auth/operation-not-allowed") {
+        showToast("Google Auth Disabled", "Please enable Google Sign-In under Firebase Console > Auth > Sign-in method.", "error");
+      } else if (err?.code === "auth/network-request-failed") {
+        showToast("Network Constraint", "Popups or cross-origin network requests were blocked. Please try opening in a new tab.", "error");
+      } else {
+        showToast("Google Sign-In Failed", err?.message || "Unable to complete Google Sign-In.", "error");
+      }
     } finally {
       setLoading(false);
     }
