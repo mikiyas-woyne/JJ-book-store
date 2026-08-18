@@ -86,7 +86,7 @@ export const BookReviews: React.FC<BookReviewsProps> = ({ bookId }) => {
 
   const avgRating = reviews.length > 0
     ? reviews.reduce((sum, r) => sum + r.rating, 0) / reviews.length
-    : 4.8;
+    : 0;
 
   return (
     <div className="space-y-6 pt-6 border-t border-slate-100">

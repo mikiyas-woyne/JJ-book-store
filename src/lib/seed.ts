@@ -1,4 +1,4 @@
-import { doc, getDoc, setDoc, writeBatch } from "firebase/firestore";
+import { doc, getDoc, setDoc, writeBatch, collection, getDocs, updateDoc } from "firebase/firestore";
 import { db } from "./firebase";
 import {
   INITIAL_AUTHORS,
@@ -7,6 +7,26 @@ import {
   INITIAL_COUPONS,
   INITIAL_STORE_SETTINGS
 } from "./sampleData";
+
+export async function resetAllReviewsToZeroInFirestore() {
+  try {
+    const booksSnap = await getDocs(collection(db, "books"));
+    if (!booksSnap.empty) {
+      const batch = writeBatch(db);
+      booksSnap.forEach((bookDoc) => {
+        batch.update(bookDoc.ref, {
+          ratingAverage: 0,
+          reviewCount: 0,
+          updatedAt: new Date().toISOString()
+        });
+      });
+      await batch.commit();
+      console.log("Successfully reset all book review counts and rating averages to 0 in Firestore.");
+    }
+  } catch (err) {
+    console.warn("Notice resetting reviews in Firestore:", err);
+  }
+}
 
 export async function seedBookstoreData(forceReset = false) {
   try {
