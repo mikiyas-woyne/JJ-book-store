@@ -33,6 +33,7 @@ import {
 import { BarcodeScannerModal } from "./BarcodeScannerModal";
 
 interface OrderWorkflowModalProps {
+  isOpen?: boolean;
   order: Order | null;
   mode: "verify" | "prepare" | "pack" | "assign" | "deliver" | "return";
   onClose: () => void;
@@ -48,6 +49,7 @@ interface OrderWorkflowModalProps {
 }
 
 export const OrderWorkflowModal: React.FC<OrderWorkflowModalProps> = ({
+  isOpen = true,
   order,
   mode,
   onClose,
@@ -117,7 +119,7 @@ export const OrderWorkflowModal: React.FC<OrderWorkflowModalProps> = ({
     }
   }, [mode, drivers, selectedDriverId]);
 
-  if (!order) return null;
+  if (!isOpen || !order) return null;
 
   const toggleItemCollected = (index: number) => {
     const updated = [...itemsChecklist];

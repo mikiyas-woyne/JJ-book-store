@@ -1199,9 +1199,13 @@ export const EmployeePanel: React.FC<{
 
       {/* Workflow Modal */}
       <OrderWorkflowModal
+        isOpen={isWorkflowModalOpen}
         order={selectedOrder}
         mode={modalMode}
-        onClose={() => setIsWorkflowModalOpen(false)}
+        onClose={() => {
+          setIsWorkflowModalOpen(false);
+          setSelectedOrder(null);
+        }}
         onUpdateOrderStatus={handleUpdateOrderStatus}
         employees={employees}
         currentEmployee={currentEmployee}
