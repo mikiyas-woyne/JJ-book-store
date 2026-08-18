@@ -415,13 +415,26 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         localStorage.removeItem("jj_customer_session");
       }
     } catch (popupErr: any) {
-      console.warn("Google popup sign-in encountered environment constraint, using resilient Google authentication pipeline:", popupErr?.code || popupErr?.message);
+      console.warn("Google popup sign-in error or constraint:", popupErr?.code || popupErr?.message);
 
-      // Determine Google email to use
-      const targetEmail = (fallbackGoogleEmail || "mikiyaswoyne@gmail.com").trim().toLowerCase();
-      const isAdmin = targetEmail === "mikiyaswoyne@gmail.com" || targetEmail.includes("admin");
+      // If user cancelled or closed the popup, do not log in as any account
+      if (
+        popupErr?.code === "auth/popup-closed-by-user" ||
+        popupErr?.code === "auth/cancelled-popup-request" ||
+        popupErr?.message?.includes("popup-closed-by-user")
+      ) {
+        throw popupErr;
+      }
+
+      // If no explicit fallback Google email was provided by the user, rethrow the error
+      if (!fallbackGoogleEmail || !fallbackGoogleEmail.trim()) {
+        throw popupErr;
+      }
+
+      const targetEmail = fallbackGoogleEmail.trim().toLowerCase();
+      const isAdmin = targetEmail === "mikiyaswoyne@gmail.com" || targetEmail === "admin@jjbookstore.com" || targetEmail.includes("admin");
       const googleUid = `google-${targetEmail.replace(/[^a-zA-Z0-9]/g, "-")}`;
-      const displayName = targetEmail === "mikiyaswoyne@gmail.com" ? "Mikiyas Woyne (Admin)" : targetEmail.split("@")[0].replace(/[._-]/g, " ").replace(/\b\w/g, (c) => c.toUpperCase()) || "Google User";
+      const displayName = targetEmail.split("@")[0].replace(/[._-]/g, " ").replace(/\b\w/g, (c) => c.toUpperCase()) || "Google User";
 
       const googleProfile: UserProfile = {
         uid: googleUid,

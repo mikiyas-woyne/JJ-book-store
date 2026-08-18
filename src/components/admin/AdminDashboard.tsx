@@ -35,12 +35,14 @@ import {
   Eye,
   EyeOff,
   Activity,
-  AlertCircle
+  AlertCircle,
+  Mail
 } from "lucide-react";
 import { collection, getDocs, doc, setDoc, updateDoc, deleteDoc, addDoc, onSnapshot, writeBatch } from "firebase/firestore";
 import { db, cleanFirestoreData } from "../../lib/firebase";
 import { Author, Book, Category, Coupon, Order, OrderStatus } from "../../types";
 import { seedBookstoreData } from "../../lib/seed";
+import { sendTestEmail } from "../../lib/emailService";
 import { useToast } from "../ui/Toast";
 import { useAuth } from "../../context/AuthContext";
 import { getValidBookCover } from "../../lib/sampleData";
@@ -76,8 +78,47 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   const { showToast } = useToast();
   const { userProfile, updateAdminCredentials } = useAuth();
   const [activeTab, setActiveTab] = useState<
-    "overview" | "books" | "orders" | "authors" | "categories" | "coupons" | "employees" | "security"
+    "overview" | "books" | "orders" | "authors" | "categories" | "coupons" | "employees" | "email" | "security"
   >("overview");
+
+  // Test Email State
+  const [testTargetEmail, setTestTargetEmail] = useState("mikiyaswoyne@gmail.com");
+  const [testingEmail, setTestingEmail] = useState(false);
+  const [testResult, setTestResult] = useState<{
+    success: boolean;
+    message: string;
+    hint?: string;
+    details?: any;
+  } | null>(null);
+
+  const handleRunEmailTest = async () => {
+    if (!testTargetEmail.trim() || !testTargetEmail.includes("@")) {
+      showToast("Invalid Email", "Please enter a valid recipient email address.", "error");
+      return;
+    }
+
+    setTestingEmail(true);
+    setTestResult(null);
+    try {
+      const res = await sendTestEmail(testTargetEmail.trim());
+      setTestResult(res);
+      if (res.success) {
+        showToast("Test Email Sent", res.message, "success");
+      } else {
+        showToast("Email Sending Issue", res.message || "Failed to send test email.", "error");
+      }
+    } catch (err: any) {
+      const errRes = {
+        success: false,
+        message: err?.message || "Failed to execute email test.",
+        hint: "Verify server connection and environment SMTP variable configuration."
+      };
+      setTestResult(errRes);
+      showToast("Email Test Error", errRes.message, "error");
+    } finally {
+      setTestingEmail(false);
+    }
+  };
 
   // Admin Security Credentials Form State
   const [adminFullName, setAdminFullName] = useState("");
@@ -830,6 +871,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
           { id: "categories", label: `Categories (${categories.length})`, icon: Layers },
           { id: "coupons", label: `Promotions (${coupons.length})`, icon: Tag },
           { id: "employees", label: "Staff & Roles", icon: UserCheck },
+          { id: "email", label: "Email Service & Test", icon: Mail },
           { id: "security", label: "Security & Admin Login", icon: Shield }
         ].map((tab) => {
           const Icon = tab.icon;
@@ -2031,6 +2073,111 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
               </button>
             </div>
           </form>
+        </div>
+      )}
+
+      {/* TAB: EMAIL SERVICE & DIAGNOSTICS */}
+      {activeTab === "email" && (
+        <div className="max-w-3xl bg-white p-6 sm:p-8 rounded-3xl border border-slate-200 shadow-sm space-y-6">
+          <div className="flex items-center gap-3 border-b border-slate-100 pb-4">
+            <div className="p-3 bg-amber-100 text-amber-900 rounded-2xl">
+              <Mail className="w-6 h-6" />
+            </div>
+            <div>
+              <h3 className="font-serif font-bold text-slate-900 text-xl">Email Service & SMTP Diagnostics</h3>
+              <p className="text-xs text-slate-500">Test backend SMTP email delivery and verify server configuration</p>
+            </div>
+          </div>
+
+          {/* Overview Card */}
+          <div className="bg-slate-900 text-white p-5 rounded-2xl border border-slate-800 space-y-3">
+            <div className="flex items-center justify-between">
+              <h4 className="text-xs font-bold uppercase tracking-wider text-amber-400 flex items-center gap-2">
+                <Zap className="w-4 h-4" /> Nodemailer Express SMTP Service
+              </h4>
+              <span className="px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-wider bg-slate-800 text-slate-300 border border-slate-700">
+                Backend API
+              </span>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs pt-1">
+              <div className="bg-slate-950 p-3 rounded-xl border border-slate-800">
+                <span className="text-[10px] uppercase text-slate-400 font-bold block">Service Transport</span>
+                <span className="font-bold text-slate-200">Nodemailer (Express Backend)</span>
+              </div>
+              <div className="bg-slate-950 p-3 rounded-xl border border-slate-800">
+                <span className="text-[10px] uppercase text-slate-400 font-bold block">Default Recipient</span>
+                <span className="font-bold text-amber-300">mikiyaswoyne@gmail.com</span>
+              </div>
+            </div>
+          </div>
+
+          {/* Interactive Test Email Tool */}
+          <div className="border border-slate-200 rounded-2xl p-5 bg-slate-50 space-y-4">
+            <div>
+              <h4 className="font-bold text-slate-900 text-sm flex items-center gap-2">
+                <Sparkles className="w-4 h-4 text-amber-600" /> Test Email Delivery
+              </h4>
+              <p className="text-xs text-slate-500 mt-0.5">
+                Send a test email through the server's Nodemailer SMTP endpoint to verify live inbox delivery.
+              </p>
+            </div>
+
+            <div className="space-y-3">
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1">Target Recipient Email Address</label>
+                <input
+                  type="email"
+                  value={testTargetEmail}
+                  onChange={(e) => setTestTargetEmail(e.target.value)}
+                  placeholder="e.g. mikiyaswoyne@gmail.com"
+                  className="w-full px-4 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:border-amber-500 text-xs font-bold text-slate-900 bg-white"
+                />
+              </div>
+
+              <button
+                onClick={handleRunEmailTest}
+                disabled={testingEmail}
+                className="px-5 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-xs shadow-md transition-all flex items-center gap-2 disabled:opacity-50"
+              >
+                <RefreshCw className={`w-4 h-4 ${testingEmail ? "animate-spin" : ""}`} />
+                <span>{testingEmail ? "Sending Test Email..." : "Send Test Email Now"}</span>
+              </button>
+            </div>
+
+            {/* Test Execution Diagnostic Result Banner */}
+            {testResult && (
+              <div
+                className={`p-4 rounded-xl text-xs space-y-2 border ${
+                  testResult.success
+                    ? "bg-emerald-50 border-emerald-200 text-emerald-900"
+                    : "bg-rose-50 border-rose-200 text-rose-900"
+                }`}
+              >
+                <div className="flex items-center gap-2 font-bold text-sm">
+                  {testResult.success ? (
+                    <CheckCircle2 className="w-5 h-5 text-emerald-600 shrink-0" />
+                  ) : (
+                    <AlertTriangle className="w-5 h-5 text-rose-600 shrink-0" />
+                  )}
+                  <span>{testResult.message}</span>
+                </div>
+
+                {testResult.hint && (
+                  <p className="text-[11px] font-medium bg-white/70 p-2.5 rounded-lg border border-slate-200 text-slate-700">
+                    💡 <strong>Diagnosis / Setup Requirement:</strong> {testResult.hint}
+                  </p>
+                )}
+
+                {testResult.details && (
+                  <div className="bg-slate-900 text-slate-200 p-3 rounded-lg font-mono text-[10px] space-y-1 overflow-x-auto">
+                    <div><strong>Server SMTP Diagnostics Output:</strong></div>
+                    <pre>{JSON.stringify(testResult.details, null, 2)}</pre>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
         </div>
       )}
 

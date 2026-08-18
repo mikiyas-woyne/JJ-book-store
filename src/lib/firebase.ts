@@ -20,6 +20,9 @@ const app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
 // Firebase Auth
 export const auth = getAuth(app);
 export const googleProvider = new GoogleAuthProvider();
+googleProvider.setCustomParameters({
+  prompt: "select_account"
+});
 
 // Firebase Firestore with auto-detect long polling fallback for sandboxed web environments
 const dbId = firebaseConfigData.firestoreDatabaseId || "(default)";

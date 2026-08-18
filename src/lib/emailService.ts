@@ -277,6 +277,19 @@ export async function sendCustomerOrderEmail(
   };
 
   try {
+    // Dispatch actual SMTP email via backend Express endpoint
+    fetch("/api/orders/send-status-email", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        order,
+        type,
+        verifiedByEmployeeName,
+        receiptNumber,
+        note
+      })
+    }).catch((fetchErr) => console.warn("Backend status email endpoint notice:", fetchErr));
+
     // Save to emailNotifications collection in Firestore
     const docRef = await addDoc(collection(db, "emailNotifications"), cleanFirestoreData(logPayload));
 
@@ -302,6 +315,32 @@ export async function sendCustomerOrderEmail(
       id: `local-${Date.now()}`,
       ...logPayload
     } as EmailNotificationLog;
+  }
+}
+
+/**
+ * Sends a test verification email via the backend /api/admin/test-email endpoint.
+ */
+export async function sendTestEmail(toEmail?: string, subject?: string, textMessage?: string): Promise<{
+  success: boolean;
+  configured?: boolean;
+  message: string;
+  details?: any;
+  hint?: string;
+  errorCode?: string;
+}> {
+  try {
+    const res = await fetch("/api/admin/test-email", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ toEmail, subject, textMessage })
+    });
+    return await res.json();
+  } catch (err: any) {
+    return {
+      success: false,
+      message: err?.message || "Network request failed while sending test email."
+    };
   }
 }
 
