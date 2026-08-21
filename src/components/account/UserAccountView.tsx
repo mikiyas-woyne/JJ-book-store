@@ -93,6 +93,21 @@ export const UserAccountView: React.FC<UserAccountViewProps> = ({
           list.push({ id: d.id, ...d.data() } as Order);
         });
 
+        // Merge local orders from localStorage for instant offline access
+        try {
+          const localOrdersRaw = localStorage.getItem("jj_local_orders");
+          if (localOrdersRaw) {
+            const localOrders: Order[] = JSON.parse(localOrdersRaw);
+            localOrders.forEach((lo) => {
+              if (!list.some((o) => o.id === lo.id || o.orderId === lo.orderId)) {
+                list.push(lo);
+              }
+            });
+          }
+        } catch (lErr) {
+          console.warn("Local orders merge notice:", lErr);
+        }
+
         // Sort by newest
         list.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
         setOrders(list);
