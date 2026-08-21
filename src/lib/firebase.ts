@@ -1,17 +1,22 @@
+/// <reference types="vite/client" />
+
 import { initializeApp, getApps, getApp } from "firebase/app";
 import { getAuth, GoogleAuthProvider } from "firebase/auth";
 import { getFirestore, initializeFirestore } from "firebase/firestore";
 import { getStorage } from "firebase/storage";
 import firebaseConfigData from "../../firebase-applet-config.json";
 
+const metaEnv = (import.meta as any).env || {};
+
+// Support both environment variables (for Vercel/production) and config file (for local/preview)
 const firebaseConfig = {
-  projectId: firebaseConfigData.projectId,
-  appId: firebaseConfigData.appId,
-  apiKey: firebaseConfigData.apiKey,
-  authDomain: firebaseConfigData.authDomain,
-  storageBucket: firebaseConfigData.storageBucket,
-  messagingSenderId: firebaseConfigData.messagingSenderId,
-  measurementId: firebaseConfigData.measurementId || undefined
+  projectId: metaEnv.VITE_FIREBASE_PROJECT_ID || firebaseConfigData.projectId || "jj-book-store",
+  appId: metaEnv.VITE_FIREBASE_APP_ID || firebaseConfigData.appId,
+  apiKey: metaEnv.VITE_FIREBASE_API_KEY || firebaseConfigData.apiKey,
+  authDomain: metaEnv.VITE_FIREBASE_AUTH_DOMAIN || firebaseConfigData.authDomain || "jj-book-store.firebaseapp.com",
+  storageBucket: metaEnv.VITE_FIREBASE_STORAGE_BUCKET || firebaseConfigData.storageBucket || "jj-book-store.firebasestorage.app",
+  messagingSenderId: metaEnv.VITE_FIREBASE_MESSAGING_SENDER_ID || firebaseConfigData.messagingSenderId,
+  measurementId: metaEnv.VITE_FIREBASE_MEASUREMENT_ID || firebaseConfigData.measurementId || undefined
 };
 
 // Initialize Firebase App
@@ -25,7 +30,9 @@ googleProvider.setCustomParameters({
 });
 
 // Firebase Firestore with auto-detect long polling fallback for sandboxed web environments
-const dbId = firebaseConfigData.firestoreDatabaseId || "(default)";
+const rawDbId = metaEnv.VITE_FIREBASE_FIRESTORE_DATABASE_ID || firebaseConfigData.firestoreDatabaseId;
+const dbId = (!rawDbId || rawDbId.startsWith("ai-studio-jjbookshopping")) ? "(default)" : rawDbId;
+
 let firestoreDb;
 try {
   firestoreDb = initializeFirestore(app, {

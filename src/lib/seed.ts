@@ -32,7 +32,13 @@ export async function seedBookstoreData(forceReset = false) {
   try {
     // Check if store settings already exist
     const settingsRef = doc(db, "settings", "store_config");
-    const settingsSnap = await getDoc(settingsRef);
+    let settingsSnap;
+    try {
+      settingsSnap = await getDoc(settingsRef);
+    } catch (e) {
+      console.warn("Firestore connectivity notice during seed check:", e);
+      return { success: false, error: "Firestore currently offline or connecting." };
+    }
 
     if (settingsSnap.exists() && !forceReset) {
       console.log("Firestore already seeded with initial bookstore data.");
