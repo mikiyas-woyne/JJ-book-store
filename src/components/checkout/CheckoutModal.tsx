@@ -185,9 +185,12 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
       let trustedGrandTotal = grandTotal;
 
       try {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 2000);
         const res = await fetch("/api/checkout/validate", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
+          signal: controller.signal,
           body: JSON.stringify({
             items: cartItems.map((i) => ({
               bookId: i.bookId,
@@ -198,6 +201,7 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
             couponCode: appliedCoupon?.code
           })
         });
+        clearTimeout(timeoutId);
 
         if (res.ok) {
           const validatedData = await res.json();
@@ -270,62 +274,51 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
       const docRef = await addDoc(collection(db, "orders"), cleanFirestoreData(newOrderData));
       const fullOrder: Order = { id: docRef.id, ...newOrderData };
 
-      // Record Activity Log
-      try {
-        await addDoc(collection(db, "activity_logs"), {
-          title: `New Order #${orderNumber}`,
-          description: `${customerName} placed order for ${cartItems.length} item(s) totalling ${trustedGrandTotal.toLocaleString()} ETB via ${paymentMethod.toUpperCase()}`,
-          category: "orders",
-          type: "order_created",
-          orderId: orderNumber,
-          amount: trustedGrandTotal,
-          timestamp: new Date().toISOString()
-        });
-      } catch (logErr) {
-        console.warn("Activity log warning:", logErr);
-      }
-
-      // Send Order Confirmation Email & Store in Firestore
-      try {
-        await fetch("/api/orders/notify-email", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ order: fullOrder })
-        });
-      } catch (emailErr) {
-        console.warn("Order email notification dispatch notice:", emailErr);
-      }
-
-      try {
-        await sendCustomerOrderEmail(
-          fullOrder,
-          "approved",
-          "JJ Order System",
-          paymentReference || "N/A",
-          "Your order has been recorded and is being prepared for dispatch."
-        );
-      } catch (inAppEmailErr) {
-        console.warn("In-app email log notice:", inAppEmailErr);
-      }
-
-      // Update book inventory stock & sold counts
-      for (const item of cartItems) {
-        try {
-          const bookRef = doc(db, "books", item.bookId);
-          await updateDoc(bookRef, {
-            stock: increment(-item.quantity),
-            soldCount: increment(item.quantity)
-          });
-        } catch (err) {
-          console.warn("Stock update notice:", err);
-        }
-      }
-
+      // Instantly advance order state & clear cart so user is never blocked!
       setCreatedOrder(fullOrder);
       clearCart();
       setStep(6);
       onOrderCompleted(fullOrder);
       showToast("Order Confirmed!", `Order ${orderNumber} has been successfully placed.`, "success");
+
+      // Non-blocking Background Tasks
+      // 1. Record Activity Log
+      addDoc(collection(db, "activity_logs"), {
+        title: `New Order #${orderNumber}`,
+        description: `${customerName} placed order for ${cartItems.length} item(s) totalling ${trustedGrandTotal.toLocaleString()} ETB via ${paymentMethod.toUpperCase()}`,
+        category: "orders",
+        type: "order_created",
+        orderId: orderNumber,
+        amount: trustedGrandTotal,
+        timestamp: new Date().toISOString()
+      }).catch(logErr => console.warn("Activity log warning:", logErr));
+
+      // 2. Send Order Confirmation Emails (Admin & Customer)
+      fetch("/api/orders/notify-email", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ order: fullOrder })
+      }).catch(emailErr => console.warn("Order email notification dispatch notice:", emailErr));
+
+      // 3. Log In-App Customer Notification Document
+      sendCustomerOrderEmail(
+        fullOrder,
+        "approved",
+        "JJ Order System",
+        paymentReference || "N/A",
+        "Your order has been recorded and is being prepared for dispatch."
+      ).catch(inAppEmailErr => console.warn("In-app email log notice:", inAppEmailErr));
+
+      // 4. Update Book Inventory Stock & Sold Counts
+      Promise.allSettled(
+        cartItems.map((item) => {
+          const bookRef = doc(db, "books", item.bookId);
+          return updateDoc(bookRef, {
+            stock: increment(-item.quantity),
+            soldCount: increment(item.quantity)
+          });
+        })
+      ).catch(err => console.warn("Stock update notice:", err));
     } catch (err) {
       console.error("Error creating order:", err);
       showToast("Checkout Error", "Failed to place order. Please try again.", "error");

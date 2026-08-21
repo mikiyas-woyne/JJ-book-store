@@ -274,6 +274,7 @@ async function startServer() {
           "Content-Type": "application/json",
           "Referer": "https://jjbookstore.com"
         },
+        signal: AbortSignal.timeout(3500),
         body: JSON.stringify(mailPayload)
       });
       const resData: any = await res.json().catch(() => ({}));
@@ -298,6 +299,7 @@ async function startServer() {
             "Content-Type": "application/json",
             "Referer": "https://jjbookstore.com"
           },
+          signal: AbortSignal.timeout(3500),
           body: JSON.stringify(customerMailPayload)
         }).then(r => r.json()).then(d => {
           console.log(`[HTTP Mail Relay Notice for customer ${customerEmail}]:`, d);
@@ -316,7 +318,7 @@ async function startServer() {
   }
 
   // Endpoint to send order notification emails
-  app.post("/api/orders/notify-email", async (req, res) => {
+  app.post("/api/orders/notify-email", (req, res) => {
     try {
       const { order } = req.body;
       if (!order) {
@@ -324,16 +326,21 @@ async function startServer() {
         return;
       }
 
-      const result = await sendOrderEmailNotifications(order);
-
+      // Send immediate HTTP response so the client order flow is never blocked
       res.json({
         success: true,
-        message: `Order email notifications sent to admin (${result.adminEmail}) and customer (${result.customerEmail})`,
-        details: result
+        message: "Order notification queued successfully."
+      });
+
+      // Dispatch email notifications asynchronously in the background
+      sendOrderEmailNotifications(order).catch((bgErr) => {
+        console.warn("Background email notification notice:", bgErr?.message);
       });
     } catch (err: any) {
       console.warn("Order notification error handler:", err?.message);
-      res.json({ success: true, message: "Order notification processed with fallback." });
+      if (!res.headersSent) {
+        res.json({ success: true, message: "Order notification processed with fallback." });
+      }
     }
   });
 
