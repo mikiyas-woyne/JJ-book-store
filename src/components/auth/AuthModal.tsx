@@ -6,9 +6,10 @@ import { useToast } from "../ui/Toast";
 interface AuthModalProps {
   isOpen: boolean;
   onClose: () => void;
+  reasonNotice?: string | null;
 }
 
-export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
+export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, reasonNotice }) => {
   const { loginWithEmail, registerWithEmail, loginWithGoogle, resetPassword } = useAuth();
   const { showToast } = useToast();
 
@@ -113,6 +114,13 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
 
         {/* Form Body */}
         <div className="p-4 sm:p-6 space-y-4 sm:space-y-5 overflow-y-auto">
+          {reasonNotice && (
+            <div className="p-3.5 rounded-2xl bg-amber-500/10 border border-amber-500/30 text-amber-950 text-xs font-semibold flex items-center gap-2.5 animate-in fade-in">
+              <Sparkles className="w-4 h-4 text-amber-600 shrink-0" />
+              <span className="leading-relaxed">{reasonNotice}</span>
+            </div>
+          )}
+
           <form onSubmit={handleSubmit} className="space-y-4 text-xs">
             {mode === "register" && (
               <div>

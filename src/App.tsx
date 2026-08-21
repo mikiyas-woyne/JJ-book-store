@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { collection, getDocs, onSnapshot } from "firebase/firestore";
 import { db } from "./lib/firebase";
-import { AuthProvider } from "./context/AuthContext";
+import { AuthProvider, useAuth } from "./context/AuthContext";
 import { CartProvider, useCart } from "./context/CartContext";
 import { WishlistProvider } from "./context/WishlistContext";
 import { ToastProvider, useToast } from "./components/ui/Toast";
@@ -42,6 +42,16 @@ import {
 function MainAppContent() {
   const { showToast } = useToast();
   const { addToCart } = useCart();
+  const { currentUser } = useAuth();
+
+  // Pending Auth Intent & Notice State (Auto-resume work after Google Sign-In)
+  const [pendingAuthAction, setPendingAuthAction] = useState<{
+    type: "buy_now" | "checkout" | "account";
+    book?: Book;
+    quantity?: number;
+    tab?: string;
+  } | null>(null);
+  const [authNoticeReason, setAuthNoticeReason] = useState<string | null>(null);
 
   // Navigation State
   const [activePage, setActivePage] = useState<
@@ -165,21 +175,87 @@ function MainAppContent() {
 
   const handleNavigate = (page: string, params?: Record<string, string>) => {
     if (page === "auth") {
+      setAuthNoticeReason(null);
       setIsAuthOpen(true);
       return;
     }
-    if (page === "account" && params?.tab) {
-      setAccountTab(params.tab);
+    if (page === "account") {
+      if (!currentUser) {
+        setPendingAuthAction({ type: "account", tab: params?.tab || "orders" });
+        setAuthNoticeReason("Please sign in or create an account to view your account dashboard & orders.");
+        setIsAuthOpen(true);
+        showToast("Sign In Required", "Please sign in or create an account to access your account.", "info");
+        return;
+      }
+      if (params?.tab) {
+        setAccountTab(params.tab);
+      }
     }
     setActivePage(page as any);
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
   const handleBuyNow = (book: Book, quantity: number) => {
+    if (!currentUser) {
+      setPendingAuthAction({ type: "buy_now", book, quantity });
+      setAuthNoticeReason(`Please sign in or create an account to purchase "${book.title}". You will continue directly to checkout after signing in.`);
+      setSelectedBook(null);
+      setIsAuthOpen(true);
+      showToast("Sign In Required", "Please sign in or create an account before buying books.", "info");
+      return;
+    }
     addToCart(book, quantity);
     setSelectedBook(null);
     setIsCheckoutOpen(true);
   };
+
+  const handleProceedToCheckout = () => {
+    if (!currentUser) {
+      setPendingAuthAction({ type: "checkout" });
+      setAuthNoticeReason("Please sign in or create an account to complete your book purchase. You will return directly to checkout after signing in.");
+      setIsCartOpen(false);
+      setIsAuthOpen(true);
+      showToast("Sign In Required", "Please sign in or create an account before checking out.", "info");
+      return;
+    }
+    setIsCartOpen(false);
+    setIsCheckoutOpen(true);
+  };
+
+  // Automatically resume user work after successful Google Sign-In / Authentication
+  useEffect(() => {
+    if (currentUser && pendingAuthAction) {
+      const action = pendingAuthAction;
+      setPendingAuthAction(null);
+      setAuthNoticeReason(null);
+      setIsAuthOpen(false);
+
+      if (action.type === "buy_now" && action.book) {
+        addToCart(action.book, action.quantity || 1);
+        setIsCheckoutOpen(true);
+        showToast(
+          "Signed In Successfully",
+          `Welcome, ${currentUser.displayName || currentUser.email}! Resuming checkout for "${action.book.title}".`,
+          "success"
+        );
+      } else if (action.type === "checkout") {
+        setIsCheckoutOpen(true);
+        showToast(
+          "Signed In Successfully",
+          `Welcome, ${currentUser.displayName || currentUser.email}! Continuing to secure checkout...`,
+          "success"
+        );
+      } else if (action.type === "account") {
+        setActivePage("account");
+        if (action.tab) setAccountTab(action.tab);
+        showToast(
+          "Signed In Successfully",
+          `Welcome, ${currentUser.displayName || currentUser.email}! Opened your account area.`,
+          "success"
+        );
+      }
+    }
+  }, [currentUser, pendingAuthAction]);
 
   // Filter & Sort Logic for Shop Page
   const filteredBooks = books.filter((b) => {
@@ -617,7 +693,7 @@ function MainAppContent() {
       <CartDrawer
         isOpen={isCartOpen}
         onClose={() => setIsCartOpen(false)}
-        onProceedToCheckout={() => setIsCheckoutOpen(true)}
+        onProceedToCheckout={handleProceedToCheckout}
       />
 
       <CheckoutModal
@@ -637,7 +713,11 @@ function MainAppContent() {
 
       <AuthModal
         isOpen={isAuthOpen}
-        onClose={() => setIsAuthOpen(false)}
+        onClose={() => {
+          setIsAuthOpen(false);
+          setAuthNoticeReason(null);
+        }}
+        reasonNotice={authNoticeReason}
       />
     </div>
   );
