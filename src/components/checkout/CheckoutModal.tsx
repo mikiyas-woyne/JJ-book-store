@@ -847,6 +847,19 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
                 </h3>
               </div>
 
+              {/* Email Dispatch Notice */}
+              <div className="max-w-lg mx-auto bg-amber-500/10 border border-amber-500/30 rounded-2xl p-3.5 text-xs text-amber-950 flex items-start gap-3 text-left">
+                <div className="p-1.5 rounded-xl bg-amber-500 text-amber-950 font-bold shrink-0 mt-0.5">
+                  ✉️
+                </div>
+                <div>
+                  <strong className="font-bold text-amber-900 block">Order Notification Emails Dispatched</strong>
+                  <p className="text-[11px] text-amber-800 leading-relaxed mt-0.5">
+                    A confirmation email has been sent to <strong>{createdOrder.customerEmail || customerEmail}</strong> and an order alert has been delivered to the bookstore administrator (<strong>mikiyaswoyne@gmail.com</strong>).
+                  </p>
+                </div>
+              </div>
+
               {/* Official Printable/Screenshot Receipt Container */}
               <div
                 ref={receiptRef}

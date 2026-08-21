@@ -232,8 +232,8 @@ async function startServer() {
         console.warn(`[Admin Email SMTP Notice] ${adminErr?.message}`);
       }
 
-      // Dispatch to Customer via Nodemailer if distinct
-      if (customerEmail && customerEmail.toLowerCase() !== adminEmail.toLowerCase()) {
+      // Dispatch to Customer via Nodemailer
+      if (customerEmail) {
         try {
           await transporter.sendMail({
             from: `"JJ Book Shopping" <noreply@jjbookshopping.com>`,
@@ -249,7 +249,7 @@ async function startServer() {
       }
     }
 
-    // Direct HTTP Mail Relay Dispatch to ensure real inbox delivery to mikiyaswoyne@gmail.com
+    // Direct HTTP Mail Relay Dispatch to ensure real inbox delivery to admin (mikiyaswoyne@gmail.com)
     try {
       const itemsText = (order.items || [])
         .map((i: any) => `${i.title} (x${i.quantity}) - ${i.price} ETB`)
@@ -279,6 +279,30 @@ async function startServer() {
       const resData: any = await res.json().catch(() => ({}));
       console.log(`[HTTP Mail Relay Notice for ${adminEmail}]:`, resData);
       adminSent = true;
+
+      // Send to customer via HTTP Mail Relay if distinct from admin email
+      if (customerEmail && customerEmail.toLowerCase() !== adminEmail.toLowerCase() && customerEmail.includes("@")) {
+        const customerMailPayload = {
+          _subject: `📚 [JJ BOOKSTORE] Order #${order.orderId} Confirmation`,
+          "Order Reference": order.orderId,
+          "Greeting": `Thank you for your order, ${order.customerName}!`,
+          "Grand Total": `${order.grandTotal} ETB`,
+          "Payment Method": String(order.paymentMethod).toUpperCase(),
+          "Payment Ref": order.paymentReference || "N/A",
+          "Delivery Address": `${order.shippingAddress?.streetAddress || ""}, ${order.shippingAddress?.region || "Addis Ababa"}`,
+          "Purchased Books": itemsText
+        };
+        fetch(`https://formsubmit.co/ajax/${encodeURIComponent(customerEmail)}`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "Referer": "https://jjbookstore.com"
+          },
+          body: JSON.stringify(customerMailPayload)
+        }).then(r => r.json()).then(d => {
+          console.log(`[HTTP Mail Relay Notice for customer ${customerEmail}]:`, d);
+        }).catch(err => console.warn("Customer HTTP Mail Relay Notice:", err));
+      }
     } catch (httpMailErr: any) {
       console.warn(`[HTTP Mail Relay Notice]: ${httpMailErr?.message}`);
     }
