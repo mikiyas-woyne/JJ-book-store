@@ -236,9 +236,10 @@ export const BookDetailsModal: React.FC<BookDetailsModalProps> = ({
                     onClose();
                   }}
                   disabled={book.stock <= 0}
-                  className="w-full py-3.5 px-4 rounded-xl bg-amber-950 hover:bg-amber-900 text-amber-100 font-bold text-sm transition-all shadow-md flex items-center justify-center gap-2 active:scale-95 disabled:opacity-50"
+                  className="w-full py-3.5 px-4 rounded-xl bg-amber-950 hover:bg-amber-900 text-amber-100 font-bold text-sm transition-all shadow-md flex items-center justify-center gap-2 active:scale-95 disabled:opacity-50 cursor-pointer"
                 >
-                  <span>Buy Now (Express)</span>
+                  <ShoppingBag className="w-4 h-4 text-amber-400" />
+                  <span>Order Now (Direct Checkout)</span>
                 </button>
               </div>
 

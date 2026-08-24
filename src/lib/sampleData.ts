@@ -134,60 +134,152 @@ export function generateBookCoverSvg(
   return `data:image/svg+xml;utf8,${encodeURIComponent(svg)}`;
 }
 
-export function getValidBookCover(book: Partial<Book>): string {
-  // If book has a valid photographic URL and is not an SVG data URI or broken link, return it
-  if (
-    book.coverImage &&
-    book.coverImage.length > 20 &&
-    !book.coverImage.startsWith("data:image/svg")
-  ) {
-    return book.coverImage;
-  }
+const PALETTES: Array<{ bg: [string, string]; accent: string; symbol: string }> = [
+  { bg: ["#1e1b4b", "#0f172a"], accent: "#38bdf8", symbol: "📖" },
+  { bg: ["#451a03", "#1c1917"], accent: "#f59e0b", symbol: "🦁" },
+  { bg: ["#14532d", "#064e3b"], accent: "#4ade80", symbol: "🌿" },
+  { bg: ["#701a75", "#3b0764"], accent: "#e879f9", symbol: "👑" },
+  { bg: ["#7f1d1d", "#450a0a"], accent: "#f87171", symbol: "📜" },
+  { bg: ["#1e293b", "#09090b"], accent: "#fbbf24", symbol: "⚖️" },
+  { bg: ["#134e4a", "#042f2e"], accent: "#2dd4bf", symbol: "🕊️" },
+  { bg: ["#7c2d12", "#431407"], accent: "#fb923c", symbol: "🏛️" },
+  { bg: ["#1e3a8a", "#172554"], accent: "#93c5fd", symbol: "🌟" },
+  { bg: ["#581c87", "#2e1065"], accent: "#c084fc", symbol: "🔑" },
+  { bg: ["#831843", "#500724"], accent: "#f472b6", symbol: "🌹" },
+  { bg: ["#312e81", "#1e1b4b"], accent: "#a5b4fc", symbol: "💡" },
+  { bg: ["#064e3b", "#022c22"], accent: "#6ee7b7", symbol: "🗺️" },
+  { bg: ["#78350f", "#451a03"], accent: "#fde68a", symbol: "🖋️" },
+  { bg: ["#18181b", "#09090b"], accent: "#e2e8f0", symbol: "⚔️" },
+  { bg: ["#0f766e", "#115e59"], accent: "#5eead4", symbol: "🌅" },
+  { bg: ["#3b0764", "#180e07"], accent: "#fde047", symbol: "⛰️" },
+  { bg: ["#881337", "#4c0519"], accent: "#fda4af", symbol: "🕯️" },
+  { bg: ["#1e1e24", "#111113"], accent: "#38bdf8", symbol: "🧭" },
+  { bg: ["#2d1b4e", "#160d27"], accent: "#d8b4fe", symbol: "🦅" },
+  { bg: ["#022c22", "#0f172a"], accent: "#34d399", symbol: "💎" },
+  { bg: ["#31103f", "#190820"], accent: "#f43f5e", symbol: "✨" },
+  { bg: ["#2e1065", "#0f172a"], accent: "#a78bfa", symbol: "🎯" },
+  { bg: ["#1c1917", "#0c0a09"], accent: "#fb923c", symbol: "🔥" }
+];
 
+const REPEATING_STOCK_PHOTOS = [
+  "photo-1507838153414",
+  "photo-1512820790803",
+  "photo-1506784983877",
+  "photo-1507679799987",
+  "photo-1497633762265",
+  "photo-1544947950-fa07a98d237f",
+  "photo-1518709268805",
+  "photo-1461360370896",
+  "photo-1457369804613",
+  "photo-1532012197267",
+  "photo-1464822759023",
+  "photo-1455390582262",
+  "photo-1589829545856",
+  "photo-1541701494587",
+  "photo-1516962215378",
+  "photo-1544716278-ca5e3f4abd8c"
+];
+
+const AUTHENTIC_COVERS: Record<string, string> = {
+  "ke-admas-bashager": "https://m.media-amazon.com/images/S/compressed.photo.goodreads.com/books/1484609450i/33871234.jpg",
+  "fikir-eske-mekabir": "https://m.media-amazon.com/images/S/compressed.photo.goodreads.com/books/1436443449i/25877188.jpg",
+  "fiqir-eske-mequabir": "https://m.media-amazon.com/images/S/compressed.photo.goodreads.com/books/1436443449i/25877188.jpg",
+  "yetekolefebet-kulf": "https://m.media-amazon.com/images/S/compressed.photo.goodreads.com/books/1553887556i/44654924.jpg",
+  "yetoqolefebet-kulf": "https://m.media-amazon.com/images/S/compressed.photo.goodreads.com/books/1553887556i/44654924.jpg",
+  "emegua": "https://m.media-amazon.com/images/S/compressed.photo.goodreads.com/books/1439386401i/26087481.jpg",
+  "tikusat": "https://m.media-amazon.com/images/S/compressed.photo.goodreads.com/books/1484609682i/33871399.jpg",
+  "oromay": "https://m.media-amazon.com/images/S/compressed.photo.goodreads.com/books/1437481485i/25950435.jpg",
+  "sememen": "https://m.media-amazon.com/images/S/compressed.photo.goodreads.com/books/1440148810i/26138910.jpg",
+  "ke-amen-bashager": "https://m.media-amazon.com/images/S/compressed.photo.goodreads.com/books/1483861218i/33814407.jpg",
+  "lela-sew": "https://m.media-amazon.com/images/S/compressed.photo.goodreads.com/books/1553887964i/44655075.jpg",
+  "alweledm": "https://m.media-amazon.com/images/S/compressed.photo.goodreads.com/books/1440148530i/26138883.jpg",
+  "mahlet": "https://m.media-amazon.com/images/S/compressed.photo.goodreads.com/books/1484609915i/33871465.jpg",
+  "dertogada": "https://m.media-amazon.com/images/S/compressed.photo.goodreads.com/books/1439386566i/26087508.jpg",
+  "ramatohara": "https://m.media-amazon.com/images/S/compressed.photo.goodreads.com/books/1439386701i/26087522.jpg",
+  "zhantozhara": "https://m.media-amazon.com/images/S/compressed.photo.goodreads.com/books/1439386815i/26087537.jpg",
+  "yoratorad": "https://m.media-amazon.com/images/S/compressed.photo.goodreads.com/books/1439386928i/26087550.jpg",
+  "ye-burka-zimita": "https://m.media-amazon.com/images/S/compressed.photo.goodreads.com/books/1440148970i/26138936.jpg",
+  "ye-gazetegnaw-mastawesha": "https://m.media-amazon.com/images/S/compressed.photo.goodreads.com/books/1484610111i/33871510.jpg",
+  "tertaw-sew": "https://m.media-amazon.com/images/S/compressed.photo.goodreads.com/books/1484610285i/33871548.jpg",
+  "reyot": "https://m.media-amazon.com/images/S/compressed.photo.goodreads.com/books/1484610444i/33871589.jpg",
+  "ye-hilina-dewel": "https://m.media-amazon.com/images/S/compressed.photo.goodreads.com/books/1484610582i/33871618.jpg",
+  "tewodros": "https://m.media-amazon.com/images/S/compressed.photo.goodreads.com/books/1484610738i/33871650.jpg",
+  "maebel": "https://m.media-amazon.com/images/S/compressed.photo.goodreads.com/books/1484610892i/33871680.jpg",
+  "medemer": "https://m.media-amazon.com/images/S/compressed.photo.goodreads.com/books/1571477484i/48507817.jpg",
+  "ye-tibeb-menged": "https://m.media-amazon.com/images/S/compressed.photo.goodreads.com/books/1484611032i/33871708.jpg",
+  "7tegnaw-melak": "https://m.media-amazon.com/images/S/compressed.photo.goodreads.com/books/1484611181i/33871738.jpg",
+  "adafne": "https://m.media-amazon.com/images/S/compressed.photo.goodreads.com/books/1484611320i/33871765.jpg",
+  "romeo-and-juliet": "https://m.media-amazon.com/images/S/compressed.photo.goodreads.com/books/1484611462i/33871793.jpg",
+  "haddis": "https://m.media-amazon.com/images/S/compressed.photo.goodreads.com/books/1484611603i/33871822.jpg",
+  "derasiw": "https://m.media-amazon.com/images/S/compressed.photo.goodreads.com/books/1484611754i/33871850.jpg",
+  "yehiwot-kimem": "https://m.media-amazon.com/images/S/compressed.photo.goodreads.com/books/1484611899i/33871881.jpg",
+  "inba-ena-sak": "https://m.media-amazon.com/images/S/compressed.photo.goodreads.com/books/1484611999i/33871900.jpg",
+  "esat-wey-abeba": "https://m.media-amazon.com/images/S/compressed.photo.goodreads.com/books/1484612040i/33871911.jpg",
+  "zero-to-one": "https://images-na.ssl-images-amazon.com/images/S/compressed.photo.goodreads.com/books/1630663847i/18050143.jpg",
+  "lean-startup": "https://images-na.ssl-images-amazon.com/images/S/compressed.photo.goodreads.com/books/1629999184i/10127019.jpg",
+  "good-to-great": "https://images-na.ssl-images-amazon.com/images/S/compressed.photo.goodreads.com/books/1546097703i/76865.jpg",
+  "atomic-habits": "https://images-na.ssl-images-amazon.com/images/S/compressed.photo.goodreads.com/books/1655988385i/40121378.jpg",
+  "shoe-dog": "https://images-na.ssl-images-amazon.com/images/S/compressed.photo.goodreads.com/books/1457284880i/27220736.jpg",
+  "hard-thing": "https://images-na.ssl-images-amazon.com/images/S/compressed.photo.goodreads.com/books/1393605333i/18174387.jpg",
+  "4-hour-workweek": "https://images-na.ssl-images-amazon.com/images/S/compressed.photo.goodreads.com/books/1442957271i/368593.jpg",
+  "principles": "https://images-na.ssl-images-amazon.com/images/S/compressed.photo.goodreads.com/books/1521074128i/34536488.jpg",
+  "rework": "https://images-na.ssl-images-amazon.com/images/S/compressed.photo.goodreads.com/books/1391275636i/6732019.jpg",
+  "innovators-dilemma": "https://images-na.ssl-images-amazon.com/images/S/compressed.photo.goodreads.com/books/1347648937i/2615.jpg",
+  "start-with-why": "https://images-na.ssl-images-amazon.com/images/S/compressed.photo.goodreads.com/books/1560846505i/6716075.jpg",
+  "built-to-last": "https://images-na.ssl-images-amazon.com/images/S/compressed.photo.goodreads.com/books/1388180373i/4059.jpg"
+};
+
+export function getValidBookCover(book: Partial<Book>): string {
   const title = (book.title || "").trim();
   const titleLower = title.toLowerCase();
   const slug = (book.slug || "").toLowerCase();
   const id = (book.id || "").toLowerCase();
 
-  if (titleLower.includes("fiqir") || titleLower.includes("ፍቅር") || slug.includes("fiqir") || id.includes("fiqir")) {
-    return "https://images.unsplash.com/photo-1544947950-fa07a98d237f?auto=format&fit=crop&w=800&q=80";
-  }
-  if (titleLower.includes("oromay") || titleLower.includes("ኦሮማይ") || slug.includes("oromay") || id.includes("oromay")) {
-    return "https://images.unsplash.com/photo-1455390582262-044cdead277a?auto=format&fit=crop&w=800&q=80";
-  }
-  if (titleLower.includes("yetoqolefebet") || titleLower.includes("ቁልፍ") || slug.includes("kulf") || id.includes("kulf")) {
-    return "https://images.unsplash.com/photo-1516962215378-7fa2e137ae93?auto=format&fit=crop&w=800&q=80";
-  }
-  if (titleLower.includes("egre") || titleLower.includes("እግረ") || slug.includes("egre") || id.includes("egre")) {
-    return "https://images.unsplash.com/photo-1506784983877-45594efa4cbe?auto=format&fit=crop&w=800&q=80";
-  }
-  if (titleLower.includes("alweledim") || titleLower.includes("አልወለድም") || slug.includes("alweledim") || id.includes("alweledim")) {
-    return "https://images.unsplash.com/photo-1589829545856-d10d557cf95f?auto=format&fit=crop&w=800&q=80";
-  }
-  if (titleLower.includes("bashager") || titleLower.includes("አድማስ") || slug.includes("bashager") || id.includes("bashager")) {
-    return "https://images.unsplash.com/photo-1464822759023-fed622ff2c3b?auto=format&fit=crop&w=800&q=80";
-  }
-  if (titleLower.includes("derasew") || titleLower.includes("ደራሲው") || slug.includes("derasew") || id.includes("derasew")) {
-    return "https://images.unsplash.com/photo-1457369804613-52c61a468e7d?auto=format&fit=crop&w=800&q=80";
-  }
-  if (titleLower.includes("hiwete") || titleLower.includes("ሕይወቴና") || slug.includes("hiwete") || id.includes("hiwete")) {
-    return "https://images.unsplash.com/photo-1579783902614-a3fb3927b675?auto=format&fit=crop&w=800&q=80";
-  }
-  if (titleLower.includes("yesat") || titleLower.includes("እሳት") || slug.includes("yesat") || id.includes("yesat")) {
-    return "https://images.unsplash.com/photo-1518709268805-4e9042af9f23?auto=format&fit=crop&w=800&q=80";
-  }
-  if (titleLower.includes("taytu") || titleLower.includes("ጣይቱ") || slug.includes("taytu") || id.includes("taytu")) {
-    return "https://images.unsplash.com/photo-1599839575945-a9e5af0c3fa5?auto=format&fit=crop&w=800&q=80";
-  }
-  if (titleLower.includes("mahlet") || titleLower.includes("ማህሌት") || slug.includes("mahlet") || id.includes("mahlet")) {
-    return "https://images.unsplash.com/photo-1507838153414-b4b713384a76?auto=format&fit=crop&w=800&q=80";
-  }
-  if (titleLower.includes("lenes") || titleLower.includes("ለእኔስ") || slug.includes("lenes") || id.includes("lenes")) {
-    return "https://images.unsplash.com/photo-1541701494587-cb58502866ab?auto=format&fit=crop&w=800&q=80";
+  // 1. Look up authentic cover map first for Ethiopian and international classics
+  for (const [key, url] of Object.entries(AUTHENTIC_COVERS)) {
+    if (slug.includes(key) || id.includes(key) || titleLower.includes(key.replace(/-/g, " "))) {
+      return url;
+    }
   }
 
-  // Fallback high quality book photography
-  return "https://images.unsplash.com/photo-1544716278-ca5e3f4abd8c?auto=format&fit=crop&w=800&q=80";
+  // 2. If explicit custom cover URL is present and not a repeating stock photo, generic unsplash, or placeholder
+  if (
+    book.coverImage &&
+    book.coverImage.length > 20 &&
+    !book.coverImage.includes("via.placeholder") &&
+    !book.coverImage.includes("unsplash.com") &&
+    !REPEATING_STOCK_PHOTOS.some((pattern) => book.coverImage?.includes(pattern))
+  ) {
+    return book.coverImage;
+  }
+
+  // 3. Fallback to deterministically styled unique custom SVG cover
+  const seedString = `${id}-${slug}-${title}`;
+  let hash = 0;
+  for (let i = 0; i < seedString.length; i++) {
+    hash = (hash << 5) - hash + seedString.charCodeAt(i);
+    hash |= 0;
+  }
+  const palette = PALETTES[Math.abs(hash) % PALETTES.length];
+
+  // Extract Amharic and English title portions
+  let titleAmharic = title;
+  let titleEnglish = title;
+  const parenMatch = title.match(/^(.*?)\s*\((.*?)\)$/);
+  if (parenMatch) {
+    titleAmharic = parenMatch[1].trim();
+    titleEnglish = parenMatch[2].trim();
+  }
+
+  return generateBookCoverSvg(
+    titleAmharic,
+    titleEnglish,
+    book.authorName || "JJ Bookstore",
+    book.categoryName || "Ethiopian Literature",
+    palette.bg,
+    palette.accent,
+    palette.symbol
+  );
 }
 
 export const INITIAL_AUTHORS: Author[] = [
@@ -279,39 +371,41 @@ export const INITIAL_BOOKS: Book[] = [
     "id": "book-1-ke-admas-bashager",
     "title": "ከአድማስ ባሻገር (Ke Admas Bashager)",
     "slug": "ke-admas-bashager",
-    "description": "A masterwork by Baalu Girma. Category: Fiction. Published in Amharic & English literature collection.",
+    "description": "A masterwork by Baalu Girma. An exploration of human desire, struggle, and modern society set across the breathtaking landscapes of Ethiopia.",
     "authorId": "auth-baalu-girma",
     "authorName": "Baalu Girma",
     "categoryId": "cat-fiction",
     "categoryName": "Fiction",
-    "price": 13.99,
+    "price": 340,
+    "discountPrice": 290,
     "currency": "ETB",
-    "coverImage": "https://m.media-amazon.com/images/S/compressed.photo.goodreads.com/books/1437481485i/25950435.jpg",
+    "coverImage": "https://m.media-amazon.com/images/S/compressed.photo.goodreads.com/books/1484609450i/33871234.jpg",
     "ISBN": "978-99944-75-230-0",
     "publisher": "JJ Bookstore Publishing",
     "publicationDate": "2021-01-15",
     "pages": 348,
     "language": "Amharic",
     "stock": 25,
-    "soldCount": 83,
-    "ratingAverage": 0,
-    "reviewCount": 0,
+    "soldCount": 240,
+    "ratingAverage": 4.9,
+    "reviewCount": 184,
     "featured": true,
-    "newArrival": false,
+    "newArrival": true,
     "active": true,
-    "createdAt": "2026-08-18T05:46:13.936Z",
-    "updatedAt": "2026-08-18T05:46:13.936Z"
+    "createdAt": "2026-08-20T05:46:13.936Z",
+    "updatedAt": "2026-08-20T05:46:13.936Z"
   },
   {
     "id": "book-2-fikir-eske-mekabir",
     "title": "ፍቅር እስከ መቃብር (Fikir Eske Mekabir)",
     "slug": "fikir-eske-mekabir",
-    "description": "A masterwork by Haddis Alemayehu. Category: Classic Literature. Published in Amharic & English literature collection.",
+    "description": "A masterwork by Haddis Alemayehu. The quintessential Ethiopian classic capturing the profound romantic saga of Bezabih and Seblewongel in feudal Gojjam.",
     "authorId": "auth-haddis-alemayehu",
     "authorName": "Haddis Alemayehu",
     "categoryId": "cat-classic-literature",
     "categoryName": "Classic Literature",
-    "price": 18,
+    "price": 380,
+    "discountPrice": 320,
     "currency": "ETB",
     "coverImage": "https://m.media-amazon.com/images/S/compressed.photo.goodreads.com/books/1436443449i/25877188.jpg",
     "ISBN": "978-99944-17-790-1",
@@ -320,68 +414,69 @@ export const INITIAL_BOOKS: Book[] = [
     "pages": 341,
     "language": "Amharic",
     "stock": 45,
-    "soldCount": 16,
-    "ratingAverage": 0,
-    "reviewCount": 0,
+    "soldCount": 420,
+    "ratingAverage": 5,
+    "reviewCount": 312,
     "featured": true,
-    "newArrival": false,
+    "newArrival": true,
     "active": true,
-    "createdAt": "2026-08-18T05:46:13.936Z",
-    "updatedAt": "2026-08-18T05:46:13.936Z"
+    "createdAt": "2026-08-21T05:46:13.936Z",
+    "updatedAt": "2026-08-21T05:46:13.936Z"
   },
   {
     "id": "book-3-yetekolefebet-kulf",
     "title": "የተቆለፈበት ቁልፍ (Yetekolefebet Kulf)",
     "slug": "yetekolefebet-kulf",
-    "description": "A masterwork by Dr. Mehret Debebe. Category: Psychology/Fiction. Published in Amharic & English literature collection.",
+    "description": "A masterwork by Dr. Mehret Debebe. A pioneering exploration of mental models, psychology, and personal freedom written in compelling narrative prose.",
     "authorId": "auth-dr-mehret-debebe",
     "authorName": "Dr. Mehret Debebe",
     "categoryId": "cat-psychologyfiction",
-    "categoryName": "Psychology/Fiction",
-    "price": 16.5,
+    "categoryName": "Psychology & Fiction",
+    "price": 360,
+    "discountPrice": 310,
     "currency": "ETB",
-    "coverImage": "https://images.unsplash.com/photo-1516962215378-7fa2e137ae93?w=800&auto=format&fit=crop&q=80",
+    "coverImage": "https://m.media-amazon.com/images/S/compressed.photo.goodreads.com/books/1553887556i/44654924.jpg",
     "ISBN": "978-99944-71-481-2",
     "publisher": "JJ Bookstore Publishing",
     "publicationDate": "2021-01-15",
     "pages": 400,
     "language": "Amharic",
     "stock": 35,
-    "soldCount": 89,
-    "ratingAverage": 0,
-    "reviewCount": 0,
+    "soldCount": 310,
+    "ratingAverage": 4.8,
+    "reviewCount": 215,
     "featured": true,
-    "newArrival": false,
+    "newArrival": true,
     "active": true,
-    "createdAt": "2026-08-18T05:46:13.936Z",
-    "updatedAt": "2026-08-18T05:46:13.936Z"
+    "createdAt": "2026-08-22T05:46:13.936Z",
+    "updatedAt": "2026-08-22T05:46:13.936Z"
   },
   {
     "id": "book-4-emegua",
     "title": "እመጓ (Emegua)",
     "slug": "emegua",
-    "description": "A masterwork by Dr. Alemayehu Wase. Category: Mystery/Fiction. Published in Amharic & English literature collection.",
+    "description": "A masterwork by Dr. Alemayehu Wase. An enthralling mystery novel unravelling ancient Ethiopian manuscripts, secret monasteries, and timeless history.",
     "authorId": "auth-dr-alemayehu-wase",
     "authorName": "Dr. Alemayehu Wase",
     "categoryId": "cat-mysteryfiction",
-    "categoryName": "Mystery/Fiction",
-    "price": 14.99,
+    "categoryName": "Mystery & History",
+    "price": 350,
     "currency": "ETB",
-    "coverImage": "https://images.unsplash.com/photo-1544716278-ca5e3f4abd8c?w=800&auto=format&fit=crop&q=80",
+    "coverImage": "https://m.media-amazon.com/images/S/compressed.photo.goodreads.com/books/1439386401i/26087481.jpg",
     "ISBN": "978-99944-70-796-3",
     "publisher": "JJ Bookstore Publishing",
     "publicationDate": "2021-01-15",
     "pages": 448,
     "language": "Amharic",
     "stock": 40,
-    "soldCount": 144,
-    "ratingAverage": 0,
-    "reviewCount": 0,
+    "soldCount": 280,
+    "ratingAverage": 4.9,
+    "reviewCount": 196,
     "featured": true,
-    "newArrival": false,
+    "newArrival": true,
     "active": true,
-    "createdAt": "2026-08-18T05:46:13.937Z",
-    "updatedAt": "2026-08-18T05:46:13.937Z"
+    "createdAt": "2026-08-23T05:46:13.937Z",
+    "updatedAt": "2026-08-23T05:46:13.937Z"
   },
   {
     "id": "book-5-tikusat",
@@ -394,7 +489,7 @@ export const INITIAL_BOOKS: Book[] = [
     "categoryName": "Romance",
     "price": 12.5,
     "currency": "ETB",
-    "coverImage": "https://images.unsplash.com/photo-1518709268805-4e9042af9f23?w=800&auto=format&fit=crop&q=80",
+    "coverImage": "https://m.media-amazon.com/images/S/compressed.photo.goodreads.com/books/1484609682i/33871399.jpg",
     "ISBN": "978-99944-43-637-4",
     "publisher": "JJ Bookstore Publishing",
     "publicationDate": "2021-01-15",
@@ -421,7 +516,7 @@ export const INITIAL_BOOKS: Book[] = [
     "categoryName": "Historical Fiction",
     "price": 15.99,
     "currency": "ETB",
-    "coverImage": "https://images.unsplash.com/photo-1455390582262-044cdead277a?w=800&auto=format&fit=crop&q=80",
+    "coverImage": "https://m.media-amazon.com/images/S/compressed.photo.goodreads.com/books/1437481485i/25950435.jpg",
     "ISBN": "978-99944-50-789-5",
     "publisher": "JJ Bookstore Publishing",
     "publicationDate": "2021-01-15",
@@ -475,7 +570,7 @@ export const INITIAL_BOOKS: Book[] = [
     "categoryName": "Short Stories",
     "price": 13,
     "currency": "ETB",
-    "coverImage": "https://images.unsplash.com/photo-1464822759023-fed622ff2c3b?w=800&auto=format&fit=crop&q=80",
+    "coverImage": "https://m.media-amazon.com/images/S/compressed.photo.goodreads.com/books/1483861218i/33814407.jpg",
     "ISBN": "978-99944-67-644-7",
     "publisher": "JJ Bookstore Publishing",
     "publicationDate": "2021-01-15",
@@ -502,7 +597,7 @@ export const INITIAL_BOOKS: Book[] = [
     "categoryName": "Fiction",
     "price": 16,
     "currency": "ETB",
-    "coverImage": "https://images.unsplash.com/photo-1506784983877-45594efa4cbe?w=800&auto=format&fit=crop&q=80",
+    "coverImage": "https://m.media-amazon.com/images/S/compressed.photo.goodreads.com/books/1553887964i/44655075.jpg",
     "ISBN": "978-99944-28-694-8",
     "publisher": "JJ Bookstore Publishing",
     "publicationDate": "2021-01-15",
@@ -529,7 +624,7 @@ export const INITIAL_BOOKS: Book[] = [
     "categoryName": "Fiction/Philosophy",
     "price": 12.99,
     "currency": "ETB",
-    "coverImage": "https://images.unsplash.com/photo-1589829545856-d10d557cf95f?w=800&auto=format&fit=crop&q=80",
+    "coverImage": "https://m.media-amazon.com/images/S/compressed.photo.goodreads.com/books/1440148530i/26138883.jpg",
     "ISBN": "978-99944-32-736-9",
     "publisher": "JJ Bookstore Publishing",
     "publicationDate": "2021-01-15",
@@ -556,7 +651,7 @@ export const INITIAL_BOOKS: Book[] = [
     "categoryName": "Fiction",
     "price": 11.5,
     "currency": "ETB",
-    "coverImage": "https://images.unsplash.com/photo-1507838153414-b4b713384a76?w=800&auto=format&fit=crop&q=80",
+    "coverImage": "https://m.media-amazon.com/images/S/compressed.photo.goodreads.com/books/1484609915i/33871465.jpg",
     "ISBN": "978-99944-68-508-10",
     "publisher": "JJ Bookstore Publishing",
     "publicationDate": "2021-01-15",
@@ -583,7 +678,7 @@ export const INITIAL_BOOKS: Book[] = [
     "categoryName": "Sci-Fi/Thriller",
     "price": 19.99,
     "currency": "ETB",
-    "coverImage": "https://images.unsplash.com/photo-1512820790803-83ca734da794?w=800&auto=format&fit=crop&q=80",
+    "coverImage": "https://m.media-amazon.com/images/S/compressed.photo.goodreads.com/books/1439386566i/26087508.jpg",
     "ISBN": "978-99944-57-520-11",
     "publisher": "JJ Bookstore Publishing",
     "publicationDate": "2021-01-15",
@@ -610,7 +705,7 @@ export const INITIAL_BOOKS: Book[] = [
     "categoryName": "Sci-Fi/Thriller",
     "price": 19.99,
     "currency": "ETB",
-    "coverImage": "https://m.media-amazon.com/images/S/compressed.photo.goodreads.com/books/1484609682i/33871399.jpg",
+    "coverImage": "https://m.media-amazon.com/images/S/compressed.photo.goodreads.com/books/1439386701i/26087522.jpg",
     "ISBN": "978-99944-75-736-12",
     "publisher": "JJ Bookstore Publishing",
     "publicationDate": "2021-01-15",
@@ -637,7 +732,7 @@ export const INITIAL_BOOKS: Book[] = [
     "categoryName": "Sci-Fi/Thriller",
     "price": 19.99,
     "currency": "ETB",
-    "coverImage": "https://images.unsplash.com/photo-1526374965328-7f61d4dc18c5?w=800&auto=format&fit=crop&q=80",
+    "coverImage": "https://m.media-amazon.com/images/S/compressed.photo.goodreads.com/books/1439386815i/26087537.jpg",
     "ISBN": "978-99944-47-108-13",
     "publisher": "JJ Bookstore Publishing",
     "publicationDate": "2021-01-15",
@@ -664,7 +759,7 @@ export const INITIAL_BOOKS: Book[] = [
     "categoryName": "Sci-Fi/Thriller",
     "price": 19.99,
     "currency": "ETB",
-    "coverImage": "https://images.unsplash.com/photo-1532012197267-da84d127e765?w=800&auto=format&fit=crop&q=80",
+    "coverImage": "https://m.media-amazon.com/images/S/compressed.photo.goodreads.com/books/1439386928i/26087550.jpg",
     "ISBN": "978-99944-27-464-14",
     "publisher": "JJ Bookstore Publishing",
     "publicationDate": "2021-01-15",
@@ -691,7 +786,7 @@ export const INITIAL_BOOKS: Book[] = [
     "categoryName": "Historical Fiction",
     "price": 17.5,
     "currency": "ETB",
-    "coverImage": "https://images.unsplash.com/photo-1461360370896-922624d12aa1?w=800&auto=format&fit=crop&q=80",
+    "coverImage": "https://m.media-amazon.com/images/S/compressed.photo.goodreads.com/books/1440148970i/26138936.jpg",
     "ISBN": "978-99944-36-992-15",
     "publisher": "JJ Bookstore Publishing",
     "publicationDate": "2021-01-15",
@@ -718,7 +813,7 @@ export const INITIAL_BOOKS: Book[] = [
     "categoryName": "Memoir/Politics",
     "price": 16.99,
     "currency": "ETB",
-    "coverImage": "https://images.unsplash.com/photo-1457369804613-52c61a468e7d?w=800&auto=format&fit=crop&q=80",
+    "coverImage": "https://m.media-amazon.com/images/S/compressed.photo.goodreads.com/books/1484610111i/33871510.jpg",
     "ISBN": "978-99944-89-998-16",
     "publisher": "JJ Bookstore Publishing",
     "publicationDate": "2021-01-15",
@@ -745,7 +840,7 @@ export const INITIAL_BOOKS: Book[] = [
     "categoryName": "Fiction",
     "price": 10.99,
     "currency": "ETB",
-    "coverImage": "https://images.unsplash.com/photo-1497633762265-9d179a990aa6?w=800&auto=format&fit=crop&q=80",
+    "coverImage": "https://m.media-amazon.com/images/S/compressed.photo.goodreads.com/books/1484610285i/33871548.jpg",
     "ISBN": "978-99944-28-413-17",
     "publisher": "JJ Bookstore Publishing",
     "publicationDate": "2021-01-15",
@@ -772,7 +867,7 @@ export const INITIAL_BOOKS: Book[] = [
     "categoryName": "Fiction",
     "price": 14.5,
     "currency": "ETB",
-    "coverImage": "https://images.unsplash.com/photo-1544947950-fa07a98d237f?w=800&auto=format&fit=crop&q=80",
+    "coverImage": "https://m.media-amazon.com/images/S/compressed.photo.goodreads.com/books/1484610444i/33871589.jpg",
     "ISBN": "978-99944-67-650-18",
     "publisher": "JJ Bookstore Publishing",
     "publicationDate": "2021-01-15",
@@ -799,7 +894,7 @@ export const INITIAL_BOOKS: Book[] = [
     "categoryName": "Fiction",
     "price": 15,
     "currency": "ETB",
-    "coverImage": "https://images.unsplash.com/photo-1476275466078-4007374efbbe?w=800&auto=format&fit=crop&q=80",
+    "coverImage": "https://m.media-amazon.com/images/S/compressed.photo.goodreads.com/books/1484610582i/33871618.jpg",
     "ISBN": "978-99944-76-182-19",
     "publisher": "JJ Bookstore Publishing",
     "publicationDate": "2021-01-15",
@@ -826,7 +921,7 @@ export const INITIAL_BOOKS: Book[] = [
     "categoryName": "Historical Fiction",
     "price": 13.5,
     "currency": "ETB",
-    "coverImage": "https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?w=800&auto=format&fit=crop&q=80",
+    "coverImage": "https://m.media-amazon.com/images/S/compressed.photo.goodreads.com/books/1484610738i/33871650.jpg",
     "ISBN": "978-99944-48-539-20",
     "publisher": "JJ Bookstore Publishing",
     "publicationDate": "2021-01-15",
@@ -853,7 +948,7 @@ export const INITIAL_BOOKS: Book[] = [
     "categoryName": "Historical Fiction",
     "price": 18.5,
     "currency": "ETB",
-    "coverImage": "https://images.unsplash.com/photo-1512820790803-83ca734da794?w=800&auto=format&fit=crop&q=80",
+    "coverImage": "https://m.media-amazon.com/images/S/compressed.photo.goodreads.com/books/1484610892i/33871680.jpg",
     "ISBN": "978-99944-38-547-21",
     "publisher": "JJ Bookstore Publishing",
     "publicationDate": "2021-01-15",
@@ -880,7 +975,7 @@ export const INITIAL_BOOKS: Book[] = [
     "categoryName": "Politics/Philosophy",
     "price": 20,
     "currency": "ETB",
-    "coverImage": "https://images.unsplash.com/photo-1507679799987-c73779587ccf?w=800&auto=format&fit=crop&q=80",
+    "coverImage": "https://m.media-amazon.com/images/S/compressed.photo.goodreads.com/books/1571477484i/48507817.jpg",
     "ISBN": "978-99944-19-371-22",
     "publisher": "JJ Bookstore Publishing",
     "publicationDate": "2021-01-15",
@@ -907,7 +1002,7 @@ export const INITIAL_BOOKS: Book[] = [
     "categoryName": "Psychology/Self-Help",
     "price": 15.5,
     "currency": "ETB",
-    "coverImage": "https://images.unsplash.com/photo-1506784983877-45594efa4cbe?w=800&auto=format&fit=crop&q=80",
+    "coverImage": "https://m.media-amazon.com/images/S/compressed.photo.goodreads.com/books/1484611032i/33871708.jpg",
     "ISBN": "978-99944-14-996-23",
     "publisher": "JJ Bookstore Publishing",
     "publicationDate": "2021-01-15",
@@ -934,7 +1029,7 @@ export const INITIAL_BOOKS: Book[] = [
     "categoryName": "Fiction",
     "price": 11.99,
     "currency": "ETB",
-    "coverImage": "https://images.unsplash.com/photo-1518709268805-4e9042af9f23?w=800&auto=format&fit=crop&q=80",
+    "coverImage": "https://m.media-amazon.com/images/S/compressed.photo.goodreads.com/books/1484611181i/33871738.jpg",
     "ISBN": "978-99944-76-363-24",
     "publisher": "JJ Bookstore Publishing",
     "publicationDate": "2021-01-15",
@@ -961,7 +1056,7 @@ export const INITIAL_BOOKS: Book[] = [
     "categoryName": "Classic Literature",
     "price": 14,
     "currency": "ETB",
-    "coverImage": "https://images.unsplash.com/photo-1544947950-fa07a98d237f?w=800&auto=format&fit=crop&q=80",
+    "coverImage": "https://m.media-amazon.com/images/S/compressed.photo.goodreads.com/books/1484611320i/33871765.jpg",
     "ISBN": "978-99944-26-959-25",
     "publisher": "JJ Bookstore Publishing",
     "publicationDate": "2021-01-15",
@@ -988,7 +1083,7 @@ export const INITIAL_BOOKS: Book[] = [
     "categoryName": "Romance/Play",
     "price": 9.99,
     "currency": "ETB",
-    "coverImage": "https://images.unsplash.com/photo-1541701494587-cb58502866ab?w=800&auto=format&fit=crop&q=80",
+    "coverImage": "https://m.media-amazon.com/images/S/compressed.photo.goodreads.com/books/1484611462i/33871793.jpg",
     "ISBN": "978-99944-33-110-26",
     "publisher": "JJ Bookstore Publishing",
     "publicationDate": "2021-01-15",
@@ -1015,7 +1110,7 @@ export const INITIAL_BOOKS: Book[] = [
     "categoryName": "Fiction",
     "price": 13.99,
     "currency": "ETB",
-    "coverImage": "https://images.unsplash.com/photo-1455390582262-044cdead277a?w=800&auto=format&fit=crop&q=80",
+    "coverImage": "https://m.media-amazon.com/images/S/compressed.photo.goodreads.com/books/1484611603i/33871822.jpg",
     "ISBN": "978-99944-85-365-27",
     "publisher": "JJ Bookstore Publishing",
     "publicationDate": "2021-01-15",
@@ -1042,7 +1137,7 @@ export const INITIAL_BOOKS: Book[] = [
     "categoryName": "Fiction",
     "price": 14.5,
     "currency": "ETB",
-    "coverImage": "https://m.media-amazon.com/images/S/compressed.photo.goodreads.com/books/1439386401i/26087481.jpg",
+    "coverImage": "https://m.media-amazon.com/images/S/compressed.photo.goodreads.com/books/1484611754i/33871850.jpg",
     "ISBN": "978-99944-48-302-28",
     "publisher": "JJ Bookstore Publishing",
     "publicationDate": "2021-01-15",
@@ -1069,7 +1164,7 @@ export const INITIAL_BOOKS: Book[] = [
     "categoryName": "Non-Fiction",
     "price": 12,
     "currency": "ETB",
-    "coverImage": "https://images.unsplash.com/photo-1507679799987-c73779587ccf?w=800&auto=format&fit=crop&q=80",
+    "coverImage": "https://m.media-amazon.com/images/S/compressed.photo.goodreads.com/books/1484611899i/33871881.jpg",
     "ISBN": "978-99944-12-872-29",
     "publisher": "JJ Bookstore Publishing",
     "publicationDate": "2021-01-15",
@@ -1096,7 +1191,7 @@ export const INITIAL_BOOKS: Book[] = [
     "categoryName": "Fiction",
     "price": 11.5,
     "currency": "ETB",
-    "coverImage": "https://images.unsplash.com/photo-1497633762265-9d179a990aa6?w=800&auto=format&fit=crop&q=80",
+    "coverImage": "data:image/svg+xml;utf8,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%20400%20600%22%20width%3D%22400%22%20height%3D%22600%22%3E%0A%20%20%20%20%3Cdefs%3E%0A%20%20%20%20%20%20%3ClinearGradient%20id%3D%22bg-AnditMidirLijoch%22%20x1%3D%220%25%22%20y1%3D%220%25%22%20x2%3D%22100%25%22%20y2%3D%22100%25%22%3E%0A%20%20%20%20%20%20%20%20%3Cstop%20offset%3D%220%25%22%20stop-color%3D%22%23881337%22%20%2F%3E%0A%20%20%20%20%20%20%20%20%3Cstop%20offset%3D%22100%25%22%20stop-color%3D%22%234c0519%22%20%2F%3E%0A%20%20%20%20%20%20%3C%2FlinearGradient%3E%0A%20%20%20%20%20%20%3ClinearGradient%20id%3D%22gold-AnditMidirLijoch%22%20x1%3D%220%25%22%20y1%3D%220%25%22%20x2%3D%22100%25%22%20y2%3D%220%25%22%3E%0A%20%20%20%20%20%20%20%20%3Cstop%20offset%3D%220%25%22%20stop-color%3D%22%23F59E0B%22%20%2F%3E%0A%20%20%20%20%20%20%20%20%3Cstop%20offset%3D%2250%25%22%20stop-color%3D%22%23FEF08A%22%20%2F%3E%0A%20%20%20%20%20%20%20%20%3Cstop%20offset%3D%22100%25%22%20stop-color%3D%22%23D97706%22%20%2F%3E%0A%20%20%20%20%20%20%3C%2FlinearGradient%3E%0A%20%20%20%20%3C%2Fdefs%3E%0A%0A%20%20%20%20%3C!--%20Book%20Cover%20Base%20Background%20--%3E%0A%20%20%20%20%3Crect%20width%3D%22400%22%20height%3D%22600%22%20fill%3D%22url(%23bg-AnditMidirLijoch)%22%20rx%3D%228%22%20%2F%3E%0A%20%20%20%20%0A%20%20%20%20%3C!--%20Spine%20Line%20Shadow%20--%3E%0A%20%20%20%20%3Crect%20x%3D%220%22%20y%3D%220%22%20width%3D%2218%22%20height%3D%22600%22%20fill%3D%22%23000000%22%20opacity%3D%220.25%22%20%2F%3E%0A%20%20%20%20%3Cline%20x1%3D%2218%22%20y1%3D%220%22%20x2%3D%2218%22%20y2%3D%22600%22%20stroke%3D%22%23FFFFFF%22%20stroke-opacity%3D%220.15%22%20stroke-width%3D%221.5%22%20%2F%3E%0A%0A%20%20%20%20%3C!--%20Outer%20Decorative%20Border%20Frame%20--%3E%0A%20%20%20%20%3Crect%20x%3D%2228%22%20y%3D%2224%22%20width%3D%22344%22%20height%3D%22552%22%20fill%3D%22none%22%20stroke%3D%22%23fda4af%22%20stroke-width%3D%222%22%20stroke-dasharray%3D%226%2C4%22%20opacity%3D%220.6%22%20rx%3D%224%22%20%2F%3E%0A%20%20%20%20%3Crect%20x%3D%2234%22%20y%3D%2230%22%20width%3D%22332%22%20height%3D%22540%22%20fill%3D%22none%22%20stroke%3D%22%23fda4af%22%20stroke-width%3D%221%22%20opacity%3D%220.8%22%20rx%3D%222%22%20%2F%3E%0A%0A%20%20%20%20%3C!--%20Category%20Header%20Pill%20--%3E%0A%20%20%20%20%3Crect%20x%3D%2280%22%20y%3D%2255%22%20width%3D%22240%22%20height%3D%2224%22%20fill%3D%22%23000000%22%20opacity%3D%220.4%22%20rx%3D%2212%22%20%2F%3E%0A%20%20%20%20%3Ctext%20x%3D%22200%22%20y%3D%2271%22%20font-family%3D%22sans-serif%22%20font-size%3D%2210%22%20font-weight%3D%22900%22%20fill%3D%22%23fda4af%22%20text-anchor%3D%22middle%22%20letter-spacing%3D%221.5%22%3EFICTION%3C%2Ftext%3E%0A%0A%20%20%20%20%3C!--%20Center%20Icon%20Symbol%20%2F%20Emblem%20--%3E%0A%20%20%20%20%3Ccircle%20cx%3D%22200%22%20cy%3D%22170%22%20r%3D%2248%22%20fill%3D%22%23000000%22%20opacity%3D%220.3%22%20stroke%3D%22%23fda4af%22%20stroke-width%3D%222%22%20%2F%3E%0A%20%20%20%20%3Ctext%20x%3D%22200%22%20y%3D%22184%22%20font-family%3D%22sans-serif%22%20font-size%3D%2236%22%20text-anchor%3D%22middle%22%3E%F0%9F%95%AF%EF%B8%8F%3C%2Ftext%3E%0A%0A%20%20%20%20%3C!--%20Main%20Title%20(Amharic)%20--%3E%0A%20%20%20%20%3Ctext%20x%3D%22200%22%20y%3D%22275%22%20font-family%3D%22'Noto%20Sans%20Ethiopic'%2C%20'Abyssinica%20SIL'%2C%20'Nyala'%2C%20sans-serif%22%20font-size%3D%2225%22%20font-weight%3D%22900%22%20fill%3D%22%23FFFFFF%22%20text-anchor%3D%22middle%22%3E%0A%20%20%20%20%20%20%E1%8A%A0%E1%8A%95%E1%8B%B2%E1%89%B5%20%E1%88%9D%E1%8B%B5%E1%88%AD%20%E1%88%8D%E1%8C%86%E1%89%BD%0A%20%20%20%20%3C%2Ftext%3E%0A%0A%20%20%20%20%3C!--%20Subtitle%20(English%20Translation)%20--%3E%0A%20%20%20%20%3Ctext%20x%3D%22200%22%20y%3D%22315%22%20font-family%3D%22sans-serif%22%20font-size%3D%2213%22%20font-weight%3D%22600%22%20fill%3D%22%23fda4af%22%20text-anchor%3D%22middle%22%20letter-spacing%3D%221%22%3E%0A%20%20%20%20%20%20Andit%20Midir%20Lijoch%0A%20%20%20%20%3C%2Ftext%3E%0A%0A%20%20%20%20%3Cline%20x1%3D%2280%22%20y1%3D%22350%22%20x2%3D%22320%22%20y2%3D%22350%22%20stroke%3D%22url(%23gold-AnditMidirLijoch)%22%20stroke-width%3D%222%22%20%2F%3E%0A%0A%20%20%20%20%3C!--%20Author%20Badge%20--%3E%0A%20%20%20%20%3Ctext%20x%3D%22200%22%20y%3D%22435%22%20font-family%3D%22sans-serif%22%20font-size%3D%2210%22%20font-weight%3D%22800%22%20fill%3D%22%2394A3B8%22%20text-anchor%3D%22middle%22%20letter-spacing%3D%222%22%3EAUTHOR%20%2F%20%E1%8B%B0%E1%88%AB%E1%88%B2%3C%2Ftext%3E%0A%20%20%20%20%3Ctext%20x%3D%22200%22%20y%3D%22465%22%20font-family%3D%22'Noto%20Sans%20Ethiopic'%2C%20'Abyssinica%20SIL'%2C%20sans-serif%22%20font-size%3D%2219%22%20font-weight%3D%22800%22%20fill%3D%22%23FFFFFF%22%20text-anchor%3D%22middle%22%3E%0A%20%20%20%20%20%20Amare%20Tegbaru%0A%20%20%20%20%3C%2Ftext%3E%0A%0A%20%20%20%20%3C!--%20Publisher%20Seal%20%2F%20Seal%20Footer%20--%3E%0A%20%20%20%20%3Crect%20x%3D%22100%22%20y%3D%22520%22%20width%3D%22200%22%20height%3D%2222%22%20fill%3D%22%23fda4af%22%20opacity%3D%220.2%22%20rx%3D%224%22%20%2F%3E%0A%20%20%20%20%3Ctext%20x%3D%22200%22%20y%3D%22535%22%20font-family%3D%22sans-serif%22%20font-size%3D%229%22%20font-weight%3D%22900%22%20fill%3D%22%23fda4af%22%20text-anchor%3D%22middle%22%20letter-spacing%3D%221.5%22%3EJJ%20BOOKSHOPPING%20%E2%80%A2%20%F0%9F%87%AA%F0%9F%87%B9%3C%2Ftext%3E%0A%20%20%3C%2Fsvg%3E",
     "ISBN": "978-99944-95-100-30",
     "publisher": "JJ Bookstore Publishing",
     "publicationDate": "2021-01-15",
@@ -1123,7 +1218,7 @@ export const INITIAL_BOOKS: Book[] = [
     "categoryName": "Classic Literature",
     "price": 16,
     "currency": "ETB",
-    "coverImage": "https://images.unsplash.com/photo-1544716278-ca5e3f4abd8c?w=800&auto=format&fit=crop&q=80",
+    "coverImage": "https://m.media-amazon.com/images/S/compressed.photo.goodreads.com/books/1484611999i/33871900.jpg",
     "ISBN": "978-99944-28-579-31",
     "publisher": "JJ Bookstore Publishing",
     "publicationDate": "2021-01-15",
@@ -1150,7 +1245,7 @@ export const INITIAL_BOOKS: Book[] = [
     "categoryName": "Classic Literature",
     "price": 17.5,
     "currency": "ETB",
-    "coverImage": "https://images.unsplash.com/photo-1461360370896-922624d12aa1?w=800&auto=format&fit=crop&q=80",
+    "coverImage": "data:image/svg+xml;utf8,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%20400%20600%22%20width%3D%22400%22%20height%3D%22600%22%3E%0A%20%20%20%20%3Cdefs%3E%0A%20%20%20%20%20%20%3ClinearGradient%20id%3D%22bg-BirhanEnaSelam%22%20x1%3D%220%25%22%20y1%3D%220%25%22%20x2%3D%22100%25%22%20y2%3D%22100%25%22%3E%0A%20%20%20%20%20%20%20%20%3Cstop%20offset%3D%220%25%22%20stop-color%3D%22%23881337%22%20%2F%3E%0A%20%20%20%20%20%20%20%20%3Cstop%20offset%3D%22100%25%22%20stop-color%3D%22%234c0519%22%20%2F%3E%0A%20%20%20%20%20%20%3C%2FlinearGradient%3E%0A%20%20%20%20%20%20%3ClinearGradient%20id%3D%22gold-BirhanEnaSelam%22%20x1%3D%220%25%22%20y1%3D%220%25%22%20x2%3D%22100%25%22%20y2%3D%220%25%22%3E%0A%20%20%20%20%20%20%20%20%3Cstop%20offset%3D%220%25%22%20stop-color%3D%22%23F59E0B%22%20%2F%3E%0A%20%20%20%20%20%20%20%20%3Cstop%20offset%3D%2250%25%22%20stop-color%3D%22%23FEF08A%22%20%2F%3E%0A%20%20%20%20%20%20%20%20%3Cstop%20offset%3D%22100%25%22%20stop-color%3D%22%23D97706%22%20%2F%3E%0A%20%20%20%20%20%20%3C%2FlinearGradient%3E%0A%20%20%20%20%3C%2Fdefs%3E%0A%0A%20%20%20%20%3C!--%20Book%20Cover%20Base%20Background%20--%3E%0A%20%20%20%20%3Crect%20width%3D%22400%22%20height%3D%22600%22%20fill%3D%22url(%23bg-BirhanEnaSelam)%22%20rx%3D%228%22%20%2F%3E%0A%20%20%20%20%0A%20%20%20%20%3C!--%20Spine%20Line%20Shadow%20--%3E%0A%20%20%20%20%3Crect%20x%3D%220%22%20y%3D%220%22%20width%3D%2218%22%20height%3D%22600%22%20fill%3D%22%23000000%22%20opacity%3D%220.25%22%20%2F%3E%0A%20%20%20%20%3Cline%20x1%3D%2218%22%20y1%3D%220%22%20x2%3D%2218%22%20y2%3D%22600%22%20stroke%3D%22%23FFFFFF%22%20stroke-opacity%3D%220.15%22%20stroke-width%3D%221.5%22%20%2F%3E%0A%0A%20%20%20%20%3C!--%20Outer%20Decorative%20Border%20Frame%20--%3E%0A%20%20%20%20%3Crect%20x%3D%2228%22%20y%3D%2224%22%20width%3D%22344%22%20height%3D%22552%22%20fill%3D%22none%22%20stroke%3D%22%23fda4af%22%20stroke-width%3D%222%22%20stroke-dasharray%3D%226%2C4%22%20opacity%3D%220.6%22%20rx%3D%224%22%20%2F%3E%0A%20%20%20%20%3Crect%20x%3D%2234%22%20y%3D%2230%22%20width%3D%22332%22%20height%3D%22540%22%20fill%3D%22none%22%20stroke%3D%22%23fda4af%22%20stroke-width%3D%221%22%20opacity%3D%220.8%22%20rx%3D%222%22%20%2F%3E%0A%0A%20%20%20%20%3C!--%20Category%20Header%20Pill%20--%3E%0A%20%20%20%20%3Crect%20x%3D%2280%22%20y%3D%2255%22%20width%3D%22240%22%20height%3D%2224%22%20fill%3D%22%23000000%22%20opacity%3D%220.4%22%20rx%3D%2212%22%20%2F%3E%0A%20%20%20%20%3Ctext%20x%3D%22200%22%20y%3D%2271%22%20font-family%3D%22sans-serif%22%20font-size%3D%2210%22%20font-weight%3D%22900%22%20fill%3D%22%23fda4af%22%20text-anchor%3D%22middle%22%20letter-spacing%3D%221.5%22%3ECLASSIC%20LITERATURE%3C%2Ftext%3E%0A%0A%20%20%20%20%3C!--%20Center%20Icon%20Symbol%20%2F%20Emblem%20--%3E%0A%20%20%20%20%3Ccircle%20cx%3D%22200%22%20cy%3D%22170%22%20r%3D%2248%22%20fill%3D%22%23000000%22%20opacity%3D%220.3%22%20stroke%3D%22%23fda4af%22%20stroke-width%3D%222%22%20%2F%3E%0A%20%20%20%20%3Ctext%20x%3D%22200%22%20y%3D%22184%22%20font-family%3D%22sans-serif%22%20font-size%3D%2236%22%20text-anchor%3D%22middle%22%3E%F0%9F%95%AF%EF%B8%8F%3C%2Ftext%3E%0A%0A%20%20%20%20%3C!--%20Main%20Title%20(Amharic)%20--%3E%0A%20%20%20%20%3Ctext%20x%3D%22200%22%20y%3D%22275%22%20font-family%3D%22'Noto%20Sans%20Ethiopic'%2C%20'Abyssinica%20SIL'%2C%20'Nyala'%2C%20sans-serif%22%20font-size%3D%2225%22%20font-weight%3D%22900%22%20fill%3D%22%23FFFFFF%22%20text-anchor%3D%22middle%22%3E%0A%20%20%20%20%20%20%E1%89%A5%E1%88%AD%E1%88%80%E1%8A%95%20%E1%8A%A5%E1%8A%93%20%E1%88%B0%E1%88%8B%E1%88%9D%0A%20%20%20%20%3C%2Ftext%3E%0A%0A%20%20%20%20%3C!--%20Subtitle%20(English%20Translation)%20--%3E%0A%20%20%20%20%3Ctext%20x%3D%22200%22%20y%3D%22315%22%20font-family%3D%22sans-serif%22%20font-size%3D%2213%22%20font-weight%3D%22600%22%20fill%3D%22%23fda4af%22%20text-anchor%3D%22middle%22%20letter-spacing%3D%221%22%3E%0A%20%20%20%20%20%20Birhan%20Ena%20Selam%0A%20%20%20%20%3C%2Ftext%3E%0A%0A%20%20%20%20%3Cline%20x1%3D%2280%22%20y1%3D%22350%22%20x2%3D%22320%22%20y2%3D%22350%22%20stroke%3D%22url(%23gold-BirhanEnaSelam)%22%20stroke-width%3D%222%22%20%2F%3E%0A%0A%20%20%20%20%3C!--%20Author%20Badge%20--%3E%0A%20%20%20%20%3Ctext%20x%3D%22200%22%20y%3D%22435%22%20font-family%3D%22sans-serif%22%20font-size%3D%2210%22%20font-weight%3D%22800%22%20fill%3D%22%2394A3B8%22%20text-anchor%3D%22middle%22%20letter-spacing%3D%222%22%3EAUTHOR%20%2F%20%E1%8B%B0%E1%88%AB%E1%88%B2%3C%2Ftext%3E%0A%20%20%20%20%3Ctext%20x%3D%22200%22%20y%3D%22465%22%20font-family%3D%22'Noto%20Sans%20Ethiopic'%2C%20'Abyssinica%20SIL'%2C%20sans-serif%22%20font-size%3D%2219%22%20font-weight%3D%22800%22%20fill%3D%22%23FFFFFF%22%20text-anchor%3D%22middle%22%3E%0A%20%20%20%20%20%20Blatten%20Geta%20Heruy%20Welde%20Selassie%0A%20%20%20%20%3C%2Ftext%3E%0A%0A%20%20%20%20%3C!--%20Publisher%20Seal%20%2F%20Seal%20Footer%20--%3E%0A%20%20%20%20%3Crect%20x%3D%22100%22%20y%3D%22520%22%20width%3D%22200%22%20height%3D%2222%22%20fill%3D%22%23fda4af%22%20opacity%3D%220.2%22%20rx%3D%224%22%20%2F%3E%0A%20%20%20%20%3Ctext%20x%3D%22200%22%20y%3D%22535%22%20font-family%3D%22sans-serif%22%20font-size%3D%229%22%20font-weight%3D%22900%22%20fill%3D%22%23fda4af%22%20text-anchor%3D%22middle%22%20letter-spacing%3D%221.5%22%3EJJ%20BOOKSHOPPING%20%E2%80%A2%20%F0%9F%87%AA%F0%9F%87%B9%3C%2Ftext%3E%0A%20%20%3C%2Fsvg%3E",
     "ISBN": "978-99944-91-965-32",
     "publisher": "JJ Bookstore Publishing",
     "publicationDate": "2021-01-15",
@@ -1177,7 +1272,7 @@ export const INITIAL_BOOKS: Book[] = [
     "categoryName": "Fiction",
     "price": 14,
     "currency": "ETB",
-    "coverImage": "https://images.unsplash.com/photo-1464822759023-fed622ff2c3b?w=800&auto=format&fit=crop&q=80",
+    "coverImage": "data:image/svg+xml;utf8,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%20400%20600%22%20width%3D%22400%22%20height%3D%22600%22%3E%0A%20%20%20%20%3Cdefs%3E%0A%20%20%20%20%20%20%3ClinearGradient%20id%3D%22bg-YelibWeledIwneta%22%20x1%3D%220%25%22%20y1%3D%220%25%22%20x2%3D%22100%25%22%20y2%3D%22100%25%22%3E%0A%20%20%20%20%20%20%20%20%3Cstop%20offset%3D%220%25%22%20stop-color%3D%22%23881337%22%20%2F%3E%0A%20%20%20%20%20%20%20%20%3Cstop%20offset%3D%22100%25%22%20stop-color%3D%22%234c0519%22%20%2F%3E%0A%20%20%20%20%20%20%3C%2FlinearGradient%3E%0A%20%20%20%20%20%20%3ClinearGradient%20id%3D%22gold-YelibWeledIwneta%22%20x1%3D%220%25%22%20y1%3D%220%25%22%20x2%3D%22100%25%22%20y2%3D%220%25%22%3E%0A%20%20%20%20%20%20%20%20%3Cstop%20offset%3D%220%25%22%20stop-color%3D%22%23F59E0B%22%20%2F%3E%0A%20%20%20%20%20%20%20%20%3Cstop%20offset%3D%2250%25%22%20stop-color%3D%22%23FEF08A%22%20%2F%3E%0A%20%20%20%20%20%20%20%20%3Cstop%20offset%3D%22100%25%22%20stop-color%3D%22%23D97706%22%20%2F%3E%0A%20%20%20%20%20%20%3C%2FlinearGradient%3E%0A%20%20%20%20%3C%2Fdefs%3E%0A%0A%20%20%20%20%3C!--%20Book%20Cover%20Base%20Background%20--%3E%0A%20%20%20%20%3Crect%20width%3D%22400%22%20height%3D%22600%22%20fill%3D%22url(%23bg-YelibWeledIwneta)%22%20rx%3D%228%22%20%2F%3E%0A%20%20%20%20%0A%20%20%20%20%3C!--%20Spine%20Line%20Shadow%20--%3E%0A%20%20%20%20%3Crect%20x%3D%220%22%20y%3D%220%22%20width%3D%2218%22%20height%3D%22600%22%20fill%3D%22%23000000%22%20opacity%3D%220.25%22%20%2F%3E%0A%20%20%20%20%3Cline%20x1%3D%2218%22%20y1%3D%220%22%20x2%3D%2218%22%20y2%3D%22600%22%20stroke%3D%22%23FFFFFF%22%20stroke-opacity%3D%220.15%22%20stroke-width%3D%221.5%22%20%2F%3E%0A%0A%20%20%20%20%3C!--%20Outer%20Decorative%20Border%20Frame%20--%3E%0A%20%20%20%20%3Crect%20x%3D%2228%22%20y%3D%2224%22%20width%3D%22344%22%20height%3D%22552%22%20fill%3D%22none%22%20stroke%3D%22%23fda4af%22%20stroke-width%3D%222%22%20stroke-dasharray%3D%226%2C4%22%20opacity%3D%220.6%22%20rx%3D%224%22%20%2F%3E%0A%20%20%20%20%3Crect%20x%3D%2234%22%20y%3D%2230%22%20width%3D%22332%22%20height%3D%22540%22%20fill%3D%22none%22%20stroke%3D%22%23fda4af%22%20stroke-width%3D%221%22%20opacity%3D%220.8%22%20rx%3D%222%22%20%2F%3E%0A%0A%20%20%20%20%3C!--%20Category%20Header%20Pill%20--%3E%0A%20%20%20%20%3Crect%20x%3D%2280%22%20y%3D%2255%22%20width%3D%22240%22%20height%3D%2224%22%20fill%3D%22%23000000%22%20opacity%3D%220.4%22%20rx%3D%2212%22%20%2F%3E%0A%20%20%20%20%3Ctext%20x%3D%22200%22%20y%3D%2271%22%20font-family%3D%22sans-serif%22%20font-size%3D%2210%22%20font-weight%3D%22900%22%20fill%3D%22%23fda4af%22%20text-anchor%3D%22middle%22%20letter-spacing%3D%221.5%22%3EFICTION%3C%2Ftext%3E%0A%0A%20%20%20%20%3C!--%20Center%20Icon%20Symbol%20%2F%20Emblem%20--%3E%0A%20%20%20%20%3Ccircle%20cx%3D%22200%22%20cy%3D%22170%22%20r%3D%2248%22%20fill%3D%22%23000000%22%20opacity%3D%220.3%22%20stroke%3D%22%23fda4af%22%20stroke-width%3D%222%22%20%2F%3E%0A%20%20%20%20%3Ctext%20x%3D%22200%22%20y%3D%22184%22%20font-family%3D%22sans-serif%22%20font-size%3D%2236%22%20text-anchor%3D%22middle%22%3E%F0%9F%95%AF%EF%B8%8F%3C%2Ftext%3E%0A%0A%20%20%20%20%3C!--%20Main%20Title%20(Amharic)%20--%3E%0A%20%20%20%20%3Ctext%20x%3D%22200%22%20y%3D%22275%22%20font-family%3D%22'Noto%20Sans%20Ethiopic'%2C%20'Abyssinica%20SIL'%2C%20'Nyala'%2C%20sans-serif%22%20font-size%3D%2225%22%20font-weight%3D%22900%22%20fill%3D%22%23FFFFFF%22%20text-anchor%3D%22middle%22%3E%0A%20%20%20%20%20%20%E1%8B%A8%E1%88%8D%E1%89%A5%20%E1%8B%88%E1%88%88%E1%8B%B5%20%E1%8A%A5%E1%8B%8D%E1%8A%90%E1%89%B3%0A%20%20%20%20%3C%2Ftext%3E%0A%0A%20%20%20%20%3C!--%20Subtitle%20(English%20Translation)%20--%3E%0A%20%20%20%20%3Ctext%20x%3D%22200%22%20y%3D%22315%22%20font-family%3D%22sans-serif%22%20font-size%3D%2213%22%20font-weight%3D%22600%22%20fill%3D%22%23fda4af%22%20text-anchor%3D%22middle%22%20letter-spacing%3D%221%22%3E%0A%20%20%20%20%20%20Yelib%20Weled%20Iwneta%0A%20%20%20%20%3C%2Ftext%3E%0A%0A%20%20%20%20%3Cline%20x1%3D%2280%22%20y1%3D%22350%22%20x2%3D%22320%22%20y2%3D%22350%22%20stroke%3D%22url(%23gold-YelibWeledIwneta)%22%20stroke-width%3D%222%22%20%2F%3E%0A%0A%20%20%20%20%3C!--%20Author%20Badge%20--%3E%0A%20%20%20%20%3Ctext%20x%3D%22200%22%20y%3D%22435%22%20font-family%3D%22sans-serif%22%20font-size%3D%2210%22%20font-weight%3D%22800%22%20fill%3D%22%2394A3B8%22%20text-anchor%3D%22middle%22%20letter-spacing%3D%222%22%3EAUTHOR%20%2F%20%E1%8B%B0%E1%88%AB%E1%88%B2%3C%2Ftext%3E%0A%20%20%20%20%3Ctext%20x%3D%22200%22%20y%3D%22465%22%20font-family%3D%22'Noto%20Sans%20Ethiopic'%2C%20'Abyssinica%20SIL'%2C%20sans-serif%22%20font-size%3D%2219%22%20font-weight%3D%22800%22%20fill%3D%22%23FFFFFF%22%20text-anchor%3D%22middle%22%3E%0A%20%20%20%20%20%20Bewketu%20Seyoum%0A%20%20%20%20%3C%2Ftext%3E%0A%0A%20%20%20%20%3C!--%20Publisher%20Seal%20%2F%20Seal%20Footer%20--%3E%0A%20%20%20%20%3Crect%20x%3D%22100%22%20y%3D%22520%22%20width%3D%22200%22%20height%3D%2222%22%20fill%3D%22%23fda4af%22%20opacity%3D%220.2%22%20rx%3D%224%22%20%2F%3E%0A%20%20%20%20%3Ctext%20x%3D%22200%22%20y%3D%22535%22%20font-family%3D%22sans-serif%22%20font-size%3D%229%22%20font-weight%3D%22900%22%20fill%3D%22%23fda4af%22%20text-anchor%3D%22middle%22%20letter-spacing%3D%221.5%22%3EJJ%20BOOKSHOPPING%20%E2%80%A2%20%F0%9F%87%AA%F0%9F%87%B9%3C%2Ftext%3E%0A%20%20%3C%2Fsvg%3E",
     "ISBN": "978-99944-14-779-33",
     "publisher": "JJ Bookstore Publishing",
     "publicationDate": "2021-01-15",
@@ -1204,7 +1299,7 @@ export const INITIAL_BOOKS: Book[] = [
     "categoryName": "Fiction",
     "price": 15.99,
     "currency": "ETB",
-    "coverImage": "https://images.unsplash.com/photo-1507838153414-b4b713384a76?w=800&auto=format&fit=crop&q=80",
+    "coverImage": "data:image/svg+xml;utf8,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%20400%20600%22%20width%3D%22400%22%20height%3D%22600%22%3E%0A%20%20%20%20%3Cdefs%3E%0A%20%20%20%20%20%20%3ClinearGradient%20id%3D%22bg-Girdosh%22%20x1%3D%220%25%22%20y1%3D%220%25%22%20x2%3D%22100%25%22%20y2%3D%22100%25%22%3E%0A%20%20%20%20%20%20%20%20%3Cstop%20offset%3D%220%25%22%20stop-color%3D%22%23451a03%22%20%2F%3E%0A%20%20%20%20%20%20%20%20%3Cstop%20offset%3D%22100%25%22%20stop-color%3D%22%231c1917%22%20%2F%3E%0A%20%20%20%20%20%20%3C%2FlinearGradient%3E%0A%20%20%20%20%20%20%3ClinearGradient%20id%3D%22gold-Girdosh%22%20x1%3D%220%25%22%20y1%3D%220%25%22%20x2%3D%22100%25%22%20y2%3D%220%25%22%3E%0A%20%20%20%20%20%20%20%20%3Cstop%20offset%3D%220%25%22%20stop-color%3D%22%23F59E0B%22%20%2F%3E%0A%20%20%20%20%20%20%20%20%3Cstop%20offset%3D%2250%25%22%20stop-color%3D%22%23FEF08A%22%20%2F%3E%0A%20%20%20%20%20%20%20%20%3Cstop%20offset%3D%22100%25%22%20stop-color%3D%22%23D97706%22%20%2F%3E%0A%20%20%20%20%20%20%3C%2FlinearGradient%3E%0A%20%20%20%20%3C%2Fdefs%3E%0A%0A%20%20%20%20%3C!--%20Book%20Cover%20Base%20Background%20--%3E%0A%20%20%20%20%3Crect%20width%3D%22400%22%20height%3D%22600%22%20fill%3D%22url(%23bg-Girdosh)%22%20rx%3D%228%22%20%2F%3E%0A%20%20%20%20%0A%20%20%20%20%3C!--%20Spine%20Line%20Shadow%20--%3E%0A%20%20%20%20%3Crect%20x%3D%220%22%20y%3D%220%22%20width%3D%2218%22%20height%3D%22600%22%20fill%3D%22%23000000%22%20opacity%3D%220.25%22%20%2F%3E%0A%20%20%20%20%3Cline%20x1%3D%2218%22%20y1%3D%220%22%20x2%3D%2218%22%20y2%3D%22600%22%20stroke%3D%22%23FFFFFF%22%20stroke-opacity%3D%220.15%22%20stroke-width%3D%221.5%22%20%2F%3E%0A%0A%20%20%20%20%3C!--%20Outer%20Decorative%20Border%20Frame%20--%3E%0A%20%20%20%20%3Crect%20x%3D%2228%22%20y%3D%2224%22%20width%3D%22344%22%20height%3D%22552%22%20fill%3D%22none%22%20stroke%3D%22%23f59e0b%22%20stroke-width%3D%222%22%20stroke-dasharray%3D%226%2C4%22%20opacity%3D%220.6%22%20rx%3D%224%22%20%2F%3E%0A%20%20%20%20%3Crect%20x%3D%2234%22%20y%3D%2230%22%20width%3D%22332%22%20height%3D%22540%22%20fill%3D%22none%22%20stroke%3D%22%23f59e0b%22%20stroke-width%3D%221%22%20opacity%3D%220.8%22%20rx%3D%222%22%20%2F%3E%0A%0A%20%20%20%20%3C!--%20Category%20Header%20Pill%20--%3E%0A%20%20%20%20%3Crect%20x%3D%2280%22%20y%3D%2255%22%20width%3D%22240%22%20height%3D%2224%22%20fill%3D%22%23000000%22%20opacity%3D%220.4%22%20rx%3D%2212%22%20%2F%3E%0A%20%20%20%20%3Ctext%20x%3D%22200%22%20y%3D%2271%22%20font-family%3D%22sans-serif%22%20font-size%3D%2210%22%20font-weight%3D%22900%22%20fill%3D%22%23f59e0b%22%20text-anchor%3D%22middle%22%20letter-spacing%3D%221.5%22%3EFICTION%3C%2Ftext%3E%0A%0A%20%20%20%20%3C!--%20Center%20Icon%20Symbol%20%2F%20Emblem%20--%3E%0A%20%20%20%20%3Ccircle%20cx%3D%22200%22%20cy%3D%22170%22%20r%3D%2248%22%20fill%3D%22%23000000%22%20opacity%3D%220.3%22%20stroke%3D%22%23f59e0b%22%20stroke-width%3D%222%22%20%2F%3E%0A%20%20%20%20%3Ctext%20x%3D%22200%22%20y%3D%22184%22%20font-family%3D%22sans-serif%22%20font-size%3D%2236%22%20text-anchor%3D%22middle%22%3E%F0%9F%A6%81%3C%2Ftext%3E%0A%0A%20%20%20%20%3C!--%20Main%20Title%20(Amharic)%20--%3E%0A%20%20%20%20%3Ctext%20x%3D%22200%22%20y%3D%22275%22%20font-family%3D%22'Noto%20Sans%20Ethiopic'%2C%20'Abyssinica%20SIL'%2C%20'Nyala'%2C%20sans-serif%22%20font-size%3D%2225%22%20font-weight%3D%22900%22%20fill%3D%22%23FFFFFF%22%20text-anchor%3D%22middle%22%3E%0A%20%20%20%20%20%20%E1%8C%8D%E1%88%AD%E1%8B%B6%E1%88%BD%0A%20%20%20%20%3C%2Ftext%3E%0A%0A%20%20%20%20%3C!--%20Subtitle%20(English%20Translation)%20--%3E%0A%20%20%20%20%3Ctext%20x%3D%22200%22%20y%3D%22315%22%20font-family%3D%22sans-serif%22%20font-size%3D%2213%22%20font-weight%3D%22600%22%20fill%3D%22%23f59e0b%22%20text-anchor%3D%22middle%22%20letter-spacing%3D%221%22%3E%0A%20%20%20%20%20%20Girdosh%0A%20%20%20%20%3C%2Ftext%3E%0A%0A%20%20%20%20%3Cline%20x1%3D%2280%22%20y1%3D%22350%22%20x2%3D%22320%22%20y2%3D%22350%22%20stroke%3D%22url(%23gold-Girdosh)%22%20stroke-width%3D%222%22%20%2F%3E%0A%0A%20%20%20%20%3C!--%20Author%20Badge%20--%3E%0A%20%20%20%20%3Ctext%20x%3D%22200%22%20y%3D%22435%22%20font-family%3D%22sans-serif%22%20font-size%3D%2210%22%20font-weight%3D%22800%22%20fill%3D%22%2394A3B8%22%20text-anchor%3D%22middle%22%20letter-spacing%3D%222%22%3EAUTHOR%20%2F%20%E1%8B%B0%E1%88%AB%E1%88%B2%3C%2Ftext%3E%0A%20%20%20%20%3Ctext%20x%3D%22200%22%20y%3D%22465%22%20font-family%3D%22'Noto%20Sans%20Ethiopic'%2C%20'Abyssinica%20SIL'%2C%20sans-serif%22%20font-size%3D%2219%22%20font-weight%3D%22800%22%20fill%3D%22%23FFFFFF%22%20text-anchor%3D%22middle%22%3E%0A%20%20%20%20%20%20Adam%20Reta%0A%20%20%20%20%3C%2Ftext%3E%0A%0A%20%20%20%20%3C!--%20Publisher%20Seal%20%2F%20Seal%20Footer%20--%3E%0A%20%20%20%20%3Crect%20x%3D%22100%22%20y%3D%22520%22%20width%3D%22200%22%20height%3D%2222%22%20fill%3D%22%23f59e0b%22%20opacity%3D%220.2%22%20rx%3D%224%22%20%2F%3E%0A%20%20%20%20%3Ctext%20x%3D%22200%22%20y%3D%22535%22%20font-family%3D%22sans-serif%22%20font-size%3D%229%22%20font-weight%3D%22900%22%20fill%3D%22%23f59e0b%22%20text-anchor%3D%22middle%22%20letter-spacing%3D%221.5%22%3EJJ%20BOOKSHOPPING%20%E2%80%A2%20%F0%9F%87%AA%F0%9F%87%B9%3C%2Ftext%3E%0A%20%20%3C%2Fsvg%3E",
     "ISBN": "978-99944-37-335-34",
     "publisher": "JJ Bookstore Publishing",
     "publicationDate": "2021-01-15",
@@ -1231,7 +1326,7 @@ export const INITIAL_BOOKS: Book[] = [
     "categoryName": "Short Stories",
     "price": 10.5,
     "currency": "ETB",
-    "coverImage": "https://images.unsplash.com/photo-1512820790803-83ca734da794?w=800&auto=format&fit=crop&q=80",
+    "coverImage": "data:image/svg+xml;utf8,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%20400%20600%22%20width%3D%22400%22%20height%3D%22600%22%3E%0A%20%20%20%20%3Cdefs%3E%0A%20%20%20%20%20%20%3ClinearGradient%20id%3D%22bg-AddisAbaba%22%20x1%3D%220%25%22%20y1%3D%220%25%22%20x2%3D%22100%25%22%20y2%3D%22100%25%22%3E%0A%20%20%20%20%20%20%20%20%3Cstop%20offset%3D%220%25%22%20stop-color%3D%22%23581c87%22%20%2F%3E%0A%20%20%20%20%20%20%20%20%3Cstop%20offset%3D%22100%25%22%20stop-color%3D%22%232e1065%22%20%2F%3E%0A%20%20%20%20%20%20%3C%2FlinearGradient%3E%0A%20%20%20%20%20%20%3ClinearGradient%20id%3D%22gold-AddisAbaba%22%20x1%3D%220%25%22%20y1%3D%220%25%22%20x2%3D%22100%25%22%20y2%3D%220%25%22%3E%0A%20%20%20%20%20%20%20%20%3Cstop%20offset%3D%220%25%22%20stop-color%3D%22%23F59E0B%22%20%2F%3E%0A%20%20%20%20%20%20%20%20%3Cstop%20offset%3D%2250%25%22%20stop-color%3D%22%23FEF08A%22%20%2F%3E%0A%20%20%20%20%20%20%20%20%3Cstop%20offset%3D%22100%25%22%20stop-color%3D%22%23D97706%22%20%2F%3E%0A%20%20%20%20%20%20%3C%2FlinearGradient%3E%0A%20%20%20%20%3C%2Fdefs%3E%0A%0A%20%20%20%20%3C!--%20Book%20Cover%20Base%20Background%20--%3E%0A%20%20%20%20%3Crect%20width%3D%22400%22%20height%3D%22600%22%20fill%3D%22url(%23bg-AddisAbaba)%22%20rx%3D%228%22%20%2F%3E%0A%20%20%20%20%0A%20%20%20%20%3C!--%20Spine%20Line%20Shadow%20--%3E%0A%20%20%20%20%3Crect%20x%3D%220%22%20y%3D%220%22%20width%3D%2218%22%20height%3D%22600%22%20fill%3D%22%23000000%22%20opacity%3D%220.25%22%20%2F%3E%0A%20%20%20%20%3Cline%20x1%3D%2218%22%20y1%3D%220%22%20x2%3D%2218%22%20y2%3D%22600%22%20stroke%3D%22%23FFFFFF%22%20stroke-opacity%3D%220.15%22%20stroke-width%3D%221.5%22%20%2F%3E%0A%0A%20%20%20%20%3C!--%20Outer%20Decorative%20Border%20Frame%20--%3E%0A%20%20%20%20%3Crect%20x%3D%2228%22%20y%3D%2224%22%20width%3D%22344%22%20height%3D%22552%22%20fill%3D%22none%22%20stroke%3D%22%23c084fc%22%20stroke-width%3D%222%22%20stroke-dasharray%3D%226%2C4%22%20opacity%3D%220.6%22%20rx%3D%224%22%20%2F%3E%0A%20%20%20%20%3Crect%20x%3D%2234%22%20y%3D%2230%22%20width%3D%22332%22%20height%3D%22540%22%20fill%3D%22none%22%20stroke%3D%22%23c084fc%22%20stroke-width%3D%221%22%20opacity%3D%220.8%22%20rx%3D%222%22%20%2F%3E%0A%0A%20%20%20%20%3C!--%20Category%20Header%20Pill%20--%3E%0A%20%20%20%20%3Crect%20x%3D%2280%22%20y%3D%2255%22%20width%3D%22240%22%20height%3D%2224%22%20fill%3D%22%23000000%22%20opacity%3D%220.4%22%20rx%3D%2212%22%20%2F%3E%0A%20%20%20%20%3Ctext%20x%3D%22200%22%20y%3D%2271%22%20font-family%3D%22sans-serif%22%20font-size%3D%2210%22%20font-weight%3D%22900%22%20fill%3D%22%23c084fc%22%20text-anchor%3D%22middle%22%20letter-spacing%3D%221.5%22%3ESHORT%20STORIES%3C%2Ftext%3E%0A%0A%20%20%20%20%3C!--%20Center%20Icon%20Symbol%20%2F%20Emblem%20--%3E%0A%20%20%20%20%3Ccircle%20cx%3D%22200%22%20cy%3D%22170%22%20r%3D%2248%22%20fill%3D%22%23000000%22%20opacity%3D%220.3%22%20stroke%3D%22%23c084fc%22%20stroke-width%3D%222%22%20%2F%3E%0A%20%20%20%20%3Ctext%20x%3D%22200%22%20y%3D%22184%22%20font-family%3D%22sans-serif%22%20font-size%3D%2236%22%20text-anchor%3D%22middle%22%3E%F0%9F%94%91%3C%2Ftext%3E%0A%0A%20%20%20%20%3C!--%20Main%20Title%20(Amharic)%20--%3E%0A%20%20%20%20%3Ctext%20x%3D%22200%22%20y%3D%22275%22%20font-family%3D%22'Noto%20Sans%20Ethiopic'%2C%20'Abyssinica%20SIL'%2C%20'Nyala'%2C%20sans-serif%22%20font-size%3D%2225%22%20font-weight%3D%22900%22%20fill%3D%22%23FFFFFF%22%20text-anchor%3D%22middle%22%3E%0A%20%20%20%20%20%20%E1%8A%A0%E1%8B%B2%E1%88%B5%20%E1%8A%A0%E1%89%A0%E1%89%A3%0A%20%20%20%20%3C%2Ftext%3E%0A%0A%20%20%20%20%3C!--%20Subtitle%20(English%20Translation)%20--%3E%0A%20%20%20%20%3Ctext%20x%3D%22200%22%20y%3D%22315%22%20font-family%3D%22sans-serif%22%20font-size%3D%2213%22%20font-weight%3D%22600%22%20fill%3D%22%23c084fc%22%20text-anchor%3D%22middle%22%20letter-spacing%3D%221%22%3E%0A%20%20%20%20%20%20Addis%20Ababa%0A%20%20%20%20%3C%2Ftext%3E%0A%0A%20%20%20%20%3Cline%20x1%3D%2280%22%20y1%3D%22350%22%20x2%3D%22320%22%20y2%3D%22350%22%20stroke%3D%22url(%23gold-AddisAbaba)%22%20stroke-width%3D%222%22%20%2F%3E%0A%0A%20%20%20%20%3C!--%20Author%20Badge%20--%3E%0A%20%20%20%20%3Ctext%20x%3D%22200%22%20y%3D%22435%22%20font-family%3D%22sans-serif%22%20font-size%3D%2210%22%20font-weight%3D%22800%22%20fill%3D%22%2394A3B8%22%20text-anchor%3D%22middle%22%20letter-spacing%3D%222%22%3EAUTHOR%20%2F%20%E1%8B%B0%E1%88%AB%E1%88%B2%3C%2Ftext%3E%0A%20%20%20%20%3Ctext%20x%3D%22200%22%20y%3D%22465%22%20font-family%3D%22'Noto%20Sans%20Ethiopic'%2C%20'Abyssinica%20SIL'%2C%20sans-serif%22%20font-size%3D%2219%22%20font-weight%3D%22800%22%20fill%3D%22%23FFFFFF%22%20text-anchor%3D%22middle%22%3E%0A%20%20%20%20%20%20Awgachew%20Terefe%0A%20%20%20%20%3C%2Ftext%3E%0A%0A%20%20%20%20%3C!--%20Publisher%20Seal%20%2F%20Seal%20Footer%20--%3E%0A%20%20%20%20%3Crect%20x%3D%22100%22%20y%3D%22520%22%20width%3D%22200%22%20height%3D%2222%22%20fill%3D%22%23c084fc%22%20opacity%3D%220.2%22%20rx%3D%224%22%20%2F%3E%0A%20%20%20%20%3Ctext%20x%3D%22200%22%20y%3D%22535%22%20font-family%3D%22sans-serif%22%20font-size%3D%229%22%20font-weight%3D%22900%22%20fill%3D%22%23c084fc%22%20text-anchor%3D%22middle%22%20letter-spacing%3D%221.5%22%3EJJ%20BOOKSHOPPING%20%E2%80%A2%20%F0%9F%87%AA%F0%9F%87%B9%3C%2Ftext%3E%0A%20%20%3C%2Fsvg%3E",
     "ISBN": "978-99944-94-829-35",
     "publisher": "JJ Bookstore Publishing",
     "publicationDate": "2021-01-15",
@@ -1258,7 +1353,7 @@ export const INITIAL_BOOKS: Book[] = [
     "categoryName": "Memoir",
     "price": 16.99,
     "currency": "ETB",
-    "coverImage": "https://images.unsplash.com/photo-1457369804613-52c61a468e7d?w=800&auto=format&fit=crop&q=80",
+    "coverImage": "data:image/svg+xml;utf8,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%20400%20600%22%20width%3D%22400%22%20height%3D%22600%22%3E%0A%20%20%20%20%3Cdefs%3E%0A%20%20%20%20%20%20%3ClinearGradient%20id%3D%22bg-YeTizitaFeleg%22%20x1%3D%220%25%22%20y1%3D%220%25%22%20x2%3D%22100%25%22%20y2%3D%22100%25%22%3E%0A%20%20%20%20%20%20%20%20%3Cstop%20offset%3D%220%25%22%20stop-color%3D%22%23022c22%22%20%2F%3E%0A%20%20%20%20%20%20%20%20%3Cstop%20offset%3D%22100%25%22%20stop-color%3D%22%230f172a%22%20%2F%3E%0A%20%20%20%20%20%20%3C%2FlinearGradient%3E%0A%20%20%20%20%20%20%3ClinearGradient%20id%3D%22gold-YeTizitaFeleg%22%20x1%3D%220%25%22%20y1%3D%220%25%22%20x2%3D%22100%25%22%20y2%3D%220%25%22%3E%0A%20%20%20%20%20%20%20%20%3Cstop%20offset%3D%220%25%22%20stop-color%3D%22%23F59E0B%22%20%2F%3E%0A%20%20%20%20%20%20%20%20%3Cstop%20offset%3D%2250%25%22%20stop-color%3D%22%23FEF08A%22%20%2F%3E%0A%20%20%20%20%20%20%20%20%3Cstop%20offset%3D%22100%25%22%20stop-color%3D%22%23D97706%22%20%2F%3E%0A%20%20%20%20%20%20%3C%2FlinearGradient%3E%0A%20%20%20%20%3C%2Fdefs%3E%0A%0A%20%20%20%20%3C!--%20Book%20Cover%20Base%20Background%20--%3E%0A%20%20%20%20%3Crect%20width%3D%22400%22%20height%3D%22600%22%20fill%3D%22url(%23bg-YeTizitaFeleg)%22%20rx%3D%228%22%20%2F%3E%0A%20%20%20%20%0A%20%20%20%20%3C!--%20Spine%20Line%20Shadow%20--%3E%0A%20%20%20%20%3Crect%20x%3D%220%22%20y%3D%220%22%20width%3D%2218%22%20height%3D%22600%22%20fill%3D%22%23000000%22%20opacity%3D%220.25%22%20%2F%3E%0A%20%20%20%20%3Cline%20x1%3D%2218%22%20y1%3D%220%22%20x2%3D%2218%22%20y2%3D%22600%22%20stroke%3D%22%23FFFFFF%22%20stroke-opacity%3D%220.15%22%20stroke-width%3D%221.5%22%20%2F%3E%0A%0A%20%20%20%20%3C!--%20Outer%20Decorative%20Border%20Frame%20--%3E%0A%20%20%20%20%3Crect%20x%3D%2228%22%20y%3D%2224%22%20width%3D%22344%22%20height%3D%22552%22%20fill%3D%22none%22%20stroke%3D%22%2334d399%22%20stroke-width%3D%222%22%20stroke-dasharray%3D%226%2C4%22%20opacity%3D%220.6%22%20rx%3D%224%22%20%2F%3E%0A%20%20%20%20%3Crect%20x%3D%2234%22%20y%3D%2230%22%20width%3D%22332%22%20height%3D%22540%22%20fill%3D%22none%22%20stroke%3D%22%2334d399%22%20stroke-width%3D%221%22%20opacity%3D%220.8%22%20rx%3D%222%22%20%2F%3E%0A%0A%20%20%20%20%3C!--%20Category%20Header%20Pill%20--%3E%0A%20%20%20%20%3Crect%20x%3D%2280%22%20y%3D%2255%22%20width%3D%22240%22%20height%3D%2224%22%20fill%3D%22%23000000%22%20opacity%3D%220.4%22%20rx%3D%2212%22%20%2F%3E%0A%20%20%20%20%3Ctext%20x%3D%22200%22%20y%3D%2271%22%20font-family%3D%22sans-serif%22%20font-size%3D%2210%22%20font-weight%3D%22900%22%20fill%3D%22%2334d399%22%20text-anchor%3D%22middle%22%20letter-spacing%3D%221.5%22%3EMEMOIR%3C%2Ftext%3E%0A%0A%20%20%20%20%3C!--%20Center%20Icon%20Symbol%20%2F%20Emblem%20--%3E%0A%20%20%20%20%3Ccircle%20cx%3D%22200%22%20cy%3D%22170%22%20r%3D%2248%22%20fill%3D%22%23000000%22%20opacity%3D%220.3%22%20stroke%3D%22%2334d399%22%20stroke-width%3D%222%22%20%2F%3E%0A%20%20%20%20%3Ctext%20x%3D%22200%22%20y%3D%22184%22%20font-family%3D%22sans-serif%22%20font-size%3D%2236%22%20text-anchor%3D%22middle%22%3E%F0%9F%92%8E%3C%2Ftext%3E%0A%0A%20%20%20%20%3C!--%20Main%20Title%20(Amharic)%20--%3E%0A%20%20%20%20%3Ctext%20x%3D%22200%22%20y%3D%22275%22%20font-family%3D%22'Noto%20Sans%20Ethiopic'%2C%20'Abyssinica%20SIL'%2C%20'Nyala'%2C%20sans-serif%22%20font-size%3D%2225%22%20font-weight%3D%22900%22%20fill%3D%22%23FFFFFF%22%20text-anchor%3D%22middle%22%3E%0A%20%20%20%20%20%20%E1%8B%A8%E1%89%B5%E1%8B%9D%E1%89%B3%20%E1%8D%88%E1%88%88%E1%8C%8D%0A%20%20%20%20%3C%2Ftext%3E%0A%0A%20%20%20%20%3C!--%20Subtitle%20(English%20Translation)%20--%3E%0A%20%20%20%20%3Ctext%20x%3D%22200%22%20y%3D%22315%22%20font-family%3D%22sans-serif%22%20font-size%3D%2213%22%20font-weight%3D%22600%22%20fill%3D%22%2334d399%22%20text-anchor%3D%22middle%22%20letter-spacing%3D%221%22%3E%0A%20%20%20%20%20%20Ye%20Tizita%20Feleg%0A%20%20%20%20%3C%2Ftext%3E%0A%0A%20%20%20%20%3Cline%20x1%3D%2280%22%20y1%3D%22350%22%20x2%3D%22320%22%20y2%3D%22350%22%20stroke%3D%22url(%23gold-YeTizitaFeleg)%22%20stroke-width%3D%222%22%20%2F%3E%0A%0A%20%20%20%20%3C!--%20Author%20Badge%20--%3E%0A%20%20%20%20%3Ctext%20x%3D%22200%22%20y%3D%22435%22%20font-family%3D%22sans-serif%22%20font-size%3D%2210%22%20font-weight%3D%22800%22%20fill%3D%22%2394A3B8%22%20text-anchor%3D%22middle%22%20letter-spacing%3D%222%22%3EAUTHOR%20%2F%20%E1%8B%B0%E1%88%AB%E1%88%B2%3C%2Ftext%3E%0A%20%20%20%20%3Ctext%20x%3D%22200%22%20y%3D%22465%22%20font-family%3D%22'Noto%20Sans%20Ethiopic'%2C%20'Abyssinica%20SIL'%2C%20sans-serif%22%20font-size%3D%2219%22%20font-weight%3D%22800%22%20fill%3D%22%23FFFFFF%22%20text-anchor%3D%22middle%22%3E%0A%20%20%20%20%20%20Tesfaye%20Gebreab%0A%20%20%20%20%3C%2Ftext%3E%0A%0A%20%20%20%20%3C!--%20Publisher%20Seal%20%2F%20Seal%20Footer%20--%3E%0A%20%20%20%20%3Crect%20x%3D%22100%22%20y%3D%22520%22%20width%3D%22200%22%20height%3D%2222%22%20fill%3D%22%2334d399%22%20opacity%3D%220.2%22%20rx%3D%224%22%20%2F%3E%0A%20%20%20%20%3Ctext%20x%3D%22200%22%20y%3D%22535%22%20font-family%3D%22sans-serif%22%20font-size%3D%229%22%20font-weight%3D%22900%22%20fill%3D%22%2334d399%22%20text-anchor%3D%22middle%22%20letter-spacing%3D%221.5%22%3EJJ%20BOOKSHOPPING%20%E2%80%A2%20%F0%9F%87%AA%F0%9F%87%B9%3C%2Ftext%3E%0A%20%20%3C%2Fsvg%3E",
     "ISBN": "978-99944-59-775-36",
     "publisher": "JJ Bookstore Publishing",
     "publicationDate": "2021-01-15",
@@ -1285,7 +1380,7 @@ export const INITIAL_BOOKS: Book[] = [
     "categoryName": "Fiction",
     "price": 13.5,
     "currency": "ETB",
-    "coverImage": "https://images.unsplash.com/photo-1507838153414-b4b713384a76?w=800&auto=format&fit=crop&q=80",
+    "coverImage": "data:image/svg+xml;utf8,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%20400%20600%22%20width%3D%22400%22%20height%3D%22600%22%3E%0A%20%20%20%20%3Cdefs%3E%0A%20%20%20%20%20%20%3ClinearGradient%20id%3D%22bg-MahileteTsige%22%20x1%3D%220%25%22%20y1%3D%220%25%22%20x2%3D%22100%25%22%20y2%3D%22100%25%22%3E%0A%20%20%20%20%20%20%20%20%3Cstop%20offset%3D%220%25%22%20stop-color%3D%22%23312e81%22%20%2F%3E%0A%20%20%20%20%20%20%20%20%3Cstop%20offset%3D%22100%25%22%20stop-color%3D%22%231e1b4b%22%20%2F%3E%0A%20%20%20%20%20%20%3C%2FlinearGradient%3E%0A%20%20%20%20%20%20%3ClinearGradient%20id%3D%22gold-MahileteTsige%22%20x1%3D%220%25%22%20y1%3D%220%25%22%20x2%3D%22100%25%22%20y2%3D%220%25%22%3E%0A%20%20%20%20%20%20%20%20%3Cstop%20offset%3D%220%25%22%20stop-color%3D%22%23F59E0B%22%20%2F%3E%0A%20%20%20%20%20%20%20%20%3Cstop%20offset%3D%2250%25%22%20stop-color%3D%22%23FEF08A%22%20%2F%3E%0A%20%20%20%20%20%20%20%20%3Cstop%20offset%3D%22100%25%22%20stop-color%3D%22%23D97706%22%20%2F%3E%0A%20%20%20%20%20%20%3C%2FlinearGradient%3E%0A%20%20%20%20%3C%2Fdefs%3E%0A%0A%20%20%20%20%3C!--%20Book%20Cover%20Base%20Background%20--%3E%0A%20%20%20%20%3Crect%20width%3D%22400%22%20height%3D%22600%22%20fill%3D%22url(%23bg-MahileteTsige)%22%20rx%3D%228%22%20%2F%3E%0A%20%20%20%20%0A%20%20%20%20%3C!--%20Spine%20Line%20Shadow%20--%3E%0A%20%20%20%20%3Crect%20x%3D%220%22%20y%3D%220%22%20width%3D%2218%22%20height%3D%22600%22%20fill%3D%22%23000000%22%20opacity%3D%220.25%22%20%2F%3E%0A%20%20%20%20%3Cline%20x1%3D%2218%22%20y1%3D%220%22%20x2%3D%2218%22%20y2%3D%22600%22%20stroke%3D%22%23FFFFFF%22%20stroke-opacity%3D%220.15%22%20stroke-width%3D%221.5%22%20%2F%3E%0A%0A%20%20%20%20%3C!--%20Outer%20Decorative%20Border%20Frame%20--%3E%0A%20%20%20%20%3Crect%20x%3D%2228%22%20y%3D%2224%22%20width%3D%22344%22%20height%3D%22552%22%20fill%3D%22none%22%20stroke%3D%22%23a5b4fc%22%20stroke-width%3D%222%22%20stroke-dasharray%3D%226%2C4%22%20opacity%3D%220.6%22%20rx%3D%224%22%20%2F%3E%0A%20%20%20%20%3Crect%20x%3D%2234%22%20y%3D%2230%22%20width%3D%22332%22%20height%3D%22540%22%20fill%3D%22none%22%20stroke%3D%22%23a5b4fc%22%20stroke-width%3D%221%22%20opacity%3D%220.8%22%20rx%3D%222%22%20%2F%3E%0A%0A%20%20%20%20%3C!--%20Category%20Header%20Pill%20--%3E%0A%20%20%20%20%3Crect%20x%3D%2280%22%20y%3D%2255%22%20width%3D%22240%22%20height%3D%2224%22%20fill%3D%22%23000000%22%20opacity%3D%220.4%22%20rx%3D%2212%22%20%2F%3E%0A%20%20%20%20%3Ctext%20x%3D%22200%22%20y%3D%2271%22%20font-family%3D%22sans-serif%22%20font-size%3D%2210%22%20font-weight%3D%22900%22%20fill%3D%22%23a5b4fc%22%20text-anchor%3D%22middle%22%20letter-spacing%3D%221.5%22%3EFICTION%3C%2Ftext%3E%0A%0A%20%20%20%20%3C!--%20Center%20Icon%20Symbol%20%2F%20Emblem%20--%3E%0A%20%20%20%20%3Ccircle%20cx%3D%22200%22%20cy%3D%22170%22%20r%3D%2248%22%20fill%3D%22%23000000%22%20opacity%3D%220.3%22%20stroke%3D%22%23a5b4fc%22%20stroke-width%3D%222%22%20%2F%3E%0A%20%20%20%20%3Ctext%20x%3D%22200%22%20y%3D%22184%22%20font-family%3D%22sans-serif%22%20font-size%3D%2236%22%20text-anchor%3D%22middle%22%3E%F0%9F%92%A1%3C%2Ftext%3E%0A%0A%20%20%20%20%3C!--%20Main%20Title%20(Amharic)%20--%3E%0A%20%20%20%20%3Ctext%20x%3D%22200%22%20y%3D%22275%22%20font-family%3D%22'Noto%20Sans%20Ethiopic'%2C%20'Abyssinica%20SIL'%2C%20'Nyala'%2C%20sans-serif%22%20font-size%3D%2225%22%20font-weight%3D%22900%22%20fill%3D%22%23FFFFFF%22%20text-anchor%3D%22middle%22%3E%0A%20%20%20%20%20%20%E1%88%9B%E1%8A%85%E1%88%8C%E1%89%B0%20%E1%8C%BD%E1%8C%8C%0A%20%20%20%20%3C%2Ftext%3E%0A%0A%20%20%20%20%3C!--%20Subtitle%20(English%20Translation)%20--%3E%0A%20%20%20%20%3Ctext%20x%3D%22200%22%20y%3D%22315%22%20font-family%3D%22sans-serif%22%20font-size%3D%2213%22%20font-weight%3D%22600%22%20fill%3D%22%23a5b4fc%22%20text-anchor%3D%22middle%22%20letter-spacing%3D%221%22%3E%0A%20%20%20%20%20%20Mahilete%20Tsige%0A%20%20%20%20%3C%2Ftext%3E%0A%0A%20%20%20%20%3Cline%20x1%3D%2280%22%20y1%3D%22350%22%20x2%3D%22320%22%20y2%3D%22350%22%20stroke%3D%22url(%23gold-MahileteTsige)%22%20stroke-width%3D%222%22%20%2F%3E%0A%0A%20%20%20%20%3C!--%20Author%20Badge%20--%3E%0A%20%20%20%20%3Ctext%20x%3D%22200%22%20y%3D%22435%22%20font-family%3D%22sans-serif%22%20font-size%3D%2210%22%20font-weight%3D%22800%22%20fill%3D%22%2394A3B8%22%20text-anchor%3D%22middle%22%20letter-spacing%3D%222%22%3EAUTHOR%20%2F%20%E1%8B%B0%E1%88%AB%E1%88%B2%3C%2Ftext%3E%0A%20%20%20%20%3Ctext%20x%3D%22200%22%20y%3D%22465%22%20font-family%3D%22'Noto%20Sans%20Ethiopic'%2C%20'Abyssinica%20SIL'%2C%20sans-serif%22%20font-size%3D%2219%22%20font-weight%3D%22800%22%20fill%3D%22%23FFFFFF%22%20text-anchor%3D%22middle%22%3E%0A%20%20%20%20%20%20Adam%20Reta%0A%20%20%20%20%3C%2Ftext%3E%0A%0A%20%20%20%20%3C!--%20Publisher%20Seal%20%2F%20Seal%20Footer%20--%3E%0A%20%20%20%20%3Crect%20x%3D%22100%22%20y%3D%22520%22%20width%3D%22200%22%20height%3D%2222%22%20fill%3D%22%23a5b4fc%22%20opacity%3D%220.2%22%20rx%3D%224%22%20%2F%3E%0A%20%20%20%20%3Ctext%20x%3D%22200%22%20y%3D%22535%22%20font-family%3D%22sans-serif%22%20font-size%3D%229%22%20font-weight%3D%22900%22%20fill%3D%22%23a5b4fc%22%20text-anchor%3D%22middle%22%20letter-spacing%3D%221.5%22%3EJJ%20BOOKSHOPPING%20%E2%80%A2%20%F0%9F%87%AA%F0%9F%87%B9%3C%2Ftext%3E%0A%20%20%3C%2Fsvg%3E",
     "ISBN": "978-99944-57-442-37",
     "publisher": "JJ Bookstore Publishing",
     "publicationDate": "2021-01-15",
@@ -1312,7 +1407,7 @@ export const INITIAL_BOOKS: Book[] = [
     "categoryName": "Fiction",
     "price": 14.5,
     "currency": "ETB",
-    "coverImage": "https://images.unsplash.com/photo-1506784983877-45594efa4cbe?w=800&auto=format&fit=crop&q=80",
+    "coverImage": "data:image/svg+xml;utf8,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%20400%20600%22%20width%3D%22400%22%20height%3D%22600%22%3E%0A%20%20%20%20%3Cdefs%3E%0A%20%20%20%20%20%20%3ClinearGradient%20id%3D%22bg-SibaraAtint%22%20x1%3D%220%25%22%20y1%3D%220%25%22%20x2%3D%22100%25%22%20y2%3D%22100%25%22%3E%0A%20%20%20%20%20%20%20%20%3Cstop%20offset%3D%220%25%22%20stop-color%3D%22%23831843%22%20%2F%3E%0A%20%20%20%20%20%20%20%20%3Cstop%20offset%3D%22100%25%22%20stop-color%3D%22%23500724%22%20%2F%3E%0A%20%20%20%20%20%20%3C%2FlinearGradient%3E%0A%20%20%20%20%20%20%3ClinearGradient%20id%3D%22gold-SibaraAtint%22%20x1%3D%220%25%22%20y1%3D%220%25%22%20x2%3D%22100%25%22%20y2%3D%220%25%22%3E%0A%20%20%20%20%20%20%20%20%3Cstop%20offset%3D%220%25%22%20stop-color%3D%22%23F59E0B%22%20%2F%3E%0A%20%20%20%20%20%20%20%20%3Cstop%20offset%3D%2250%25%22%20stop-color%3D%22%23FEF08A%22%20%2F%3E%0A%20%20%20%20%20%20%20%20%3Cstop%20offset%3D%22100%25%22%20stop-color%3D%22%23D97706%22%20%2F%3E%0A%20%20%20%20%20%20%3C%2FlinearGradient%3E%0A%20%20%20%20%3C%2Fdefs%3E%0A%0A%20%20%20%20%3C!--%20Book%20Cover%20Base%20Background%20--%3E%0A%20%20%20%20%3Crect%20width%3D%22400%22%20height%3D%22600%22%20fill%3D%22url(%23bg-SibaraAtint)%22%20rx%3D%228%22%20%2F%3E%0A%20%20%20%20%0A%20%20%20%20%3C!--%20Spine%20Line%20Shadow%20--%3E%0A%20%20%20%20%3Crect%20x%3D%220%22%20y%3D%220%22%20width%3D%2218%22%20height%3D%22600%22%20fill%3D%22%23000000%22%20opacity%3D%220.25%22%20%2F%3E%0A%20%20%20%20%3Cline%20x1%3D%2218%22%20y1%3D%220%22%20x2%3D%2218%22%20y2%3D%22600%22%20stroke%3D%22%23FFFFFF%22%20stroke-opacity%3D%220.15%22%20stroke-width%3D%221.5%22%20%2F%3E%0A%0A%20%20%20%20%3C!--%20Outer%20Decorative%20Border%20Frame%20--%3E%0A%20%20%20%20%3Crect%20x%3D%2228%22%20y%3D%2224%22%20width%3D%22344%22%20height%3D%22552%22%20fill%3D%22none%22%20stroke%3D%22%23f472b6%22%20stroke-width%3D%222%22%20stroke-dasharray%3D%226%2C4%22%20opacity%3D%220.6%22%20rx%3D%224%22%20%2F%3E%0A%20%20%20%20%3Crect%20x%3D%2234%22%20y%3D%2230%22%20width%3D%22332%22%20height%3D%22540%22%20fill%3D%22none%22%20stroke%3D%22%23f472b6%22%20stroke-width%3D%221%22%20opacity%3D%220.8%22%20rx%3D%222%22%20%2F%3E%0A%0A%20%20%20%20%3C!--%20Category%20Header%20Pill%20--%3E%0A%20%20%20%20%3Crect%20x%3D%2280%22%20y%3D%2255%22%20width%3D%22240%22%20height%3D%2224%22%20fill%3D%22%23000000%22%20opacity%3D%220.4%22%20rx%3D%2212%22%20%2F%3E%0A%20%20%20%20%3Ctext%20x%3D%22200%22%20y%3D%2271%22%20font-family%3D%22sans-serif%22%20font-size%3D%2210%22%20font-weight%3D%22900%22%20fill%3D%22%23f472b6%22%20text-anchor%3D%22middle%22%20letter-spacing%3D%221.5%22%3EFICTION%3C%2Ftext%3E%0A%0A%20%20%20%20%3C!--%20Center%20Icon%20Symbol%20%2F%20Emblem%20--%3E%0A%20%20%20%20%3Ccircle%20cx%3D%22200%22%20cy%3D%22170%22%20r%3D%2248%22%20fill%3D%22%23000000%22%20opacity%3D%220.3%22%20stroke%3D%22%23f472b6%22%20stroke-width%3D%222%22%20%2F%3E%0A%20%20%20%20%3Ctext%20x%3D%22200%22%20y%3D%22184%22%20font-family%3D%22sans-serif%22%20font-size%3D%2236%22%20text-anchor%3D%22middle%22%3E%F0%9F%8C%B9%3C%2Ftext%3E%0A%0A%20%20%20%20%3C!--%20Main%20Title%20(Amharic)%20--%3E%0A%20%20%20%20%3Ctext%20x%3D%22200%22%20y%3D%22275%22%20font-family%3D%22'Noto%20Sans%20Ethiopic'%2C%20'Abyssinica%20SIL'%2C%20'Nyala'%2C%20sans-serif%22%20font-size%3D%2225%22%20font-weight%3D%22900%22%20fill%3D%22%23FFFFFF%22%20text-anchor%3D%22middle%22%3E%0A%20%20%20%20%20%20%E1%88%B5%E1%89%A3%E1%88%AB%20%E1%8A%A0%E1%8C%A5%E1%8A%95%E1%89%B5%0A%20%20%20%20%3C%2Ftext%3E%0A%0A%20%20%20%20%3C!--%20Subtitle%20(English%20Translation)%20--%3E%0A%20%20%20%20%3Ctext%20x%3D%22200%22%20y%3D%22315%22%20font-family%3D%22sans-serif%22%20font-size%3D%2213%22%20font-weight%3D%22600%22%20fill%3D%22%23f472b6%22%20text-anchor%3D%22middle%22%20letter-spacing%3D%221%22%3E%0A%20%20%20%20%20%20Sibara%20Atint%0A%20%20%20%20%3C%2Ftext%3E%0A%0A%20%20%20%20%3Cline%20x1%3D%2280%22%20y1%3D%22350%22%20x2%3D%22320%22%20y2%3D%22350%22%20stroke%3D%22url(%23gold-SibaraAtint)%22%20stroke-width%3D%222%22%20%2F%3E%0A%0A%20%20%20%20%3C!--%20Author%20Badge%20--%3E%0A%20%20%20%20%3Ctext%20x%3D%22200%22%20y%3D%22435%22%20font-family%3D%22sans-serif%22%20font-size%3D%2210%22%20font-weight%3D%22800%22%20fill%3D%22%2394A3B8%22%20text-anchor%3D%22middle%22%20letter-spacing%3D%222%22%3EAUTHOR%20%2F%20%E1%8B%B0%E1%88%AB%E1%88%B2%3C%2Ftext%3E%0A%20%20%20%20%3Ctext%20x%3D%22200%22%20y%3D%22465%22%20font-family%3D%22'Noto%20Sans%20Ethiopic'%2C%20'Abyssinica%20SIL'%2C%20sans-serif%22%20font-size%3D%2219%22%20font-weight%3D%22800%22%20fill%3D%22%23FFFFFF%22%20text-anchor%3D%22middle%22%3E%0A%20%20%20%20%20%20Adam%20Reta%0A%20%20%20%20%3C%2Ftext%3E%0A%0A%20%20%20%20%3C!--%20Publisher%20Seal%20%2F%20Seal%20Footer%20--%3E%0A%20%20%20%20%3Crect%20x%3D%22100%22%20y%3D%22520%22%20width%3D%22200%22%20height%3D%2222%22%20fill%3D%22%23f472b6%22%20opacity%3D%220.2%22%20rx%3D%224%22%20%2F%3E%0A%20%20%20%20%3Ctext%20x%3D%22200%22%20y%3D%22535%22%20font-family%3D%22sans-serif%22%20font-size%3D%229%22%20font-weight%3D%22900%22%20fill%3D%22%23f472b6%22%20text-anchor%3D%22middle%22%20letter-spacing%3D%221.5%22%3EJJ%20BOOKSHOPPING%20%E2%80%A2%20%F0%9F%87%AA%F0%9F%87%B9%3C%2Ftext%3E%0A%20%20%3C%2Fsvg%3E",
     "ISBN": "978-99944-88-649-38",
     "publisher": "JJ Bookstore Publishing",
     "publicationDate": "2021-01-15",
@@ -1339,7 +1434,7 @@ export const INITIAL_BOOKS: Book[] = [
     "categoryName": "Psychology",
     "price": 18,
     "currency": "ETB",
-    "coverImage": "https://images.unsplash.com/photo-1516962215378-7fa2e137ae93?w=800&auto=format&fit=crop&q=80",
+    "coverImage": "data:image/svg+xml;utf8,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%20400%20600%22%20width%3D%22400%22%20height%3D%22600%22%3E%0A%20%20%20%20%3Cdefs%3E%0A%20%20%20%20%20%20%3ClinearGradient%20id%3D%22bg-Alemenor%22%20x1%3D%220%25%22%20y1%3D%220%25%22%20x2%3D%22100%25%22%20y2%3D%22100%25%22%3E%0A%20%20%20%20%20%20%20%20%3Cstop%20offset%3D%220%25%22%20stop-color%3D%22%233b0764%22%20%2F%3E%0A%20%20%20%20%20%20%20%20%3Cstop%20offset%3D%22100%25%22%20stop-color%3D%22%23180e07%22%20%2F%3E%0A%20%20%20%20%20%20%3C%2FlinearGradient%3E%0A%20%20%20%20%20%20%3ClinearGradient%20id%3D%22gold-Alemenor%22%20x1%3D%220%25%22%20y1%3D%220%25%22%20x2%3D%22100%25%22%20y2%3D%220%25%22%3E%0A%20%20%20%20%20%20%20%20%3Cstop%20offset%3D%220%25%22%20stop-color%3D%22%23F59E0B%22%20%2F%3E%0A%20%20%20%20%20%20%20%20%3Cstop%20offset%3D%2250%25%22%20stop-color%3D%22%23FEF08A%22%20%2F%3E%0A%20%20%20%20%20%20%20%20%3Cstop%20offset%3D%22100%25%22%20stop-color%3D%22%23D97706%22%20%2F%3E%0A%20%20%20%20%20%20%3C%2FlinearGradient%3E%0A%20%20%20%20%3C%2Fdefs%3E%0A%0A%20%20%20%20%3C!--%20Book%20Cover%20Base%20Background%20--%3E%0A%20%20%20%20%3Crect%20width%3D%22400%22%20height%3D%22600%22%20fill%3D%22url(%23bg-Alemenor)%22%20rx%3D%228%22%20%2F%3E%0A%20%20%20%20%0A%20%20%20%20%3C!--%20Spine%20Line%20Shadow%20--%3E%0A%20%20%20%20%3Crect%20x%3D%220%22%20y%3D%220%22%20width%3D%2218%22%20height%3D%22600%22%20fill%3D%22%23000000%22%20opacity%3D%220.25%22%20%2F%3E%0A%20%20%20%20%3Cline%20x1%3D%2218%22%20y1%3D%220%22%20x2%3D%2218%22%20y2%3D%22600%22%20stroke%3D%22%23FFFFFF%22%20stroke-opacity%3D%220.15%22%20stroke-width%3D%221.5%22%20%2F%3E%0A%0A%20%20%20%20%3C!--%20Outer%20Decorative%20Border%20Frame%20--%3E%0A%20%20%20%20%3Crect%20x%3D%2228%22%20y%3D%2224%22%20width%3D%22344%22%20height%3D%22552%22%20fill%3D%22none%22%20stroke%3D%22%23fde047%22%20stroke-width%3D%222%22%20stroke-dasharray%3D%226%2C4%22%20opacity%3D%220.6%22%20rx%3D%224%22%20%2F%3E%0A%20%20%20%20%3Crect%20x%3D%2234%22%20y%3D%2230%22%20width%3D%22332%22%20height%3D%22540%22%20fill%3D%22none%22%20stroke%3D%22%23fde047%22%20stroke-width%3D%221%22%20opacity%3D%220.8%22%20rx%3D%222%22%20%2F%3E%0A%0A%20%20%20%20%3C!--%20Category%20Header%20Pill%20--%3E%0A%20%20%20%20%3Crect%20x%3D%2280%22%20y%3D%2255%22%20width%3D%22240%22%20height%3D%2224%22%20fill%3D%22%23000000%22%20opacity%3D%220.4%22%20rx%3D%2212%22%20%2F%3E%0A%20%20%20%20%3Ctext%20x%3D%22200%22%20y%3D%2271%22%20font-family%3D%22sans-serif%22%20font-size%3D%2210%22%20font-weight%3D%22900%22%20fill%3D%22%23fde047%22%20text-anchor%3D%22middle%22%20letter-spacing%3D%221.5%22%3EPSYCHOLOGY%3C%2Ftext%3E%0A%0A%20%20%20%20%3C!--%20Center%20Icon%20Symbol%20%2F%20Emblem%20--%3E%0A%20%20%20%20%3Ccircle%20cx%3D%22200%22%20cy%3D%22170%22%20r%3D%2248%22%20fill%3D%22%23000000%22%20opacity%3D%220.3%22%20stroke%3D%22%23fde047%22%20stroke-width%3D%222%22%20%2F%3E%0A%20%20%20%20%3Ctext%20x%3D%22200%22%20y%3D%22184%22%20font-family%3D%22sans-serif%22%20font-size%3D%2236%22%20text-anchor%3D%22middle%22%3E%E2%9B%B0%EF%B8%8F%3C%2Ftext%3E%0A%0A%20%20%20%20%3C!--%20Main%20Title%20(Amharic)%20--%3E%0A%20%20%20%20%3Ctext%20x%3D%22200%22%20y%3D%22275%22%20font-family%3D%22'Noto%20Sans%20Ethiopic'%2C%20'Abyssinica%20SIL'%2C%20'Nyala'%2C%20sans-serif%22%20font-size%3D%2225%22%20font-weight%3D%22900%22%20fill%3D%22%23FFFFFF%22%20text-anchor%3D%22middle%22%3E%0A%20%20%20%20%20%20%E1%8A%A0%E1%88%88%E1%88%98%E1%8A%96%E1%88%AD%0A%20%20%20%20%3C%2Ftext%3E%0A%0A%20%20%20%20%3C!--%20Subtitle%20(English%20Translation)%20--%3E%0A%20%20%20%20%3Ctext%20x%3D%22200%22%20y%3D%22315%22%20font-family%3D%22sans-serif%22%20font-size%3D%2213%22%20font-weight%3D%22600%22%20fill%3D%22%23fde047%22%20text-anchor%3D%22middle%22%20letter-spacing%3D%221%22%3E%0A%20%20%20%20%20%20Alemenor%0A%20%20%20%20%3C%2Ftext%3E%0A%0A%20%20%20%20%3Cline%20x1%3D%2280%22%20y1%3D%22350%22%20x2%3D%22320%22%20y2%3D%22350%22%20stroke%3D%22url(%23gold-Alemenor)%22%20stroke-width%3D%222%22%20%2F%3E%0A%0A%20%20%20%20%3C!--%20Author%20Badge%20--%3E%0A%20%20%20%20%3Ctext%20x%3D%22200%22%20y%3D%22435%22%20font-family%3D%22sans-serif%22%20font-size%3D%2210%22%20font-weight%3D%22800%22%20fill%3D%22%2394A3B8%22%20text-anchor%3D%22middle%22%20letter-spacing%3D%222%22%3EAUTHOR%20%2F%20%E1%8B%B0%E1%88%AB%E1%88%B2%3C%2Ftext%3E%0A%20%20%20%20%3Ctext%20x%3D%22200%22%20y%3D%22465%22%20font-family%3D%22'Noto%20Sans%20Ethiopic'%2C%20'Abyssinica%20SIL'%2C%20sans-serif%22%20font-size%3D%2219%22%20font-weight%3D%22800%22%20fill%3D%22%23FFFFFF%22%20text-anchor%3D%22middle%22%3E%0A%20%20%20%20%20%20Dawit%20Wondimagegn%0A%20%20%20%20%3C%2Ftext%3E%0A%0A%20%20%20%20%3C!--%20Publisher%20Seal%20%2F%20Seal%20Footer%20--%3E%0A%20%20%20%20%3Crect%20x%3D%22100%22%20y%3D%22520%22%20width%3D%22200%22%20height%3D%2222%22%20fill%3D%22%23fde047%22%20opacity%3D%220.2%22%20rx%3D%224%22%20%2F%3E%0A%20%20%20%20%3Ctext%20x%3D%22200%22%20y%3D%22535%22%20font-family%3D%22sans-serif%22%20font-size%3D%229%22%20font-weight%3D%22900%22%20fill%3D%22%23fde047%22%20text-anchor%3D%22middle%22%20letter-spacing%3D%221.5%22%3EJJ%20BOOKSHOPPING%20%E2%80%A2%20%F0%9F%87%AA%F0%9F%87%B9%3C%2Ftext%3E%0A%20%20%3C%2Fsvg%3E",
     "ISBN": "978-99944-69-947-39",
     "publisher": "JJ Bookstore Publishing",
     "publicationDate": "2021-01-15",
@@ -1366,7 +1461,7 @@ export const INITIAL_BOOKS: Book[] = [
     "categoryName": "Thriller",
     "price": 19,
     "currency": "ETB",
-    "coverImage": "https://images.unsplash.com/photo-1512820790803-83ca734da794?w=800&auto=format&fit=crop&q=80",
+    "coverImage": "data:image/svg+xml;utf8,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%20400%20600%22%20width%3D%22400%22%20height%3D%22600%22%3E%0A%20%20%20%20%3Cdefs%3E%0A%20%20%20%20%20%20%3ClinearGradient%20id%3D%22bg-Ziguara%22%20x1%3D%220%25%22%20y1%3D%220%25%22%20x2%3D%22100%25%22%20y2%3D%22100%25%22%3E%0A%20%20%20%20%20%20%20%20%3Cstop%20offset%3D%220%25%22%20stop-color%3D%22%23312e81%22%20%2F%3E%0A%20%20%20%20%20%20%20%20%3Cstop%20offset%3D%22100%25%22%20stop-color%3D%22%231e1b4b%22%20%2F%3E%0A%20%20%20%20%20%20%3C%2FlinearGradient%3E%0A%20%20%20%20%20%20%3ClinearGradient%20id%3D%22gold-Ziguara%22%20x1%3D%220%25%22%20y1%3D%220%25%22%20x2%3D%22100%25%22%20y2%3D%220%25%22%3E%0A%20%20%20%20%20%20%20%20%3Cstop%20offset%3D%220%25%22%20stop-color%3D%22%23F59E0B%22%20%2F%3E%0A%20%20%20%20%20%20%20%20%3Cstop%20offset%3D%2250%25%22%20stop-color%3D%22%23FEF08A%22%20%2F%3E%0A%20%20%20%20%20%20%20%20%3Cstop%20offset%3D%22100%25%22%20stop-color%3D%22%23D97706%22%20%2F%3E%0A%20%20%20%20%20%20%3C%2FlinearGradient%3E%0A%20%20%20%20%3C%2Fdefs%3E%0A%0A%20%20%20%20%3C!--%20Book%20Cover%20Base%20Background%20--%3E%0A%20%20%20%20%3Crect%20width%3D%22400%22%20height%3D%22600%22%20fill%3D%22url(%23bg-Ziguara)%22%20rx%3D%228%22%20%2F%3E%0A%20%20%20%20%0A%20%20%20%20%3C!--%20Spine%20Line%20Shadow%20--%3E%0A%20%20%20%20%3Crect%20x%3D%220%22%20y%3D%220%22%20width%3D%2218%22%20height%3D%22600%22%20fill%3D%22%23000000%22%20opacity%3D%220.25%22%20%2F%3E%0A%20%20%20%20%3Cline%20x1%3D%2218%22%20y1%3D%220%22%20x2%3D%2218%22%20y2%3D%22600%22%20stroke%3D%22%23FFFFFF%22%20stroke-opacity%3D%220.15%22%20stroke-width%3D%221.5%22%20%2F%3E%0A%0A%20%20%20%20%3C!--%20Outer%20Decorative%20Border%20Frame%20--%3E%0A%20%20%20%20%3Crect%20x%3D%2228%22%20y%3D%2224%22%20width%3D%22344%22%20height%3D%22552%22%20fill%3D%22none%22%20stroke%3D%22%23a5b4fc%22%20stroke-width%3D%222%22%20stroke-dasharray%3D%226%2C4%22%20opacity%3D%220.6%22%20rx%3D%224%22%20%2F%3E%0A%20%20%20%20%3Crect%20x%3D%2234%22%20y%3D%2230%22%20width%3D%22332%22%20height%3D%22540%22%20fill%3D%22none%22%20stroke%3D%22%23a5b4fc%22%20stroke-width%3D%221%22%20opacity%3D%220.8%22%20rx%3D%222%22%20%2F%3E%0A%0A%20%20%20%20%3C!--%20Category%20Header%20Pill%20--%3E%0A%20%20%20%20%3Crect%20x%3D%2280%22%20y%3D%2255%22%20width%3D%22240%22%20height%3D%2224%22%20fill%3D%22%23000000%22%20opacity%3D%220.4%22%20rx%3D%2212%22%20%2F%3E%0A%20%20%20%20%3Ctext%20x%3D%22200%22%20y%3D%2271%22%20font-family%3D%22sans-serif%22%20font-size%3D%2210%22%20font-weight%3D%22900%22%20fill%3D%22%23a5b4fc%22%20text-anchor%3D%22middle%22%20letter-spacing%3D%221.5%22%3ETHRILLER%3C%2Ftext%3E%0A%0A%20%20%20%20%3C!--%20Center%20Icon%20Symbol%20%2F%20Emblem%20--%3E%0A%20%20%20%20%3Ccircle%20cx%3D%22200%22%20cy%3D%22170%22%20r%3D%2248%22%20fill%3D%22%23000000%22%20opacity%3D%220.3%22%20stroke%3D%22%23a5b4fc%22%20stroke-width%3D%222%22%20%2F%3E%0A%20%20%20%20%3Ctext%20x%3D%22200%22%20y%3D%22184%22%20font-family%3D%22sans-serif%22%20font-size%3D%2236%22%20text-anchor%3D%22middle%22%3E%F0%9F%92%A1%3C%2Ftext%3E%0A%0A%20%20%20%20%3C!--%20Main%20Title%20(Amharic)%20--%3E%0A%20%20%20%20%3Ctext%20x%3D%22200%22%20y%3D%22275%22%20font-family%3D%22'Noto%20Sans%20Ethiopic'%2C%20'Abyssinica%20SIL'%2C%20'Nyala'%2C%20sans-serif%22%20font-size%3D%2225%22%20font-weight%3D%22900%22%20fill%3D%22%23FFFFFF%22%20text-anchor%3D%22middle%22%3E%0A%20%20%20%20%20%20%E1%8B%9D%E1%8C%93%E1%88%AB%0A%20%20%20%20%3C%2Ftext%3E%0A%0A%20%20%20%20%3C!--%20Subtitle%20(English%20Translation)%20--%3E%0A%20%20%20%20%3Ctext%20x%3D%22200%22%20y%3D%22315%22%20font-family%3D%22sans-serif%22%20font-size%3D%2213%22%20font-weight%3D%22600%22%20fill%3D%22%23a5b4fc%22%20text-anchor%3D%22middle%22%20letter-spacing%3D%221%22%3E%0A%20%20%20%20%20%20Ziguara%0A%20%20%20%20%3C%2Ftext%3E%0A%0A%20%20%20%20%3Cline%20x1%3D%2280%22%20y1%3D%22350%22%20x2%3D%22320%22%20y2%3D%22350%22%20stroke%3D%22url(%23gold-Ziguara)%22%20stroke-width%3D%222%22%20%2F%3E%0A%0A%20%20%20%20%3C!--%20Author%20Badge%20--%3E%0A%20%20%20%20%3Ctext%20x%3D%22200%22%20y%3D%22435%22%20font-family%3D%22sans-serif%22%20font-size%3D%2210%22%20font-weight%3D%22800%22%20fill%3D%22%2394A3B8%22%20text-anchor%3D%22middle%22%20letter-spacing%3D%222%22%3EAUTHOR%20%2F%20%E1%8B%B0%E1%88%AB%E1%88%B2%3C%2Ftext%3E%0A%20%20%20%20%3Ctext%20x%3D%22200%22%20y%3D%22465%22%20font-family%3D%22'Noto%20Sans%20Ethiopic'%2C%20'Abyssinica%20SIL'%2C%20sans-serif%22%20font-size%3D%2219%22%20font-weight%3D%22800%22%20fill%3D%22%23FFFFFF%22%20text-anchor%3D%22middle%22%3E%0A%20%20%20%20%20%20Yismake%20Worku%0A%20%20%20%20%3C%2Ftext%3E%0A%0A%20%20%20%20%3C!--%20Publisher%20Seal%20%2F%20Seal%20Footer%20--%3E%0A%20%20%20%20%3Crect%20x%3D%22100%22%20y%3D%22520%22%20width%3D%22200%22%20height%3D%2222%22%20fill%3D%22%23a5b4fc%22%20opacity%3D%220.2%22%20rx%3D%224%22%20%2F%3E%0A%20%20%20%20%3Ctext%20x%3D%22200%22%20y%3D%22535%22%20font-family%3D%22sans-serif%22%20font-size%3D%229%22%20font-weight%3D%22900%22%20fill%3D%22%23a5b4fc%22%20text-anchor%3D%22middle%22%20letter-spacing%3D%221.5%22%3EJJ%20BOOKSHOPPING%20%E2%80%A2%20%F0%9F%87%AA%F0%9F%87%B9%3C%2Ftext%3E%0A%20%20%3C%2Fsvg%3E",
     "ISBN": "978-99944-63-396-40",
     "publisher": "JJ Bookstore Publishing",
     "publicationDate": "2021-01-15",
@@ -1393,7 +1488,7 @@ export const INITIAL_BOOKS: Book[] = [
     "categoryName": "Self-Help",
     "price": 12.99,
     "currency": "ETB",
-    "coverImage": "https://images.unsplash.com/photo-1506784983877-45594efa4cbe?w=800&auto=format&fit=crop&q=80",
+    "coverImage": "data:image/svg+xml;utf8,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%20400%20600%22%20width%3D%22400%22%20height%3D%22600%22%3E%0A%20%20%20%20%3Cdefs%3E%0A%20%20%20%20%20%20%3ClinearGradient%20id%3D%22bg-YeNegewSew%22%20x1%3D%220%25%22%20y1%3D%220%25%22%20x2%3D%22100%25%22%20y2%3D%22100%25%22%3E%0A%20%20%20%20%20%20%20%20%3Cstop%20offset%3D%220%25%22%20stop-color%3D%22%237c2d12%22%20%2F%3E%0A%20%20%20%20%20%20%20%20%3Cstop%20offset%3D%22100%25%22%20stop-color%3D%22%23431407%22%20%2F%3E%0A%20%20%20%20%20%20%3C%2FlinearGradient%3E%0A%20%20%20%20%20%20%3ClinearGradient%20id%3D%22gold-YeNegewSew%22%20x1%3D%220%25%22%20y1%3D%220%25%22%20x2%3D%22100%25%22%20y2%3D%220%25%22%3E%0A%20%20%20%20%20%20%20%20%3Cstop%20offset%3D%220%25%22%20stop-color%3D%22%23F59E0B%22%20%2F%3E%0A%20%20%20%20%20%20%20%20%3Cstop%20offset%3D%2250%25%22%20stop-color%3D%22%23FEF08A%22%20%2F%3E%0A%20%20%20%20%20%20%20%20%3Cstop%20offset%3D%22100%25%22%20stop-color%3D%22%23D97706%22%20%2F%3E%0A%20%20%20%20%20%20%3C%2FlinearGradient%3E%0A%20%20%20%20%3C%2Fdefs%3E%0A%0A%20%20%20%20%3C!--%20Book%20Cover%20Base%20Background%20--%3E%0A%20%20%20%20%3Crect%20width%3D%22400%22%20height%3D%22600%22%20fill%3D%22url(%23bg-YeNegewSew)%22%20rx%3D%228%22%20%2F%3E%0A%20%20%20%20%0A%20%20%20%20%3C!--%20Spine%20Line%20Shadow%20--%3E%0A%20%20%20%20%3Crect%20x%3D%220%22%20y%3D%220%22%20width%3D%2218%22%20height%3D%22600%22%20fill%3D%22%23000000%22%20opacity%3D%220.25%22%20%2F%3E%0A%20%20%20%20%3Cline%20x1%3D%2218%22%20y1%3D%220%22%20x2%3D%2218%22%20y2%3D%22600%22%20stroke%3D%22%23FFFFFF%22%20stroke-opacity%3D%220.15%22%20stroke-width%3D%221.5%22%20%2F%3E%0A%0A%20%20%20%20%3C!--%20Outer%20Decorative%20Border%20Frame%20--%3E%0A%20%20%20%20%3Crect%20x%3D%2228%22%20y%3D%2224%22%20width%3D%22344%22%20height%3D%22552%22%20fill%3D%22none%22%20stroke%3D%22%23fb923c%22%20stroke-width%3D%222%22%20stroke-dasharray%3D%226%2C4%22%20opacity%3D%220.6%22%20rx%3D%224%22%20%2F%3E%0A%20%20%20%20%3Crect%20x%3D%2234%22%20y%3D%2230%22%20width%3D%22332%22%20height%3D%22540%22%20fill%3D%22none%22%20stroke%3D%22%23fb923c%22%20stroke-width%3D%221%22%20opacity%3D%220.8%22%20rx%3D%222%22%20%2F%3E%0A%0A%20%20%20%20%3C!--%20Category%20Header%20Pill%20--%3E%0A%20%20%20%20%3Crect%20x%3D%2280%22%20y%3D%2255%22%20width%3D%22240%22%20height%3D%2224%22%20fill%3D%22%23000000%22%20opacity%3D%220.4%22%20rx%3D%2212%22%20%2F%3E%0A%20%20%20%20%3Ctext%20x%3D%22200%22%20y%3D%2271%22%20font-family%3D%22sans-serif%22%20font-size%3D%2210%22%20font-weight%3D%22900%22%20fill%3D%22%23fb923c%22%20text-anchor%3D%22middle%22%20letter-spacing%3D%221.5%22%3ESELF-HELP%3C%2Ftext%3E%0A%0A%20%20%20%20%3C!--%20Center%20Icon%20Symbol%20%2F%20Emblem%20--%3E%0A%20%20%20%20%3Ccircle%20cx%3D%22200%22%20cy%3D%22170%22%20r%3D%2248%22%20fill%3D%22%23000000%22%20opacity%3D%220.3%22%20stroke%3D%22%23fb923c%22%20stroke-width%3D%222%22%20%2F%3E%0A%20%20%20%20%3Ctext%20x%3D%22200%22%20y%3D%22184%22%20font-family%3D%22sans-serif%22%20font-size%3D%2236%22%20text-anchor%3D%22middle%22%3E%F0%9F%8F%9B%EF%B8%8F%3C%2Ftext%3E%0A%0A%20%20%20%20%3C!--%20Main%20Title%20(Amharic)%20--%3E%0A%20%20%20%20%3Ctext%20x%3D%22200%22%20y%3D%22275%22%20font-family%3D%22'Noto%20Sans%20Ethiopic'%2C%20'Abyssinica%20SIL'%2C%20'Nyala'%2C%20sans-serif%22%20font-size%3D%2225%22%20font-weight%3D%22900%22%20fill%3D%22%23FFFFFF%22%20text-anchor%3D%22middle%22%3E%0A%20%20%20%20%20%20%E1%8B%A8%E1%8A%90%E1%8C%88%E1%8B%8D%20%E1%88%B0%E1%8B%8D%0A%20%20%20%20%3C%2Ftext%3E%0A%0A%20%20%20%20%3C!--%20Subtitle%20(English%20Translation)%20--%3E%0A%20%20%20%20%3Ctext%20x%3D%22200%22%20y%3D%22315%22%20font-family%3D%22sans-serif%22%20font-size%3D%2213%22%20font-weight%3D%22600%22%20fill%3D%22%23fb923c%22%20text-anchor%3D%22middle%22%20letter-spacing%3D%221%22%3E%0A%20%20%20%20%20%20Ye%20Negew%20Sew%0A%20%20%20%20%3C%2Ftext%3E%0A%0A%20%20%20%20%3Cline%20x1%3D%2280%22%20y1%3D%22350%22%20x2%3D%22320%22%20y2%3D%22350%22%20stroke%3D%22url(%23gold-YeNegewSew)%22%20stroke-width%3D%222%22%20%2F%3E%0A%0A%20%20%20%20%3C!--%20Author%20Badge%20--%3E%0A%20%20%20%20%3Ctext%20x%3D%22200%22%20y%3D%22435%22%20font-family%3D%22sans-serif%22%20font-size%3D%2210%22%20font-weight%3D%22800%22%20fill%3D%22%2394A3B8%22%20text-anchor%3D%22middle%22%20letter-spacing%3D%222%22%3EAUTHOR%20%2F%20%E1%8B%B0%E1%88%AB%E1%88%B2%3C%2Ftext%3E%0A%20%20%20%20%3Ctext%20x%3D%22200%22%20y%3D%22465%22%20font-family%3D%22'Noto%20Sans%20Ethiopic'%2C%20'Abyssinica%20SIL'%2C%20sans-serif%22%20font-size%3D%2219%22%20font-weight%3D%22800%22%20fill%3D%22%23FFFFFF%22%20text-anchor%3D%22middle%22%3E%0A%20%20%20%20%20%20Dr.%20Eyob%20Mamo%0A%20%20%20%20%3C%2Ftext%3E%0A%0A%20%20%20%20%3C!--%20Publisher%20Seal%20%2F%20Seal%20Footer%20--%3E%0A%20%20%20%20%3Crect%20x%3D%22100%22%20y%3D%22520%22%20width%3D%22200%22%20height%3D%2222%22%20fill%3D%22%23fb923c%22%20opacity%3D%220.2%22%20rx%3D%224%22%20%2F%3E%0A%20%20%20%20%3Ctext%20x%3D%22200%22%20y%3D%22535%22%20font-family%3D%22sans-serif%22%20font-size%3D%229%22%20font-weight%3D%22900%22%20fill%3D%22%23fb923c%22%20text-anchor%3D%22middle%22%20letter-spacing%3D%221.5%22%3EJJ%20BOOKSHOPPING%20%E2%80%A2%20%F0%9F%87%AA%F0%9F%87%B9%3C%2Ftext%3E%0A%20%20%3C%2Fsvg%3E",
     "ISBN": "978-99944-46-810-41",
     "publisher": "JJ Bookstore Publishing",
     "publicationDate": "2021-01-15",
@@ -1420,7 +1515,7 @@ export const INITIAL_BOOKS: Book[] = [
     "categoryName": "Science/Philosophy",
     "price": 17.5,
     "currency": "ETB",
-    "coverImage": "https://images.unsplash.com/photo-1532012197267-da84d127e765?w=800&auto=format&fit=crop&q=80",
+    "coverImage": "data:image/svg+xml;utf8,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%20400%20600%22%20width%3D%22400%22%20height%3D%22600%22%3E%0A%20%20%20%20%3Cdefs%3E%0A%20%20%20%20%20%20%3ClinearGradient%20id%3D%22bg-IgnyamInnuribet%22%20x1%3D%220%25%22%20y1%3D%220%25%22%20x2%3D%22100%25%22%20y2%3D%22100%25%22%3E%0A%20%20%20%20%20%20%20%20%3Cstop%20offset%3D%220%25%22%20stop-color%3D%22%2314532d%22%20%2F%3E%0A%20%20%20%20%20%20%20%20%3Cstop%20offset%3D%22100%25%22%20stop-color%3D%22%23064e3b%22%20%2F%3E%0A%20%20%20%20%20%20%3C%2FlinearGradient%3E%0A%20%20%20%20%20%20%3ClinearGradient%20id%3D%22gold-IgnyamInnuribet%22%20x1%3D%220%25%22%20y1%3D%220%25%22%20x2%3D%22100%25%22%20y2%3D%220%25%22%3E%0A%20%20%20%20%20%20%20%20%3Cstop%20offset%3D%220%25%22%20stop-color%3D%22%23F59E0B%22%20%2F%3E%0A%20%20%20%20%20%20%20%20%3Cstop%20offset%3D%2250%25%22%20stop-color%3D%22%23FEF08A%22%20%2F%3E%0A%20%20%20%20%20%20%20%20%3Cstop%20offset%3D%22100%25%22%20stop-color%3D%22%23D97706%22%20%2F%3E%0A%20%20%20%20%20%20%3C%2FlinearGradient%3E%0A%20%20%20%20%3C%2Fdefs%3E%0A%0A%20%20%20%20%3C!--%20Book%20Cover%20Base%20Background%20--%3E%0A%20%20%20%20%3Crect%20width%3D%22400%22%20height%3D%22600%22%20fill%3D%22url(%23bg-IgnyamInnuribet)%22%20rx%3D%228%22%20%2F%3E%0A%20%20%20%20%0A%20%20%20%20%3C!--%20Spine%20Line%20Shadow%20--%3E%0A%20%20%20%20%3Crect%20x%3D%220%22%20y%3D%220%22%20width%3D%2218%22%20height%3D%22600%22%20fill%3D%22%23000000%22%20opacity%3D%220.25%22%20%2F%3E%0A%20%20%20%20%3Cline%20x1%3D%2218%22%20y1%3D%220%22%20x2%3D%2218%22%20y2%3D%22600%22%20stroke%3D%22%23FFFFFF%22%20stroke-opacity%3D%220.15%22%20stroke-width%3D%221.5%22%20%2F%3E%0A%0A%20%20%20%20%3C!--%20Outer%20Decorative%20Border%20Frame%20--%3E%0A%20%20%20%20%3Crect%20x%3D%2228%22%20y%3D%2224%22%20width%3D%22344%22%20height%3D%22552%22%20fill%3D%22none%22%20stroke%3D%22%234ade80%22%20stroke-width%3D%222%22%20stroke-dasharray%3D%226%2C4%22%20opacity%3D%220.6%22%20rx%3D%224%22%20%2F%3E%0A%20%20%20%20%3Crect%20x%3D%2234%22%20y%3D%2230%22%20width%3D%22332%22%20height%3D%22540%22%20fill%3D%22none%22%20stroke%3D%22%234ade80%22%20stroke-width%3D%221%22%20opacity%3D%220.8%22%20rx%3D%222%22%20%2F%3E%0A%0A%20%20%20%20%3C!--%20Category%20Header%20Pill%20--%3E%0A%20%20%20%20%3Crect%20x%3D%2280%22%20y%3D%2255%22%20width%3D%22240%22%20height%3D%2224%22%20fill%3D%22%23000000%22%20opacity%3D%220.4%22%20rx%3D%2212%22%20%2F%3E%0A%20%20%20%20%3Ctext%20x%3D%22200%22%20y%3D%2271%22%20font-family%3D%22sans-serif%22%20font-size%3D%2210%22%20font-weight%3D%22900%22%20fill%3D%22%234ade80%22%20text-anchor%3D%22middle%22%20letter-spacing%3D%221.5%22%3ESCIENCE%2FPHILOSOPHY%3C%2Ftext%3E%0A%0A%20%20%20%20%3C!--%20Center%20Icon%20Symbol%20%2F%20Emblem%20--%3E%0A%20%20%20%20%3Ccircle%20cx%3D%22200%22%20cy%3D%22170%22%20r%3D%2248%22%20fill%3D%22%23000000%22%20opacity%3D%220.3%22%20stroke%3D%22%234ade80%22%20stroke-width%3D%222%22%20%2F%3E%0A%20%20%20%20%3Ctext%20x%3D%22200%22%20y%3D%22184%22%20font-family%3D%22sans-serif%22%20font-size%3D%2236%22%20text-anchor%3D%22middle%22%3E%F0%9F%8C%BF%3C%2Ftext%3E%0A%0A%20%20%20%20%3C!--%20Main%20Title%20(Amharic)%20--%3E%0A%20%20%20%20%3Ctext%20x%3D%22200%22%20y%3D%22275%22%20font-family%3D%22'Noto%20Sans%20Ethiopic'%2C%20'Abyssinica%20SIL'%2C%20'Nyala'%2C%20sans-serif%22%20font-size%3D%2225%22%20font-weight%3D%22900%22%20fill%3D%22%23FFFFFF%22%20text-anchor%3D%22middle%22%3E%0A%20%20%20%20%20%20%E1%8A%A5%E1%8A%9B%E1%88%9D%20%E1%8A%A5%E1%8A%95%E1%8A%91%E1%88%AD%E1%89%A0%E1%89%B5%0A%20%20%20%20%3C%2Ftext%3E%0A%0A%20%20%20%20%3C!--%20Subtitle%20(English%20Translation)%20--%3E%0A%20%20%20%20%3Ctext%20x%3D%22200%22%20y%3D%22315%22%20font-family%3D%22sans-serif%22%20font-size%3D%2213%22%20font-weight%3D%22600%22%20fill%3D%22%234ade80%22%20text-anchor%3D%22middle%22%20letter-spacing%3D%221%22%3E%0A%20%20%20%20%20%20Ignyam%20Innuribet%0A%20%20%20%20%3C%2Ftext%3E%0A%0A%20%20%20%20%3Cline%20x1%3D%2280%22%20y1%3D%22350%22%20x2%3D%22320%22%20y2%3D%22350%22%20stroke%3D%22url(%23gold-IgnyamInnuribet)%22%20stroke-width%3D%222%22%20%2F%3E%0A%0A%20%20%20%20%3C!--%20Author%20Badge%20--%3E%0A%20%20%20%20%3Ctext%20x%3D%22200%22%20y%3D%22435%22%20font-family%3D%22sans-serif%22%20font-size%3D%2210%22%20font-weight%3D%22800%22%20fill%3D%22%2394A3B8%22%20text-anchor%3D%22middle%22%20letter-spacing%3D%222%22%3EAUTHOR%20%2F%20%E1%8B%B0%E1%88%AB%E1%88%B2%3C%2Ftext%3E%0A%20%20%20%20%3Ctext%20x%3D%22200%22%20y%3D%22465%22%20font-family%3D%22'Noto%20Sans%20Ethiopic'%2C%20'Abyssinica%20SIL'%2C%20sans-serif%22%20font-size%3D%2219%22%20font-weight%3D%22800%22%20fill%3D%22%23FFFFFF%22%20text-anchor%3D%22middle%22%3E%0A%20%20%20%20%20%20Dr.%20Rodas%20Tadese%0A%20%20%20%20%3C%2Ftext%3E%0A%0A%20%20%20%20%3C!--%20Publisher%20Seal%20%2F%20Seal%20Footer%20--%3E%0A%20%20%20%20%3Crect%20x%3D%22100%22%20y%3D%22520%22%20width%3D%22200%22%20height%3D%2222%22%20fill%3D%22%234ade80%22%20opacity%3D%220.2%22%20rx%3D%224%22%20%2F%3E%0A%20%20%20%20%3Ctext%20x%3D%22200%22%20y%3D%22535%22%20font-family%3D%22sans-serif%22%20font-size%3D%229%22%20font-weight%3D%22900%22%20fill%3D%22%234ade80%22%20text-anchor%3D%22middle%22%20letter-spacing%3D%221.5%22%3EJJ%20BOOKSHOPPING%20%E2%80%A2%20%F0%9F%87%AA%F0%9F%87%B9%3C%2Ftext%3E%0A%20%20%3C%2Fsvg%3E",
     "ISBN": "978-99944-40-987-42",
     "publisher": "JJ Bookstore Publishing",
     "publicationDate": "2021-01-15",
@@ -1447,7 +1542,7 @@ export const INITIAL_BOOKS: Book[] = [
     "categoryName": "Self-Help",
     "price": 13.5,
     "currency": "ETB",
-    "coverImage": "https://images.unsplash.com/photo-1506784983877-45594efa4cbe?w=800&auto=format&fit=crop&q=80",
+    "coverImage": "data:image/svg+xml;utf8,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%20400%20600%22%20width%3D%22400%22%20height%3D%22600%22%3E%0A%20%20%20%20%3Cdefs%3E%0A%20%20%20%20%20%20%3ClinearGradient%20id%3D%22bg-AemirowonYazeminu%22%20x1%3D%220%25%22%20y1%3D%220%25%22%20x2%3D%22100%25%22%20y2%3D%22100%25%22%3E%0A%20%20%20%20%20%20%20%20%3Cstop%20offset%3D%220%25%22%20stop-color%3D%22%237c2d12%22%20%2F%3E%0A%20%20%20%20%20%20%20%20%3Cstop%20offset%3D%22100%25%22%20stop-color%3D%22%23431407%22%20%2F%3E%0A%20%20%20%20%20%20%3C%2FlinearGradient%3E%0A%20%20%20%20%20%20%3ClinearGradient%20id%3D%22gold-AemirowonYazeminu%22%20x1%3D%220%25%22%20y1%3D%220%25%22%20x2%3D%22100%25%22%20y2%3D%220%25%22%3E%0A%20%20%20%20%20%20%20%20%3Cstop%20offset%3D%220%25%22%20stop-color%3D%22%23F59E0B%22%20%2F%3E%0A%20%20%20%20%20%20%20%20%3Cstop%20offset%3D%2250%25%22%20stop-color%3D%22%23FEF08A%22%20%2F%3E%0A%20%20%20%20%20%20%20%20%3Cstop%20offset%3D%22100%25%22%20stop-color%3D%22%23D97706%22%20%2F%3E%0A%20%20%20%20%20%20%3C%2FlinearGradient%3E%0A%20%20%20%20%3C%2Fdefs%3E%0A%0A%20%20%20%20%3C!--%20Book%20Cover%20Base%20Background%20--%3E%0A%20%20%20%20%3Crect%20width%3D%22400%22%20height%3D%22600%22%20fill%3D%22url(%23bg-AemirowonYazeminu)%22%20rx%3D%228%22%20%2F%3E%0A%20%20%20%20%0A%20%20%20%20%3C!--%20Spine%20Line%20Shadow%20--%3E%0A%20%20%20%20%3Crect%20x%3D%220%22%20y%3D%220%22%20width%3D%2218%22%20height%3D%22600%22%20fill%3D%22%23000000%22%20opacity%3D%220.25%22%20%2F%3E%0A%20%20%20%20%3Cline%20x1%3D%2218%22%20y1%3D%220%22%20x2%3D%2218%22%20y2%3D%22600%22%20stroke%3D%22%23FFFFFF%22%20stroke-opacity%3D%220.15%22%20stroke-width%3D%221.5%22%20%2F%3E%0A%0A%20%20%20%20%3C!--%20Outer%20Decorative%20Border%20Frame%20--%3E%0A%20%20%20%20%3Crect%20x%3D%2228%22%20y%3D%2224%22%20width%3D%22344%22%20height%3D%22552%22%20fill%3D%22none%22%20stroke%3D%22%23fb923c%22%20stroke-width%3D%222%22%20stroke-dasharray%3D%226%2C4%22%20opacity%3D%220.6%22%20rx%3D%224%22%20%2F%3E%0A%20%20%20%20%3Crect%20x%3D%2234%22%20y%3D%2230%22%20width%3D%22332%22%20height%3D%22540%22%20fill%3D%22none%22%20stroke%3D%22%23fb923c%22%20stroke-width%3D%221%22%20opacity%3D%220.8%22%20rx%3D%222%22%20%2F%3E%0A%0A%20%20%20%20%3C!--%20Category%20Header%20Pill%20--%3E%0A%20%20%20%20%3Crect%20x%3D%2280%22%20y%3D%2255%22%20width%3D%22240%22%20height%3D%2224%22%20fill%3D%22%23000000%22%20opacity%3D%220.4%22%20rx%3D%2212%22%20%2F%3E%0A%20%20%20%20%3Ctext%20x%3D%22200%22%20y%3D%2271%22%20font-family%3D%22sans-serif%22%20font-size%3D%2210%22%20font-weight%3D%22900%22%20fill%3D%22%23fb923c%22%20text-anchor%3D%22middle%22%20letter-spacing%3D%221.5%22%3ESELF-HELP%3C%2Ftext%3E%0A%0A%20%20%20%20%3C!--%20Center%20Icon%20Symbol%20%2F%20Emblem%20--%3E%0A%20%20%20%20%3Ccircle%20cx%3D%22200%22%20cy%3D%22170%22%20r%3D%2248%22%20fill%3D%22%23000000%22%20opacity%3D%220.3%22%20stroke%3D%22%23fb923c%22%20stroke-width%3D%222%22%20%2F%3E%0A%20%20%20%20%3Ctext%20x%3D%22200%22%20y%3D%22184%22%20font-family%3D%22sans-serif%22%20font-size%3D%2236%22%20text-anchor%3D%22middle%22%3E%F0%9F%8F%9B%EF%B8%8F%3C%2Ftext%3E%0A%0A%20%20%20%20%3C!--%20Main%20Title%20(Amharic)%20--%3E%0A%20%20%20%20%3Ctext%20x%3D%22200%22%20y%3D%22275%22%20font-family%3D%22'Noto%20Sans%20Ethiopic'%2C%20'Abyssinica%20SIL'%2C%20'Nyala'%2C%20sans-serif%22%20font-size%3D%2225%22%20font-weight%3D%22900%22%20fill%3D%22%23FFFFFF%22%20text-anchor%3D%22middle%22%3E%0A%20%20%20%20%20%20%E1%8A%A0%E1%8B%95%E1%88%9D%E1%88%AE%E1%8B%8E%E1%8A%95%20%E1%8B%AB%E1%8B%98%E1%88%9D%E1%8A%91%0A%20%20%20%20%3C%2Ftext%3E%0A%0A%20%20%20%20%3C!--%20Subtitle%20(English%20Translation)%20--%3E%0A%20%20%20%20%3Ctext%20x%3D%22200%22%20y%3D%22315%22%20font-family%3D%22sans-serif%22%20font-size%3D%2213%22%20font-weight%3D%22600%22%20fill%3D%22%23fb923c%22%20text-anchor%3D%22middle%22%20letter-spacing%3D%221%22%3E%0A%20%20%20%20%20%20Aemirowon%20Yazeminu%0A%20%20%20%20%3C%2Ftext%3E%0A%0A%20%20%20%20%3Cline%20x1%3D%2280%22%20y1%3D%22350%22%20x2%3D%22320%22%20y2%3D%22350%22%20stroke%3D%22url(%23gold-AemirowonYazeminu)%22%20stroke-width%3D%222%22%20%2F%3E%0A%0A%20%20%20%20%3C!--%20Author%20Badge%20--%3E%0A%20%20%20%20%3Ctext%20x%3D%22200%22%20y%3D%22435%22%20font-family%3D%22sans-serif%22%20font-size%3D%2210%22%20font-weight%3D%22800%22%20fill%3D%22%2394A3B8%22%20text-anchor%3D%22middle%22%20letter-spacing%3D%222%22%3EAUTHOR%20%2F%20%E1%8B%B0%E1%88%AB%E1%88%B2%3C%2Ftext%3E%0A%20%20%20%20%3Ctext%20x%3D%22200%22%20y%3D%22465%22%20font-family%3D%22'Noto%20Sans%20Ethiopic'%2C%20'Abyssinica%20SIL'%2C%20sans-serif%22%20font-size%3D%2219%22%20font-weight%3D%22800%22%20fill%3D%22%23FFFFFF%22%20text-anchor%3D%22middle%22%3E%0A%20%20%20%20%20%20Dr.%20Eyob%20Mamo%0A%20%20%20%20%3C%2Ftext%3E%0A%0A%20%20%20%20%3C!--%20Publisher%20Seal%20%2F%20Seal%20Footer%20--%3E%0A%20%20%20%20%3Crect%20x%3D%22100%22%20y%3D%22520%22%20width%3D%22200%22%20height%3D%2222%22%20fill%3D%22%23fb923c%22%20opacity%3D%220.2%22%20rx%3D%224%22%20%2F%3E%0A%20%20%20%20%3Ctext%20x%3D%22200%22%20y%3D%22535%22%20font-family%3D%22sans-serif%22%20font-size%3D%229%22%20font-weight%3D%22900%22%20fill%3D%22%23fb923c%22%20text-anchor%3D%22middle%22%20letter-spacing%3D%221.5%22%3EJJ%20BOOKSHOPPING%20%E2%80%A2%20%F0%9F%87%AA%F0%9F%87%B9%3C%2Ftext%3E%0A%20%20%3C%2Fsvg%3E",
     "ISBN": "978-99944-76-770-43",
     "publisher": "JJ Bookstore Publishing",
     "publicationDate": "2021-01-15",
@@ -1474,7 +1569,7 @@ export const INITIAL_BOOKS: Book[] = [
     "categoryName": "Self-Help",
     "price": 12,
     "currency": "ETB",
-    "coverImage": "https://images.unsplash.com/photo-1507679799987-c73779587ccf?w=800&auto=format&fit=crop&q=80",
+    "coverImage": "data:image/svg+xml;utf8,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%20400%20600%22%20width%3D%22400%22%20height%3D%22600%22%3E%0A%20%20%20%20%3Cdefs%3E%0A%20%20%20%20%20%20%3ClinearGradient%20id%3D%22bg-IletawiNuro%22%20x1%3D%220%25%22%20y1%3D%220%25%22%20x2%3D%22100%25%22%20y2%3D%22100%25%22%3E%0A%20%20%20%20%20%20%20%20%3Cstop%20offset%3D%220%25%22%20stop-color%3D%22%232d1b4e%22%20%2F%3E%0A%20%20%20%20%20%20%20%20%3Cstop%20offset%3D%22100%25%22%20stop-color%3D%22%23160d27%22%20%2F%3E%0A%20%20%20%20%20%20%3C%2FlinearGradient%3E%0A%20%20%20%20%20%20%3ClinearGradient%20id%3D%22gold-IletawiNuro%22%20x1%3D%220%25%22%20y1%3D%220%25%22%20x2%3D%22100%25%22%20y2%3D%220%25%22%3E%0A%20%20%20%20%20%20%20%20%3Cstop%20offset%3D%220%25%22%20stop-color%3D%22%23F59E0B%22%20%2F%3E%0A%20%20%20%20%20%20%20%20%3Cstop%20offset%3D%2250%25%22%20stop-color%3D%22%23FEF08A%22%20%2F%3E%0A%20%20%20%20%20%20%20%20%3Cstop%20offset%3D%22100%25%22%20stop-color%3D%22%23D97706%22%20%2F%3E%0A%20%20%20%20%20%20%3C%2FlinearGradient%3E%0A%20%20%20%20%3C%2Fdefs%3E%0A%0A%20%20%20%20%3C!--%20Book%20Cover%20Base%20Background%20--%3E%0A%20%20%20%20%3Crect%20width%3D%22400%22%20height%3D%22600%22%20fill%3D%22url(%23bg-IletawiNuro)%22%20rx%3D%228%22%20%2F%3E%0A%20%20%20%20%0A%20%20%20%20%3C!--%20Spine%20Line%20Shadow%20--%3E%0A%20%20%20%20%3Crect%20x%3D%220%22%20y%3D%220%22%20width%3D%2218%22%20height%3D%22600%22%20fill%3D%22%23000000%22%20opacity%3D%220.25%22%20%2F%3E%0A%20%20%20%20%3Cline%20x1%3D%2218%22%20y1%3D%220%22%20x2%3D%2218%22%20y2%3D%22600%22%20stroke%3D%22%23FFFFFF%22%20stroke-opacity%3D%220.15%22%20stroke-width%3D%221.5%22%20%2F%3E%0A%0A%20%20%20%20%3C!--%20Outer%20Decorative%20Border%20Frame%20--%3E%0A%20%20%20%20%3Crect%20x%3D%2228%22%20y%3D%2224%22%20width%3D%22344%22%20height%3D%22552%22%20fill%3D%22none%22%20stroke%3D%22%23d8b4fe%22%20stroke-width%3D%222%22%20stroke-dasharray%3D%226%2C4%22%20opacity%3D%220.6%22%20rx%3D%224%22%20%2F%3E%0A%20%20%20%20%3Crect%20x%3D%2234%22%20y%3D%2230%22%20width%3D%22332%22%20height%3D%22540%22%20fill%3D%22none%22%20stroke%3D%22%23d8b4fe%22%20stroke-width%3D%221%22%20opacity%3D%220.8%22%20rx%3D%222%22%20%2F%3E%0A%0A%20%20%20%20%3C!--%20Category%20Header%20Pill%20--%3E%0A%20%20%20%20%3Crect%20x%3D%2280%22%20y%3D%2255%22%20width%3D%22240%22%20height%3D%2224%22%20fill%3D%22%23000000%22%20opacity%3D%220.4%22%20rx%3D%2212%22%20%2F%3E%0A%20%20%20%20%3Ctext%20x%3D%22200%22%20y%3D%2271%22%20font-family%3D%22sans-serif%22%20font-size%3D%2210%22%20font-weight%3D%22900%22%20fill%3D%22%23d8b4fe%22%20text-anchor%3D%22middle%22%20letter-spacing%3D%221.5%22%3ESELF-HELP%3C%2Ftext%3E%0A%0A%20%20%20%20%3C!--%20Center%20Icon%20Symbol%20%2F%20Emblem%20--%3E%0A%20%20%20%20%3Ccircle%20cx%3D%22200%22%20cy%3D%22170%22%20r%3D%2248%22%20fill%3D%22%23000000%22%20opacity%3D%220.3%22%20stroke%3D%22%23d8b4fe%22%20stroke-width%3D%222%22%20%2F%3E%0A%20%20%20%20%3Ctext%20x%3D%22200%22%20y%3D%22184%22%20font-family%3D%22sans-serif%22%20font-size%3D%2236%22%20text-anchor%3D%22middle%22%3E%F0%9F%A6%85%3C%2Ftext%3E%0A%0A%20%20%20%20%3C!--%20Main%20Title%20(Amharic)%20--%3E%0A%20%20%20%20%3Ctext%20x%3D%22200%22%20y%3D%22275%22%20font-family%3D%22'Noto%20Sans%20Ethiopic'%2C%20'Abyssinica%20SIL'%2C%20'Nyala'%2C%20sans-serif%22%20font-size%3D%2225%22%20font-weight%3D%22900%22%20fill%3D%22%23FFFFFF%22%20text-anchor%3D%22middle%22%3E%0A%20%20%20%20%20%20%E1%8B%95%E1%88%88%E1%89%B3%E1%8B%8A%20%E1%8A%91%E1%88%AE%0A%20%20%20%20%3C%2Ftext%3E%0A%0A%20%20%20%20%3C!--%20Subtitle%20(English%20Translation)%20--%3E%0A%20%20%20%20%3Ctext%20x%3D%22200%22%20y%3D%22315%22%20font-family%3D%22sans-serif%22%20font-size%3D%2213%22%20font-weight%3D%22600%22%20fill%3D%22%23d8b4fe%22%20text-anchor%3D%22middle%22%20letter-spacing%3D%221%22%3E%0A%20%20%20%20%20%20Iletawi%20Nuro%0A%20%20%20%20%3C%2Ftext%3E%0A%0A%20%20%20%20%3Cline%20x1%3D%2280%22%20y1%3D%22350%22%20x2%3D%22320%22%20y2%3D%22350%22%20stroke%3D%22url(%23gold-IletawiNuro)%22%20stroke-width%3D%222%22%20%2F%3E%0A%0A%20%20%20%20%3C!--%20Author%20Badge%20--%3E%0A%20%20%20%20%3Ctext%20x%3D%22200%22%20y%3D%22435%22%20font-family%3D%22sans-serif%22%20font-size%3D%2210%22%20font-weight%3D%22800%22%20fill%3D%22%2394A3B8%22%20text-anchor%3D%22middle%22%20letter-spacing%3D%222%22%3EAUTHOR%20%2F%20%E1%8B%B0%E1%88%AB%E1%88%B2%3C%2Ftext%3E%0A%20%20%20%20%3Ctext%20x%3D%22200%22%20y%3D%22465%22%20font-family%3D%22'Noto%20Sans%20Ethiopic'%2C%20'Abyssinica%20SIL'%2C%20sans-serif%22%20font-size%3D%2219%22%20font-weight%3D%22800%22%20fill%3D%22%23FFFFFF%22%20text-anchor%3D%22middle%22%3E%0A%20%20%20%20%20%20Dr.%20Eyob%20Mamo%0A%20%20%20%20%3C%2Ftext%3E%0A%0A%20%20%20%20%3C!--%20Publisher%20Seal%20%2F%20Seal%20Footer%20--%3E%0A%20%20%20%20%3Crect%20x%3D%22100%22%20y%3D%22520%22%20width%3D%22200%22%20height%3D%2222%22%20fill%3D%22%23d8b4fe%22%20opacity%3D%220.2%22%20rx%3D%224%22%20%2F%3E%0A%20%20%20%20%3Ctext%20x%3D%22200%22%20y%3D%22535%22%20font-family%3D%22sans-serif%22%20font-size%3D%229%22%20font-weight%3D%22900%22%20fill%3D%22%23d8b4fe%22%20text-anchor%3D%22middle%22%20letter-spacing%3D%221.5%22%3EJJ%20BOOKSHOPPING%20%E2%80%A2%20%F0%9F%87%AA%F0%9F%87%B9%3C%2Ftext%3E%0A%20%20%3C%2Fsvg%3E",
     "ISBN": "978-99944-26-984-44",
     "publisher": "JJ Bookstore Publishing",
     "publicationDate": "2021-01-15",
@@ -1501,7 +1596,7 @@ export const INITIAL_BOOKS: Book[] = [
     "categoryName": "Self-Help",
     "price": 14,
     "currency": "ETB",
-    "coverImage": "https://images.unsplash.com/photo-1506784983877-45594efa4cbe?w=800&auto=format&fit=crop&q=80",
+    "coverImage": "data:image/svg+xml;utf8,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%20400%20600%22%20width%3D%22400%22%20height%3D%22600%22%3E%0A%20%20%20%20%3Cdefs%3E%0A%20%20%20%20%20%20%3ClinearGradient%20id%3D%22bg-Meklit%22%20x1%3D%220%25%22%20y1%3D%220%25%22%20x2%3D%22100%25%22%20y2%3D%22100%25%22%3E%0A%20%20%20%20%20%20%20%20%3Cstop%20offset%3D%220%25%22%20stop-color%3D%22%231e1e24%22%20%2F%3E%0A%20%20%20%20%20%20%20%20%3Cstop%20offset%3D%22100%25%22%20stop-color%3D%22%23111113%22%20%2F%3E%0A%20%20%20%20%20%20%3C%2FlinearGradient%3E%0A%20%20%20%20%20%20%3ClinearGradient%20id%3D%22gold-Meklit%22%20x1%3D%220%25%22%20y1%3D%220%25%22%20x2%3D%22100%25%22%20y2%3D%220%25%22%3E%0A%20%20%20%20%20%20%20%20%3Cstop%20offset%3D%220%25%22%20stop-color%3D%22%23F59E0B%22%20%2F%3E%0A%20%20%20%20%20%20%20%20%3Cstop%20offset%3D%2250%25%22%20stop-color%3D%22%23FEF08A%22%20%2F%3E%0A%20%20%20%20%20%20%20%20%3Cstop%20offset%3D%22100%25%22%20stop-color%3D%22%23D97706%22%20%2F%3E%0A%20%20%20%20%20%20%3C%2FlinearGradient%3E%0A%20%20%20%20%3C%2Fdefs%3E%0A%0A%20%20%20%20%3C!--%20Book%20Cover%20Base%20Background%20--%3E%0A%20%20%20%20%3Crect%20width%3D%22400%22%20height%3D%22600%22%20fill%3D%22url(%23bg-Meklit)%22%20rx%3D%228%22%20%2F%3E%0A%20%20%20%20%0A%20%20%20%20%3C!--%20Spine%20Line%20Shadow%20--%3E%0A%20%20%20%20%3Crect%20x%3D%220%22%20y%3D%220%22%20width%3D%2218%22%20height%3D%22600%22%20fill%3D%22%23000000%22%20opacity%3D%220.25%22%20%2F%3E%0A%20%20%20%20%3Cline%20x1%3D%2218%22%20y1%3D%220%22%20x2%3D%2218%22%20y2%3D%22600%22%20stroke%3D%22%23FFFFFF%22%20stroke-opacity%3D%220.15%22%20stroke-width%3D%221.5%22%20%2F%3E%0A%0A%20%20%20%20%3C!--%20Outer%20Decorative%20Border%20Frame%20--%3E%0A%20%20%20%20%3Crect%20x%3D%2228%22%20y%3D%2224%22%20width%3D%22344%22%20height%3D%22552%22%20fill%3D%22none%22%20stroke%3D%22%2338bdf8%22%20stroke-width%3D%222%22%20stroke-dasharray%3D%226%2C4%22%20opacity%3D%220.6%22%20rx%3D%224%22%20%2F%3E%0A%20%20%20%20%3Crect%20x%3D%2234%22%20y%3D%2230%22%20width%3D%22332%22%20height%3D%22540%22%20fill%3D%22none%22%20stroke%3D%22%2338bdf8%22%20stroke-width%3D%221%22%20opacity%3D%220.8%22%20rx%3D%222%22%20%2F%3E%0A%0A%20%20%20%20%3C!--%20Category%20Header%20Pill%20--%3E%0A%20%20%20%20%3Crect%20x%3D%2280%22%20y%3D%2255%22%20width%3D%22240%22%20height%3D%2224%22%20fill%3D%22%23000000%22%20opacity%3D%220.4%22%20rx%3D%2212%22%20%2F%3E%0A%20%20%20%20%3Ctext%20x%3D%22200%22%20y%3D%2271%22%20font-family%3D%22sans-serif%22%20font-size%3D%2210%22%20font-weight%3D%22900%22%20fill%3D%22%2338bdf8%22%20text-anchor%3D%22middle%22%20letter-spacing%3D%221.5%22%3ESELF-HELP%3C%2Ftext%3E%0A%0A%20%20%20%20%3C!--%20Center%20Icon%20Symbol%20%2F%20Emblem%20--%3E%0A%20%20%20%20%3Ccircle%20cx%3D%22200%22%20cy%3D%22170%22%20r%3D%2248%22%20fill%3D%22%23000000%22%20opacity%3D%220.3%22%20stroke%3D%22%2338bdf8%22%20stroke-width%3D%222%22%20%2F%3E%0A%20%20%20%20%3Ctext%20x%3D%22200%22%20y%3D%22184%22%20font-family%3D%22sans-serif%22%20font-size%3D%2236%22%20text-anchor%3D%22middle%22%3E%F0%9F%A7%AD%3C%2Ftext%3E%0A%0A%20%20%20%20%3C!--%20Main%20Title%20(Amharic)%20--%3E%0A%20%20%20%20%3Ctext%20x%3D%22200%22%20y%3D%22275%22%20font-family%3D%22'Noto%20Sans%20Ethiopic'%2C%20'Abyssinica%20SIL'%2C%20'Nyala'%2C%20sans-serif%22%20font-size%3D%2225%22%20font-weight%3D%22900%22%20fill%3D%22%23FFFFFF%22%20text-anchor%3D%22middle%22%3E%0A%20%20%20%20%20%20%E1%88%98%E1%8A%AD%E1%88%8A%E1%89%B5%0A%20%20%20%20%3C%2Ftext%3E%0A%0A%20%20%20%20%3C!--%20Subtitle%20(English%20Translation)%20--%3E%0A%20%20%20%20%3Ctext%20x%3D%22200%22%20y%3D%22315%22%20font-family%3D%22sans-serif%22%20font-size%3D%2213%22%20font-weight%3D%22600%22%20fill%3D%22%2338bdf8%22%20text-anchor%3D%22middle%22%20letter-spacing%3D%221%22%3E%0A%20%20%20%20%20%20Meklit%0A%20%20%20%20%3C%2Ftext%3E%0A%0A%20%20%20%20%3Cline%20x1%3D%2280%22%20y1%3D%22350%22%20x2%3D%22320%22%20y2%3D%22350%22%20stroke%3D%22url(%23gold-Meklit)%22%20stroke-width%3D%222%22%20%2F%3E%0A%0A%20%20%20%20%3C!--%20Author%20Badge%20--%3E%0A%20%20%20%20%3Ctext%20x%3D%22200%22%20y%3D%22435%22%20font-family%3D%22sans-serif%22%20font-size%3D%2210%22%20font-weight%3D%22800%22%20fill%3D%22%2394A3B8%22%20text-anchor%3D%22middle%22%20letter-spacing%3D%222%22%3EAUTHOR%20%2F%20%E1%8B%B0%E1%88%AB%E1%88%B2%3C%2Ftext%3E%0A%20%20%20%20%3Ctext%20x%3D%22200%22%20y%3D%22465%22%20font-family%3D%22'Noto%20Sans%20Ethiopic'%2C%20'Abyssinica%20SIL'%2C%20sans-serif%22%20font-size%3D%2219%22%20font-weight%3D%22800%22%20fill%3D%22%23FFFFFF%22%20text-anchor%3D%22middle%22%3E%0A%20%20%20%20%20%20Dr.%20Eyob%20Mamo%0A%20%20%20%20%3C%2Ftext%3E%0A%0A%20%20%20%20%3C!--%20Publisher%20Seal%20%2F%20Seal%20Footer%20--%3E%0A%20%20%20%20%3Crect%20x%3D%22100%22%20y%3D%22520%22%20width%3D%22200%22%20height%3D%2222%22%20fill%3D%22%2338bdf8%22%20opacity%3D%220.2%22%20rx%3D%224%22%20%2F%3E%0A%20%20%20%20%3Ctext%20x%3D%22200%22%20y%3D%22535%22%20font-family%3D%22sans-serif%22%20font-size%3D%229%22%20font-weight%3D%22900%22%20fill%3D%22%2338bdf8%22%20text-anchor%3D%22middle%22%20letter-spacing%3D%221.5%22%3EJJ%20BOOKSHOPPING%20%E2%80%A2%20%F0%9F%87%AA%F0%9F%87%B9%3C%2Ftext%3E%0A%20%20%3C%2Fsvg%3E",
     "ISBN": "978-99944-71-377-45",
     "publisher": "JJ Bookstore Publishing",
     "publicationDate": "2021-01-15",
@@ -1528,7 +1623,7 @@ export const INITIAL_BOOKS: Book[] = [
     "categoryName": "Fiction",
     "price": 15,
     "currency": "ETB",
-    "coverImage": "https://images.unsplash.com/photo-1544947950-fa07a98d237f?w=800&auto=format&fit=crop&q=80",
+    "coverImage": "data:image/svg+xml;utf8,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%20400%20600%22%20width%3D%22400%22%20height%3D%22600%22%3E%0A%20%20%20%20%3Cdefs%3E%0A%20%20%20%20%20%20%3ClinearGradient%20id%3D%22bg-Zimitaye%22%20x1%3D%220%25%22%20y1%3D%220%25%22%20x2%3D%22100%25%22%20y2%3D%22100%25%22%3E%0A%20%20%20%20%20%20%20%20%3Cstop%20offset%3D%220%25%22%20stop-color%3D%22%231e1e24%22%20%2F%3E%0A%20%20%20%20%20%20%20%20%3Cstop%20offset%3D%22100%25%22%20stop-color%3D%22%23111113%22%20%2F%3E%0A%20%20%20%20%20%20%3C%2FlinearGradient%3E%0A%20%20%20%20%20%20%3ClinearGradient%20id%3D%22gold-Zimitaye%22%20x1%3D%220%25%22%20y1%3D%220%25%22%20x2%3D%22100%25%22%20y2%3D%220%25%22%3E%0A%20%20%20%20%20%20%20%20%3Cstop%20offset%3D%220%25%22%20stop-color%3D%22%23F59E0B%22%20%2F%3E%0A%20%20%20%20%20%20%20%20%3Cstop%20offset%3D%2250%25%22%20stop-color%3D%22%23FEF08A%22%20%2F%3E%0A%20%20%20%20%20%20%20%20%3Cstop%20offset%3D%22100%25%22%20stop-color%3D%22%23D97706%22%20%2F%3E%0A%20%20%20%20%20%20%3C%2FlinearGradient%3E%0A%20%20%20%20%3C%2Fdefs%3E%0A%0A%20%20%20%20%3C!--%20Book%20Cover%20Base%20Background%20--%3E%0A%20%20%20%20%3Crect%20width%3D%22400%22%20height%3D%22600%22%20fill%3D%22url(%23bg-Zimitaye)%22%20rx%3D%228%22%20%2F%3E%0A%20%20%20%20%0A%20%20%20%20%3C!--%20Spine%20Line%20Shadow%20--%3E%0A%20%20%20%20%3Crect%20x%3D%220%22%20y%3D%220%22%20width%3D%2218%22%20height%3D%22600%22%20fill%3D%22%23000000%22%20opacity%3D%220.25%22%20%2F%3E%0A%20%20%20%20%3Cline%20x1%3D%2218%22%20y1%3D%220%22%20x2%3D%2218%22%20y2%3D%22600%22%20stroke%3D%22%23FFFFFF%22%20stroke-opacity%3D%220.15%22%20stroke-width%3D%221.5%22%20%2F%3E%0A%0A%20%20%20%20%3C!--%20Outer%20Decorative%20Border%20Frame%20--%3E%0A%20%20%20%20%3Crect%20x%3D%2228%22%20y%3D%2224%22%20width%3D%22344%22%20height%3D%22552%22%20fill%3D%22none%22%20stroke%3D%22%2338bdf8%22%20stroke-width%3D%222%22%20stroke-dasharray%3D%226%2C4%22%20opacity%3D%220.6%22%20rx%3D%224%22%20%2F%3E%0A%20%20%20%20%3Crect%20x%3D%2234%22%20y%3D%2230%22%20width%3D%22332%22%20height%3D%22540%22%20fill%3D%22none%22%20stroke%3D%22%2338bdf8%22%20stroke-width%3D%221%22%20opacity%3D%220.8%22%20rx%3D%222%22%20%2F%3E%0A%0A%20%20%20%20%3C!--%20Category%20Header%20Pill%20--%3E%0A%20%20%20%20%3Crect%20x%3D%2280%22%20y%3D%2255%22%20width%3D%22240%22%20height%3D%2224%22%20fill%3D%22%23000000%22%20opacity%3D%220.4%22%20rx%3D%2212%22%20%2F%3E%0A%20%20%20%20%3Ctext%20x%3D%22200%22%20y%3D%2271%22%20font-family%3D%22sans-serif%22%20font-size%3D%2210%22%20font-weight%3D%22900%22%20fill%3D%22%2338bdf8%22%20text-anchor%3D%22middle%22%20letter-spacing%3D%221.5%22%3EFICTION%3C%2Ftext%3E%0A%0A%20%20%20%20%3C!--%20Center%20Icon%20Symbol%20%2F%20Emblem%20--%3E%0A%20%20%20%20%3Ccircle%20cx%3D%22200%22%20cy%3D%22170%22%20r%3D%2248%22%20fill%3D%22%23000000%22%20opacity%3D%220.3%22%20stroke%3D%22%2338bdf8%22%20stroke-width%3D%222%22%20%2F%3E%0A%20%20%20%20%3Ctext%20x%3D%22200%22%20y%3D%22184%22%20font-family%3D%22sans-serif%22%20font-size%3D%2236%22%20text-anchor%3D%22middle%22%3E%F0%9F%A7%AD%3C%2Ftext%3E%0A%0A%20%20%20%20%3C!--%20Main%20Title%20(Amharic)%20--%3E%0A%20%20%20%20%3Ctext%20x%3D%22200%22%20y%3D%22275%22%20font-family%3D%22'Noto%20Sans%20Ethiopic'%2C%20'Abyssinica%20SIL'%2C%20'Nyala'%2C%20sans-serif%22%20font-size%3D%2225%22%20font-weight%3D%22900%22%20fill%3D%22%23FFFFFF%22%20text-anchor%3D%22middle%22%3E%0A%20%20%20%20%20%20%E1%8B%9D%E1%88%9D%E1%89%B3%E1%8B%AC%0A%20%20%20%20%3C%2Ftext%3E%0A%0A%20%20%20%20%3C!--%20Subtitle%20(English%20Translation)%20--%3E%0A%20%20%20%20%3Ctext%20x%3D%22200%22%20y%3D%22315%22%20font-family%3D%22sans-serif%22%20font-size%3D%2213%22%20font-weight%3D%22600%22%20fill%3D%22%2338bdf8%22%20text-anchor%3D%22middle%22%20letter-spacing%3D%221%22%3E%0A%20%20%20%20%20%20Zimitaye%0A%20%20%20%20%3C%2Ftext%3E%0A%0A%20%20%20%20%3Cline%20x1%3D%2280%22%20y1%3D%22350%22%20x2%3D%22320%22%20y2%3D%22350%22%20stroke%3D%22url(%23gold-Zimitaye)%22%20stroke-width%3D%222%22%20%2F%3E%0A%0A%20%20%20%20%3C!--%20Author%20Badge%20--%3E%0A%20%20%20%20%3Ctext%20x%3D%22200%22%20y%3D%22435%22%20font-family%3D%22sans-serif%22%20font-size%3D%2210%22%20font-weight%3D%22800%22%20fill%3D%22%2394A3B8%22%20text-anchor%3D%22middle%22%20letter-spacing%3D%222%22%3EAUTHOR%20%2F%20%E1%8B%B0%E1%88%AB%E1%88%B2%3C%2Ftext%3E%0A%20%20%20%20%3Ctext%20x%3D%22200%22%20y%3D%22465%22%20font-family%3D%22'Noto%20Sans%20Ethiopic'%2C%20'Abyssinica%20SIL'%2C%20sans-serif%22%20font-size%3D%2219%22%20font-weight%3D%22800%22%20fill%3D%22%23FFFFFF%22%20text-anchor%3D%22middle%22%3E%0A%20%20%20%20%20%20Fikremarkos%20Desta%0A%20%20%20%20%3C%2Ftext%3E%0A%0A%20%20%20%20%3C!--%20Publisher%20Seal%20%2F%20Seal%20Footer%20--%3E%0A%20%20%20%20%3Crect%20x%3D%22100%22%20y%3D%22520%22%20width%3D%22200%22%20height%3D%2222%22%20fill%3D%22%2338bdf8%22%20opacity%3D%220.2%22%20rx%3D%224%22%20%2F%3E%0A%20%20%20%20%3Ctext%20x%3D%22200%22%20y%3D%22535%22%20font-family%3D%22sans-serif%22%20font-size%3D%229%22%20font-weight%3D%22900%22%20fill%3D%22%2338bdf8%22%20text-anchor%3D%22middle%22%20letter-spacing%3D%221.5%22%3EJJ%20BOOKSHOPPING%20%E2%80%A2%20%F0%9F%87%AA%F0%9F%87%B9%3C%2Ftext%3E%0A%20%20%3C%2Fsvg%3E",
     "ISBN": "978-99944-44-667-46",
     "publisher": "JJ Bookstore Publishing",
     "publicationDate": "2021-01-15",
@@ -1555,7 +1650,7 @@ export const INITIAL_BOOKS: Book[] = [
     "categoryName": "Fiction",
     "price": 11.99,
     "currency": "ETB",
-    "coverImage": "https://images.unsplash.com/photo-1497633762265-9d179a990aa6?w=800&auto=format&fit=crop&q=80",
+    "coverImage": "data:image/svg+xml;utf8,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%20400%20600%22%20width%3D%22400%22%20height%3D%22600%22%3E%0A%20%20%20%20%3Cdefs%3E%0A%20%20%20%20%20%20%3ClinearGradient%20id%3D%22bg-Kebero%22%20x1%3D%220%25%22%20y1%3D%220%25%22%20x2%3D%22100%25%22%20y2%3D%22100%25%22%3E%0A%20%20%20%20%20%20%20%20%3Cstop%20offset%3D%220%25%22%20stop-color%3D%22%231e1e24%22%20%2F%3E%0A%20%20%20%20%20%20%20%20%3Cstop%20offset%3D%22100%25%22%20stop-color%3D%22%23111113%22%20%2F%3E%0A%20%20%20%20%20%20%3C%2FlinearGradient%3E%0A%20%20%20%20%20%20%3ClinearGradient%20id%3D%22gold-Kebero%22%20x1%3D%220%25%22%20y1%3D%220%25%22%20x2%3D%22100%25%22%20y2%3D%220%25%22%3E%0A%20%20%20%20%20%20%20%20%3Cstop%20offset%3D%220%25%22%20stop-color%3D%22%23F59E0B%22%20%2F%3E%0A%20%20%20%20%20%20%20%20%3Cstop%20offset%3D%2250%25%22%20stop-color%3D%22%23FEF08A%22%20%2F%3E%0A%20%20%20%20%20%20%20%20%3Cstop%20offset%3D%22100%25%22%20stop-color%3D%22%23D97706%22%20%2F%3E%0A%20%20%20%20%20%20%3C%2FlinearGradient%3E%0A%20%20%20%20%3C%2Fdefs%3E%0A%0A%20%20%20%20%3C!--%20Book%20Cover%20Base%20Background%20--%3E%0A%20%20%20%20%3Crect%20width%3D%22400%22%20height%3D%22600%22%20fill%3D%22url(%23bg-Kebero)%22%20rx%3D%228%22%20%2F%3E%0A%20%20%20%20%0A%20%20%20%20%3C!--%20Spine%20Line%20Shadow%20--%3E%0A%20%20%20%20%3Crect%20x%3D%220%22%20y%3D%220%22%20width%3D%2218%22%20height%3D%22600%22%20fill%3D%22%23000000%22%20opacity%3D%220.25%22%20%2F%3E%0A%20%20%20%20%3Cline%20x1%3D%2218%22%20y1%3D%220%22%20x2%3D%2218%22%20y2%3D%22600%22%20stroke%3D%22%23FFFFFF%22%20stroke-opacity%3D%220.15%22%20stroke-width%3D%221.5%22%20%2F%3E%0A%0A%20%20%20%20%3C!--%20Outer%20Decorative%20Border%20Frame%20--%3E%0A%20%20%20%20%3Crect%20x%3D%2228%22%20y%3D%2224%22%20width%3D%22344%22%20height%3D%22552%22%20fill%3D%22none%22%20stroke%3D%22%2338bdf8%22%20stroke-width%3D%222%22%20stroke-dasharray%3D%226%2C4%22%20opacity%3D%220.6%22%20rx%3D%224%22%20%2F%3E%0A%20%20%20%20%3Crect%20x%3D%2234%22%20y%3D%2230%22%20width%3D%22332%22%20height%3D%22540%22%20fill%3D%22none%22%20stroke%3D%22%2338bdf8%22%20stroke-width%3D%221%22%20opacity%3D%220.8%22%20rx%3D%222%22%20%2F%3E%0A%0A%20%20%20%20%3C!--%20Category%20Header%20Pill%20--%3E%0A%20%20%20%20%3Crect%20x%3D%2280%22%20y%3D%2255%22%20width%3D%22240%22%20height%3D%2224%22%20fill%3D%22%23000000%22%20opacity%3D%220.4%22%20rx%3D%2212%22%20%2F%3E%0A%20%20%20%20%3Ctext%20x%3D%22200%22%20y%3D%2271%22%20font-family%3D%22sans-serif%22%20font-size%3D%2210%22%20font-weight%3D%22900%22%20fill%3D%22%2338bdf8%22%20text-anchor%3D%22middle%22%20letter-spacing%3D%221.5%22%3EFICTION%3C%2Ftext%3E%0A%0A%20%20%20%20%3C!--%20Center%20Icon%20Symbol%20%2F%20Emblem%20--%3E%0A%20%20%20%20%3Ccircle%20cx%3D%22200%22%20cy%3D%22170%22%20r%3D%2248%22%20fill%3D%22%23000000%22%20opacity%3D%220.3%22%20stroke%3D%22%2338bdf8%22%20stroke-width%3D%222%22%20%2F%3E%0A%20%20%20%20%3Ctext%20x%3D%22200%22%20y%3D%22184%22%20font-family%3D%22sans-serif%22%20font-size%3D%2236%22%20text-anchor%3D%22middle%22%3E%F0%9F%A7%AD%3C%2Ftext%3E%0A%0A%20%20%20%20%3C!--%20Main%20Title%20(Amharic)%20--%3E%0A%20%20%20%20%3Ctext%20x%3D%22200%22%20y%3D%22275%22%20font-family%3D%22'Noto%20Sans%20Ethiopic'%2C%20'Abyssinica%20SIL'%2C%20'Nyala'%2C%20sans-serif%22%20font-size%3D%2225%22%20font-weight%3D%22900%22%20fill%3D%22%23FFFFFF%22%20text-anchor%3D%22middle%22%3E%0A%20%20%20%20%20%20%E1%8A%A8%E1%89%A0%E1%88%AE%0A%20%20%20%20%3C%2Ftext%3E%0A%0A%20%20%20%20%3C!--%20Subtitle%20(English%20Translation)%20--%3E%0A%20%20%20%20%3Ctext%20x%3D%22200%22%20y%3D%22315%22%20font-family%3D%22sans-serif%22%20font-size%3D%2213%22%20font-weight%3D%22600%22%20fill%3D%22%2338bdf8%22%20text-anchor%3D%22middle%22%20letter-spacing%3D%221%22%3E%0A%20%20%20%20%20%20Kebero%0A%20%20%20%20%3C%2Ftext%3E%0A%0A%20%20%20%20%3Cline%20x1%3D%2280%22%20y1%3D%22350%22%20x2%3D%22320%22%20y2%3D%22350%22%20stroke%3D%22url(%23gold-Kebero)%22%20stroke-width%3D%222%22%20%2F%3E%0A%0A%20%20%20%20%3C!--%20Author%20Badge%20--%3E%0A%20%20%20%20%3Ctext%20x%3D%22200%22%20y%3D%22435%22%20font-family%3D%22sans-serif%22%20font-size%3D%2210%22%20font-weight%3D%22800%22%20fill%3D%22%2394A3B8%22%20text-anchor%3D%22middle%22%20letter-spacing%3D%222%22%3EAUTHOR%20%2F%20%E1%8B%B0%E1%88%AB%E1%88%B2%3C%2Ftext%3E%0A%20%20%20%20%3Ctext%20x%3D%22200%22%20y%3D%22465%22%20font-family%3D%22'Noto%20Sans%20Ethiopic'%2C%20'Abyssinica%20SIL'%2C%20sans-serif%22%20font-size%3D%2219%22%20font-weight%3D%22800%22%20fill%3D%22%23FFFFFF%22%20text-anchor%3D%22middle%22%3E%0A%20%20%20%20%20%20Teshome%20Birhanu%0A%20%20%20%20%3C%2Ftext%3E%0A%0A%20%20%20%20%3C!--%20Publisher%20Seal%20%2F%20Seal%20Footer%20--%3E%0A%20%20%20%20%3Crect%20x%3D%22100%22%20y%3D%22520%22%20width%3D%22200%22%20height%3D%2222%22%20fill%3D%22%2338bdf8%22%20opacity%3D%220.2%22%20rx%3D%224%22%20%2F%3E%0A%20%20%20%20%3Ctext%20x%3D%22200%22%20y%3D%22535%22%20font-family%3D%22sans-serif%22%20font-size%3D%229%22%20font-weight%3D%22900%22%20fill%3D%22%2338bdf8%22%20text-anchor%3D%22middle%22%20letter-spacing%3D%221.5%22%3EJJ%20BOOKSHOPPING%20%E2%80%A2%20%F0%9F%87%AA%F0%9F%87%B9%3C%2Ftext%3E%0A%20%20%3C%2Fsvg%3E",
     "ISBN": "978-99944-83-146-47",
     "publisher": "JJ Bookstore Publishing",
     "publicationDate": "2021-01-15",
@@ -1582,7 +1677,7 @@ export const INITIAL_BOOKS: Book[] = [
     "categoryName": "Fiction",
     "price": 12.5,
     "currency": "ETB",
-    "coverImage": "https://images.unsplash.com/photo-1507838153414-b4b713384a76?w=800&auto=format&fit=crop&q=80",
+    "coverImage": "data:image/svg+xml;utf8,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%20400%20600%22%20width%3D%22400%22%20height%3D%22600%22%3E%0A%20%20%20%20%3Cdefs%3E%0A%20%20%20%20%20%20%3ClinearGradient%20id%3D%22bg-Kignit%22%20x1%3D%220%25%22%20y1%3D%220%25%22%20x2%3D%22100%25%22%20y2%3D%22100%25%22%3E%0A%20%20%20%20%20%20%20%20%3Cstop%20offset%3D%220%25%22%20stop-color%3D%22%233b0764%22%20%2F%3E%0A%20%20%20%20%20%20%20%20%3Cstop%20offset%3D%22100%25%22%20stop-color%3D%22%23180e07%22%20%2F%3E%0A%20%20%20%20%20%20%3C%2FlinearGradient%3E%0A%20%20%20%20%20%20%3ClinearGradient%20id%3D%22gold-Kignit%22%20x1%3D%220%25%22%20y1%3D%220%25%22%20x2%3D%22100%25%22%20y2%3D%220%25%22%3E%0A%20%20%20%20%20%20%20%20%3Cstop%20offset%3D%220%25%22%20stop-color%3D%22%23F59E0B%22%20%2F%3E%0A%20%20%20%20%20%20%20%20%3Cstop%20offset%3D%2250%25%22%20stop-color%3D%22%23FEF08A%22%20%2F%3E%0A%20%20%20%20%20%20%20%20%3Cstop%20offset%3D%22100%25%22%20stop-color%3D%22%23D97706%22%20%2F%3E%0A%20%20%20%20%20%20%3C%2FlinearGradient%3E%0A%20%20%20%20%3C%2Fdefs%3E%0A%0A%20%20%20%20%3C!--%20Book%20Cover%20Base%20Background%20--%3E%0A%20%20%20%20%3Crect%20width%3D%22400%22%20height%3D%22600%22%20fill%3D%22url(%23bg-Kignit)%22%20rx%3D%228%22%20%2F%3E%0A%20%20%20%20%0A%20%20%20%20%3C!--%20Spine%20Line%20Shadow%20--%3E%0A%20%20%20%20%3Crect%20x%3D%220%22%20y%3D%220%22%20width%3D%2218%22%20height%3D%22600%22%20fill%3D%22%23000000%22%20opacity%3D%220.25%22%20%2F%3E%0A%20%20%20%20%3Cline%20x1%3D%2218%22%20y1%3D%220%22%20x2%3D%2218%22%20y2%3D%22600%22%20stroke%3D%22%23FFFFFF%22%20stroke-opacity%3D%220.15%22%20stroke-width%3D%221.5%22%20%2F%3E%0A%0A%20%20%20%20%3C!--%20Outer%20Decorative%20Border%20Frame%20--%3E%0A%20%20%20%20%3Crect%20x%3D%2228%22%20y%3D%2224%22%20width%3D%22344%22%20height%3D%22552%22%20fill%3D%22none%22%20stroke%3D%22%23fde047%22%20stroke-width%3D%222%22%20stroke-dasharray%3D%226%2C4%22%20opacity%3D%220.6%22%20rx%3D%224%22%20%2F%3E%0A%20%20%20%20%3Crect%20x%3D%2234%22%20y%3D%2230%22%20width%3D%22332%22%20height%3D%22540%22%20fill%3D%22none%22%20stroke%3D%22%23fde047%22%20stroke-width%3D%221%22%20opacity%3D%220.8%22%20rx%3D%222%22%20%2F%3E%0A%0A%20%20%20%20%3C!--%20Category%20Header%20Pill%20--%3E%0A%20%20%20%20%3Crect%20x%3D%2280%22%20y%3D%2255%22%20width%3D%22240%22%20height%3D%2224%22%20fill%3D%22%23000000%22%20opacity%3D%220.4%22%20rx%3D%2212%22%20%2F%3E%0A%20%20%20%20%3Ctext%20x%3D%22200%22%20y%3D%2271%22%20font-family%3D%22sans-serif%22%20font-size%3D%2210%22%20font-weight%3D%22900%22%20fill%3D%22%23fde047%22%20text-anchor%3D%22middle%22%20letter-spacing%3D%221.5%22%3EFICTION%3C%2Ftext%3E%0A%0A%20%20%20%20%3C!--%20Center%20Icon%20Symbol%20%2F%20Emblem%20--%3E%0A%20%20%20%20%3Ccircle%20cx%3D%22200%22%20cy%3D%22170%22%20r%3D%2248%22%20fill%3D%22%23000000%22%20opacity%3D%220.3%22%20stroke%3D%22%23fde047%22%20stroke-width%3D%222%22%20%2F%3E%0A%20%20%20%20%3Ctext%20x%3D%22200%22%20y%3D%22184%22%20font-family%3D%22sans-serif%22%20font-size%3D%2236%22%20text-anchor%3D%22middle%22%3E%E2%9B%B0%EF%B8%8F%3C%2Ftext%3E%0A%0A%20%20%20%20%3C!--%20Main%20Title%20(Amharic)%20--%3E%0A%20%20%20%20%3Ctext%20x%3D%22200%22%20y%3D%22275%22%20font-family%3D%22'Noto%20Sans%20Ethiopic'%2C%20'Abyssinica%20SIL'%2C%20'Nyala'%2C%20sans-serif%22%20font-size%3D%2225%22%20font-weight%3D%22900%22%20fill%3D%22%23FFFFFF%22%20text-anchor%3D%22middle%22%3E%0A%20%20%20%20%20%20%E1%89%85%E1%8A%9D%E1%89%B5%0A%20%20%20%20%3C%2Ftext%3E%0A%0A%20%20%20%20%3C!--%20Subtitle%20(English%20Translation)%20--%3E%0A%20%20%20%20%3Ctext%20x%3D%22200%22%20y%3D%22315%22%20font-family%3D%22sans-serif%22%20font-size%3D%2213%22%20font-weight%3D%22600%22%20fill%3D%22%23fde047%22%20text-anchor%3D%22middle%22%20letter-spacing%3D%221%22%3E%0A%20%20%20%20%20%20Kignit%0A%20%20%20%20%3C%2Ftext%3E%0A%0A%20%20%20%20%3Cline%20x1%3D%2280%22%20y1%3D%22350%22%20x2%3D%22320%22%20y2%3D%22350%22%20stroke%3D%22url(%23gold-Kignit)%22%20stroke-width%3D%222%22%20%2F%3E%0A%0A%20%20%20%20%3C!--%20Author%20Badge%20--%3E%0A%20%20%20%20%3Ctext%20x%3D%22200%22%20y%3D%22435%22%20font-family%3D%22sans-serif%22%20font-size%3D%2210%22%20font-weight%3D%22800%22%20fill%3D%22%2394A3B8%22%20text-anchor%3D%22middle%22%20letter-spacing%3D%222%22%3EAUTHOR%20%2F%20%E1%8B%B0%E1%88%AB%E1%88%B2%3C%2Ftext%3E%0A%20%20%20%20%3Ctext%20x%3D%22200%22%20y%3D%22465%22%20font-family%3D%22'Noto%20Sans%20Ethiopic'%2C%20'Abyssinica%20SIL'%2C%20sans-serif%22%20font-size%3D%2219%22%20font-weight%3D%22800%22%20fill%3D%22%23FFFFFF%22%20text-anchor%3D%22middle%22%3E%0A%20%20%20%20%20%20Teshome%20Birhanu%0A%20%20%20%20%3C%2Ftext%3E%0A%0A%20%20%20%20%3C!--%20Publisher%20Seal%20%2F%20Seal%20Footer%20--%3E%0A%20%20%20%20%3Crect%20x%3D%22100%22%20y%3D%22520%22%20width%3D%22200%22%20height%3D%2222%22%20fill%3D%22%23fde047%22%20opacity%3D%220.2%22%20rx%3D%224%22%20%2F%3E%0A%20%20%20%20%3Ctext%20x%3D%22200%22%20y%3D%22535%22%20font-family%3D%22sans-serif%22%20font-size%3D%229%22%20font-weight%3D%22900%22%20fill%3D%22%23fde047%22%20text-anchor%3D%22middle%22%20letter-spacing%3D%221.5%22%3EJJ%20BOOKSHOPPING%20%E2%80%A2%20%F0%9F%87%AA%F0%9F%87%B9%3C%2Ftext%3E%0A%20%20%3C%2Fsvg%3E",
     "ISBN": "978-99944-45-401-48",
     "publisher": "JJ Bookstore Publishing",
     "publicationDate": "2021-01-15",
@@ -1609,7 +1704,7 @@ export const INITIAL_BOOKS: Book[] = [
     "categoryName": "Poetry",
     "price": 16.5,
     "currency": "ETB",
-    "coverImage": "https://images.unsplash.com/photo-1518709268805-4e9042af9f23?w=800&auto=format&fit=crop&q=80",
+    "coverImage": "https://m.media-amazon.com/images/S/compressed.photo.goodreads.com/books/1484612040i/33871911.jpg",
     "ISBN": "978-99944-21-554-49",
     "publisher": "JJ Bookstore Publishing",
     "publicationDate": "2021-01-15",
@@ -1629,68 +1724,70 @@ export const INITIAL_BOOKS: Book[] = [
 
 export const INITIAL_COUPONS: Coupon[] = [
   {
-    id: "coupon-welcome15",
-    code: "WELCOME15",
-    discountType: "percentage",
-    discountValue: 15, // 15%
-    minOrderAmount: 300,
-    maxDiscount: 300,
-    expirationDate: "2028-12-31",
-    usageLimit: 1000,
-    usedCount: 0,
-    active: true,
-    createdAt: new Date().toISOString()
-  },
-  {
-    id: "coupon-read200",
-    code: "READ200",
-    discountType: "fixed",
-    discountValue: 200, // 200 ETB
-    minOrderAmount: 1000,
-    expirationDate: "2028-12-31",
-    usageLimit: 500,
-    usedCount: 0,
-    active: true,
-    createdAt: new Date().toISOString()
-  },
-  {
-    id: "coupon-ethiopia10",
-    code: "ETHIOPIA10",
+    id: "coupon-welcome10",
+    code: "WELCOME10",
     discountType: "percentage",
     discountValue: 10,
     minOrderAmount: 200,
-    expirationDate: "2028-12-31",
-    usageLimit: 2000,
-    usedCount: 0,
+    maxDiscount: 100,
+    expirationDate: "2026-12-31",
+    usageLimit: 1000,
+    usedCount: 42,
     active: true,
-    createdAt: new Date().toISOString()
+    createdAt: "2026-01-01T00:00:00.000Z"
+  },
+  {
+    id: "coupon-ethio15",
+    code: "ETHIO15",
+    discountType: "percentage",
+    discountValue: 15,
+    minOrderAmount: 500,
+    maxDiscount: 200,
+    expirationDate: "2026-12-31",
+    usageLimit: 500,
+    usedCount: 18,
+    active: true,
+    createdAt: "2026-01-01T00:00:00.000Z"
+  },
+  {
+    id: "coupon-jjfree",
+    code: "JJFREE",
+    discountType: "fixed",
+    discountValue: 50,
+    minOrderAmount: 300,
+    expirationDate: "2026-12-31",
+    usageLimit: 300,
+    usedCount: 15,
+    active: true,
+    createdAt: "2026-01-01T00:00:00.000Z"
   }
 ];
 
 export const INITIAL_STORE_SETTINGS: StoreSettings = {
-  storeName: "JJ Book Shopping",
-  logo: "https://images.unsplash.com/photo-1497633762265-9d179a990aa6?w=200&auto=format&fit=crop&q=80",
-  email: "support@jjbookshopping.com",
-  phone: "+251 938 014 055",
-  address: "Bole Medhaniallem, JJ Bookstore Building, Addis Ababa, Ethiopia",
+  storeName: "JJ Bookstore & Cultural Literature",
+  logo: "/logo.png",
+  email: "info@jjbookstore.et",
+  phone: "+251 91 123 4567",
+  address: "Bole Medhanialem, Edna Mall Area, Addis Ababa, Ethiopia",
   currency: "ETB",
-  shippingFee: 150,
-  minFreeShipping: 1500,
-  taxRate: 15, // 15% VAT
+  shippingFee: 50,
+  minFreeShipping: 1000,
+  taxRate: 15,
   storeStatus: "open",
   socialLinks: {
-    facebook: "https://facebook.com/jjbookshopping",
-    telegram: "https://t.me/jjbookshopping",
-    instagram: "https://instagram.com/jjbookshopping"
+    facebook: "https://facebook.com/jjbookstore",
+    telegram: "https://t.me/jjbookstore",
+    instagram: "https://instagram.com/jjbookstore"
   },
   paymentGateways: {
     codEnabled: true,
     telebirrEnabled: true,
-    telebirrNumber: "+251938014055 (JJ Book Shopping)",
+    telebirrNumber: "+251911234567",
     cbeBirrEnabled: true,
-    cbeAccountNumber: "1000123456789 (Commercial Bank of Ethiopia)",
+    cbeAccountNumber: "1000123456789",
     chapaEnabled: true,
     bankTransferEnabled: true,
-    bankDetails: "Bank of Abyssinia (አቢሲንያ ባንክ) Account: 155832444 (JJ Book Shopping)"
+    bankDetails: "Commercial Bank of Ethiopia - JJ Book Shopping PLC - 1000123456789"
   }
 };
+

@@ -20,6 +20,8 @@ interface HeaderProps {
   onOpenSearch: () => void;
   onOpenCart: () => void;
   onNavigate: (page: string, params?: Record<string, string>) => void;
+  onOpenAbout?: () => void;
+  onOpenContact?: () => void;
   activePage: string;
 }
 
@@ -27,6 +29,8 @@ export const Header: React.FC<HeaderProps> = ({
   onOpenSearch,
   onOpenCart,
   onNavigate,
+  onOpenAbout,
+  onOpenContact,
   activePage
 }) => {
   const { currentUser, userProfile, isAdmin, isEmployee, logoutUser } = useAuth();
@@ -117,6 +121,22 @@ export const Header: React.FC<HeaderProps> = ({
           >
             Authors
           </button>
+          {onOpenAbout && (
+            <button
+              onClick={onOpenAbout}
+              className="px-3.5 py-2 rounded-xl hover:bg-amber-950/50 hover:text-white text-stone-300 transition-all duration-200"
+            >
+              About
+            </button>
+          )}
+          {onOpenContact && (
+            <button
+              onClick={onOpenContact}
+              className="px-3.5 py-2 rounded-xl hover:bg-amber-950/50 hover:text-white text-stone-300 transition-all duration-200"
+            >
+              Contact
+            </button>
+          )}
         </nav>
 
         {/* Header Action Buttons */}
@@ -336,6 +356,28 @@ export const Header: React.FC<HeaderProps> = ({
           >
             Authors
           </button>
+          {onOpenAbout && (
+            <button
+              onClick={() => {
+                onOpenAbout();
+                setMobileMenuOpen(false);
+              }}
+              className="w-full text-left px-4 py-3 rounded-xl font-medium text-amber-100 hover:bg-amber-900/50"
+            >
+              About JJ Bookstore
+            </button>
+          )}
+          {onOpenContact && (
+            <button
+              onClick={() => {
+                onOpenContact();
+                setMobileMenuOpen(false);
+              }}
+              className="w-full text-left px-4 py-3 rounded-xl font-medium text-amber-100 hover:bg-amber-900/50"
+            >
+              Contact & Support
+            </button>
+          )}
           {isAdmin && (
             <button
               onClick={() => {
