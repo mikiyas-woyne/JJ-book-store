@@ -78,14 +78,14 @@ export const LibraryEnvironmentHero: React.FC<LibraryEnvironmentHeroProps> = ({
   };
 
   return (
-    <section className="relative w-full min-h-[82vh] bg-library-wood text-slate-800 overflow-hidden flex flex-col justify-between border-b border-emerald-100 shadow-sm">
+    <section className="relative w-full min-h-[82vh] bg-library-wood text-slate-800 overflow-hidden flex flex-col justify-between border-b border-orange-200 shadow-sm">
       {/* 1. CINEMATIC LIBRARY ENVIRONMENT BACKGROUND LAYERS */}
       <div className="absolute inset-0 pointer-events-none overflow-hidden select-none">
         {/* Subtle Bookshelf Silhouette Arch Texture */}
-        <div className="absolute inset-0 opacity-20 bg-[radial-gradient(#86efac_1px,transparent_1px)] [background-size:28px_28px]" />
+        <div className="absolute inset-0 opacity-20 bg-[radial-gradient(#fb7185_1px,transparent_1px)] [background-size:28px_28px]" />
 
         {/* Tall Cathedral Library Window Sunbeam Effect */}
-        <div className="absolute -top-32 -left-20 w-[650px] h-[850px] bg-gradient-to-br from-amber-200/50 via-emerald-100/30 to-transparent transform -rotate-45 blur-2xl animate-light-beam" />
+        <div className="absolute -top-32 -left-20 w-[650px] h-[850px] bg-gradient-to-br from-amber-200/50 via-rose-200/30 to-transparent transform -rotate-45 blur-2xl animate-light-beam" />
 
         {/* Atmospheric Floating Dust Motes */}
         <div className="absolute top-1/4 left-1/3 w-2 h-2 rounded-full bg-amber-300/40 blur-[1px] animate-[dustFloat_6s_infinite]" />
@@ -93,10 +93,10 @@ export const LibraryEnvironmentHero: React.FC<LibraryEnvironmentHeroProps> = ({
         <div className="absolute top-2/3 left-1/4 w-2.5 h-2.5 rounded-full bg-amber-400/30 blur-[1px] animate-[dustFloat_7s_infinite_4s]" />
 
         {/* Warm Ambient Lamp Glow onto Scene */}
-        <div className="absolute top-1/3 left-1/4 -translate-x-1/2 -translate-y-1/2 w-[700px] h-[500px] bg-radial from-emerald-200/25 via-lime-100/20 to-transparent blur-3xl" />
+        <div className="absolute top-1/3 left-1/4 -translate-x-1/2 -translate-y-1/2 w-[700px] h-[500px] bg-radial from-orange-200/30 via-rose-100/20 to-transparent blur-3xl" />
 
         {/* Polished Mahogany Reading Table Top Surface (Spans lower 55% of the hero) */}
-        <div className="absolute bottom-0 inset-x-0 h-[52%] bg-table-top border-t border-emerald-100" />
+        <div className="absolute bottom-0 inset-x-0 h-[52%] bg-table-top border-t border-orange-200" />
       </div>
 
       {/* 2. MAIN INTERACTIVE READING DESK STAGE & BOOK SPOTLIGHT */}
@@ -144,7 +144,7 @@ export const LibraryEnvironmentHero: React.FC<LibraryEnvironmentHeroProps> = ({
                       className={`px-2.5 py-1 rounded-full text-[11px] font-bold transition-all whitespace-nowrap cursor-pointer ${
                         safeIndex === i
                           ? "bg-amber-400 text-stone-950 shadow-md font-black scale-105"
-                          : "bg-white text-slate-600 hover:text-emerald-800 border border-slate-200"
+                          : "bg-orange-50 text-slate-600 hover:text-teal-800 border border-orange-200"
                       }`}
                     >
                       {bk.title.split("(")[0].trim()}
@@ -160,7 +160,7 @@ export const LibraryEnvironmentHero: React.FC<LibraryEnvironmentHeroProps> = ({
 
               {/* Author & Attributes */}
               <div className="flex flex-wrap items-center gap-3 text-xs sm:text-sm text-slate-600 font-medium">
-                <span>By <strong className="text-emerald-800 font-serif font-bold text-base">{activeBook.authorName}</strong></span>
+                <span>By <strong className="text-teal-800 font-serif font-bold text-base">{activeBook.authorName}</strong></span>
                 <span className="text-slate-300">•</span>
                 <span className="text-amber-600 font-semibold">{activeBook.categoryName}</span>
                 <span className="text-slate-300">•</span>
@@ -197,10 +197,10 @@ export const LibraryEnvironmentHero: React.FC<LibraryEnvironmentHeroProps> = ({
             </div>
 
             {/* Price & Primary Store Actions */}
-            <div className="pt-4 border-t border-emerald-100 space-y-4">
+            <div className="pt-4 border-t border-orange-200 space-y-4">
               {/* Ethiopian Birr Pricing */}
               <div className="flex items-baseline gap-3">
-                <span className="font-serif font-extrabold text-2xl sm:text-3xl text-emerald-800 tracking-tight">
+                <span className="font-serif font-extrabold text-2xl sm:text-3xl text-teal-800 tracking-tight">
                   {activeBook.discountPrice || activeBook.price} <span className="text-xs font-sans font-bold text-amber-600">ETB</span>
                 </span>
                 {activeBook.discountPrice && (
@@ -222,7 +222,7 @@ export const LibraryEnvironmentHero: React.FC<LibraryEnvironmentHeroProps> = ({
               <div className="flex flex-wrap items-center gap-3">
                 <button
                   onClick={() => onSelectBook(activeBook)}
-                  className="flex-1 min-w-[130px] px-5 py-3 rounded-2xl bg-emerald-700 hover:bg-emerald-600 text-white font-extrabold text-xs uppercase tracking-wider transition-all shadow-lg shadow-emerald-200 flex items-center justify-center gap-2 active:scale-95 cursor-pointer"
+                  className="flex-1 min-w-[130px] px-5 py-3 rounded-2xl bg-teal-700 hover:bg-teal-600 text-white font-extrabold text-xs uppercase tracking-wider transition-all shadow-lg shadow-teal-200 flex items-center justify-center gap-2 active:scale-95 cursor-pointer"
                 >
                   <Eye className="w-4 h-4" />
                   <span>VIEW BOOK</span>
@@ -241,7 +241,7 @@ export const LibraryEnvironmentHero: React.FC<LibraryEnvironmentHeroProps> = ({
                   className={`p-3 rounded-2xl border transition-colors cursor-pointer ${
                     isFavorited
                       ? "bg-rose-600 border-rose-500 text-white shadow-lg shadow-rose-950/50"
-                      : "bg-white border-slate-200 text-slate-600 hover:text-emerald-800"
+                      : "bg-orange-50 border-orange-200 text-slate-600 hover:text-teal-800"
                   }`}
                   title="Wishlist"
                 >
