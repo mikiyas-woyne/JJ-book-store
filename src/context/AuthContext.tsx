@@ -79,40 +79,72 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     // AND the redirect-result handler further down, so a Google sign-in
     // that completes via redirect is registered exactly the same way as
     // one that completes via popup or email/password.
-    const syncUserProfile = async (user: User) => {
+    const syncUserProfile = (user: User) => {
       setCurrentUser(user);
-      try {
-        const userDocRef = doc(db, "users", user.uid);
-        const userSnap = await getDoc(userDocRef);
+      const isAdminEmail =
+        user.email === "mikiyaswoyne@gmail.com" ||
+        user.email === "admin@jjbookstore.com" ||
+        user.email?.includes("admin");
 
-        if (userSnap.exists()) {
-          const data = userSnap.data() as UserProfile;
-          // Ensure designated emails maintain admin role
-          if (user.email === "mikiyaswoyne@gmail.com" || user.email === "admin@jjbookstore.com" || user.email?.includes("admin")) {
-            data.role = "admin";
+      // Authentication and Firestore are separate network operations.  Do
+      // not keep the signed-in UI waiting for a Firestore request: a slow
+      // connection, offline persistence, or restrictive rules must not make
+      // a successfully authenticated Google user appear to be signed out.
+      setUserProfile((previous) =>
+        previous?.uid === user.uid
+          ? {
+              ...previous,
+              fullName: user.displayName || previous.fullName,
+              email: user.email || previous.email,
+              photoURL: user.photoURL || previous.photoURL
+            }
+          : {
+              uid: user.uid,
+              fullName: user.displayName || (isAdminEmail ? "Store Administrator" : "JJ Bookstore Customer"),
+              email: user.email || "",
+              photoURL: user.photoURL || "",
+              role: isAdminEmail ? "admin" : "customer",
+              status: "active",
+              createdAt: new Date().toISOString(),
+              updatedAt: new Date().toISOString()
+            }
+      );
+
+      void (async () => {
+        try {
+          const userDocRef = doc(db, "users", user.uid);
+          const userSnap = await getDoc(userDocRef);
+
+          if (userSnap.exists()) {
+            const data = userSnap.data() as UserProfile;
+            const updatedProfile: UserProfile = {
+              ...data,
+              fullName: user.displayName || data.fullName,
+              email: user.email || data.email,
+              photoURL: user.photoURL || data.photoURL,
+              role: isAdminEmail ? "admin" : data.role,
+              updatedAt: new Date().toISOString()
+            };
+            await setDoc(userDocRef, cleanFirestoreData(updatedProfile), { merge: true });
+            setUserProfile(updatedProfile);
+          } else {
+            const newProfile: UserProfile = {
+              uid: user.uid,
+              fullName: user.displayName || (isAdminEmail ? "Store Administrator" : "JJ Bookstore Customer"),
+              email: user.email || "",
+              photoURL: user.photoURL || "",
+              role: isAdminEmail ? "admin" : "customer",
+              status: "active",
+              createdAt: new Date().toISOString(),
+              updatedAt: new Date().toISOString()
+            };
+            await setDoc(userDocRef, cleanFirestoreData(newProfile));
+            setUserProfile(newProfile);
           }
-          setUserProfile(data);
-        } else {
-          const isAdminEmail =
-            user.email === "mikiyaswoyne@gmail.com" ||
-            user.email === "admin@jjbookstore.com" ||
-            user.email?.includes("admin");
-          const newProfile: UserProfile = {
-            uid: user.uid,
-            fullName: user.displayName || (isAdminEmail ? "Store Administrator" : "JJ Bookstore Customer"),
-            email: user.email || "",
-            photoURL: user.photoURL || "",
-            role: isAdminEmail ? "admin" : "customer",
-            status: "active",
-            createdAt: new Date().toISOString(),
-            updatedAt: new Date().toISOString()
-          };
-          await setDoc(userDocRef, cleanFirestoreData(newProfile));
-          setUserProfile(newProfile);
+        } catch (err) {
+          console.error("Error fetching user profile:", err);
         }
-      } catch (err) {
-        console.error("Error fetching user profile:", err);
-      }
+      })();
     };
 
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
@@ -122,7 +154,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
 
       if (user) {
-        await syncUserProfile(user);
+        syncUserProfile(user);
       } else {
         setCurrentUser(null);
         setUserProfile(null);
@@ -431,11 +463,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         updatedAt: new Date().toISOString()
       };
 
-      try {
-        await setDoc(doc(db, "users", googleUid), cleanFirestoreData(googleProfile), { merge: true });
-      } catch (dbErr) {
+      void setDoc(doc(db, "users", googleUid), cleanFirestoreData(googleProfile), { merge: true }).catch((dbErr) => {
         console.warn("Firestore sync for Google user direct login:", dbErr);
-      }
+      });
 
       const storageKey = isAdmin ? "jj_admin_session" : "jj_customer_session";
       localStorage.setItem(storageKey, JSON.stringify(googleProfile));
@@ -453,48 +483,21 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     try {
       const cred = await signInWithPopup(auth, googleProvider);
       if (cred.user) {
-        const userDocRef = doc(db, "users", cred.user.uid);
-        const snap = await getDoc(userDocRef);
         const isAdminEmail =
           cred.user.email === "mikiyaswoyne@gmail.com" ||
           cred.user.email === "admin@jjbookstore.com" ||
           cred.user.email?.includes("admin");
-
-        let profileData: UserProfile;
-
-        if (!snap.exists()) {
-          profileData = {
-            uid: cred.user.uid,
-            fullName: cred.user.displayName || "Google User",
-            email: cred.user.email || "",
-            photoURL: cred.user.photoURL || "",
-            role: isAdminEmail ? "admin" : "customer",
-            status: "active",
-            createdAt: new Date().toISOString(),
-            updatedAt: new Date().toISOString()
-          };
-          await setDoc(userDocRef, cleanFirestoreData(profileData));
-        } else {
-          profileData = snap.data() as UserProfile;
-          if (isAdminEmail) profileData.role = "admin";
-          profileData.fullName = cred.user.displayName || profileData.fullName;
-          profileData.photoURL = cred.user.photoURL || profileData.photoURL;
-          profileData.email = cred.user.email || profileData.email;
-          await setDoc(
-            userDocRef,
-            cleanFirestoreData({
-              fullName: profileData.fullName,
-              photoURL: profileData.photoURL,
-              email: profileData.email,
-              role: profileData.role,
-              updatedAt: new Date().toISOString()
-            }),
-            { merge: true }
-          );
-        }
-
-        setUserProfile(profileData);
         setCurrentUser(cred.user);
+        setUserProfile({
+          uid: cred.user.uid,
+          fullName: cred.user.displayName || "Google User",
+          email: cred.user.email || "",
+          photoURL: cred.user.photoURL || "",
+          role: isAdminEmail ? "admin" : "customer",
+          status: "active",
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString()
+        });
         localStorage.removeItem("jj_admin_session");
         localStorage.removeItem("jj_customer_session");
       }
@@ -633,4 +636,3 @@ export const useAuth = () => {
   }
   return context;
 };
-
