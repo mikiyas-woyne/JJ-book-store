@@ -293,6 +293,10 @@ function MainAppContent() {
     if (selectedSort === "price-high") return priceB - priceA;
     if (selectedSort === "rating") return b.ratingAverage - a.ratingAverage;
     if (selectedSort === "bestselling") return b.soldCount - a.soldCount;
+    // Sort alphabetically by title, ignoring case (A→Z)
+    if (selectedSort === "title-az") return a.title.localeCompare(b.title);
+    // Sort alphabetically by title, ignoring case, reversed (Z→A)
+    if (selectedSort === "title-za") return b.title.localeCompare(a.title);
     return new Date(b.createdAt || "").getTime() - new Date(a.createdAt || "").getTime();
   });
 
@@ -380,10 +384,12 @@ function MainAppContent() {
                   className="px-3.5 py-2 rounded-xl border border-amber-800/60 bg-stone-900 text-xs font-bold text-amber-200 focus:outline-none focus:border-amber-500"
                 >
                   <option value="newest">Newest Titles</option>
+                  <option value="bestselling">Most Popular</option>
+                  <option value="rating">Highest Rated</option>
                   <option value="price-low">Price: Low to High</option>
                   <option value="price-high">Price: High to Low</option>
-                  <option value="rating">Highest Rated</option>
-                  <option value="bestselling">Most Popular</option>
+                  <option value="title-az">Title: A to Z</option>
+                  <option value="title-za">Title: Z to A</option>
                 </select>
               </div>
             </div>

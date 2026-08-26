@@ -25,8 +25,10 @@ export const BookGrid: React.FC<BookGridProps> = ({
 
   if (loading) {
     return (
-      <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 sm:gap-6">
-        {Array.from({ length: 8 }).map((_, idx) => (
+      // Loading skeleton uses the SAME column layout as the real grid below,
+      // so the page doesn't "jump" once the books finish loading.
+      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-5 gap-3 sm:gap-5">
+        {Array.from({ length: 10 }).map((_, idx) => (
           <div
             key={idx}
             className="bg-stone-900/80 rounded-2xl p-4 border border-stone-800 animate-pulse flex flex-col gap-3"
@@ -110,7 +112,9 @@ export const BookGrid: React.FC<BookGridProps> = ({
 
       {/* Book Catalog Layout */}
       {layoutMode === "grid" ? (
-        <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 sm:gap-6">
+        // Denser catalog grid: 2 columns on phones, growing up to 5 columns
+        // on large screens, with slightly tighter spacing between cards.
+        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-5 gap-3 sm:gap-5">
           {books.map((book) => (
             <BookCard key={book.id} book={book} onSelectBook={onSelectBook} />
           ))}
