@@ -2,10 +2,12 @@ import React, { createContext, useContext, useEffect, useState } from "react";
 import {
   User,
   createUserWithEmailAndPassword,
+  getRedirectResult,
   onAuthStateChanged,
   sendPasswordResetEmail,
   signInWithEmailAndPassword,
   signInWithPopup,
+  signInWithRedirect,
   signOut,
   updateProfile
 } from "firebase/auth";
@@ -116,6 +118,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         setUserProfile(null);
       }
       setLoading(false);
+    });
+
+    // If the last Google sign-in attempt used the redirect fallback (see
+    // loginWithGoogle below), the browser has just navigated back from
+    // Google. This checks for that result so we can log/report any error.
+    // On success, onAuthStateChanged above already handles building the
+    // user profile, so nothing else needs to happen here.
+    getRedirectResult(auth).catch((redirectErr) => {
+      console.warn("Google redirect sign-in error:", redirectErr?.code, redirectErr?.message);
     });
 
     return () => unsubscribe();
@@ -470,6 +481,18 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
     } catch (popupErr: any) {
       console.warn("Google popup error:", popupErr?.code, popupErr?.message);
+
+      // The browser (or the sandboxed preview window this app is often
+      // shown in) blocked the popup window before Google could open in
+      // it. Falling back to a full-page redirect avoids the popup
+      // blocker entirely. When this succeeds, the browser navigates
+      // away to Google and back; the redirect result is then picked up
+      // by getRedirectResult() and onAuthStateChanged() further up.
+      if (popupErr?.code === "auth/popup-blocked") {
+        await signInWithRedirect(auth, googleProvider);
+        return;
+      }
+
       throw popupErr;
     }
   };
