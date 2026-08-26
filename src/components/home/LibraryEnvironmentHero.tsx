@@ -79,14 +79,14 @@ export const LibraryEnvironmentHero: React.FC<LibraryEnvironmentHeroProps> = ({
   };
 
   return (
-    <section className="relative w-full min-h-[82vh] bg-library-wood text-stone-100 overflow-hidden flex flex-col justify-between border-b border-amber-950/80 shadow-2xl">
+    <section className="relative w-full min-h-[82vh] bg-library-wood text-slate-800 overflow-hidden flex flex-col justify-between border-b border-indigo-100 shadow-sm">
       {/* 1. CINEMATIC LIBRARY ENVIRONMENT BACKGROUND LAYERS */}
       <div className="absolute inset-0 pointer-events-none overflow-hidden select-none">
         {/* Subtle Bookshelf Silhouette Arch Texture */}
-        <div className="absolute inset-0 opacity-20 bg-[radial-gradient(#f59e0b_1px,transparent_1px)] [background-size:28px_28px]" />
+        <div className="absolute inset-0 opacity-30 bg-[radial-gradient(#a5b4fc_1px,transparent_1px)] [background-size:28px_28px]" />
 
         {/* Tall Cathedral Library Window Sunbeam Effect */}
-        <div className="absolute -top-32 -left-20 w-[650px] h-[850px] bg-gradient-to-br from-amber-200/20 via-amber-400/10 to-transparent transform -rotate-45 blur-2xl animate-light-beam" />
+        <div className="absolute -top-32 -left-20 w-[650px] h-[850px] bg-gradient-to-br from-amber-200/50 via-violet-200/20 to-transparent transform -rotate-45 blur-2xl animate-light-beam" />
 
         {/* Atmospheric Floating Dust Motes */}
         <div className="absolute top-1/4 left-1/3 w-2 h-2 rounded-full bg-amber-300/40 blur-[1px] animate-[dustFloat_6s_infinite]" />
@@ -94,10 +94,10 @@ export const LibraryEnvironmentHero: React.FC<LibraryEnvironmentHeroProps> = ({
         <div className="absolute top-2/3 left-1/4 w-2.5 h-2.5 rounded-full bg-amber-400/30 blur-[1px] animate-[dustFloat_7s_infinite_4s]" />
 
         {/* Warm Ambient Lamp Glow onto Scene */}
-        <div className="absolute top-1/3 left-1/4 -translate-x-1/2 -translate-y-1/2 w-[700px] h-[500px] bg-radial from-amber-600/15 via-amber-900/10 to-transparent blur-3xl" />
+        <div className="absolute top-1/3 left-1/4 -translate-x-1/2 -translate-y-1/2 w-[700px] h-[500px] bg-radial from-violet-300/25 via-indigo-100/20 to-transparent blur-3xl" />
 
         {/* Polished Mahogany Reading Table Top Surface (Spans lower 55% of the hero) */}
-        <div className="absolute bottom-0 inset-x-0 h-[52%] bg-table-top border-t border-amber-800/40" />
+        <div className="absolute bottom-0 inset-x-0 h-[52%] bg-table-top border-t border-indigo-100" />
       </div>
 
       {/* 2. MAIN INTERACTIVE READING DESK STAGE & BOOK SPOTLIGHT */}
@@ -116,17 +116,17 @@ export const LibraryEnvironmentHero: React.FC<LibraryEnvironmentHeroProps> = ({
 
         {/* RIGHT: CURATED BOOK SHOWCASE PLAQUE (Blends seamlessly into the library scene) */}
         {activeBook && (
-          <div className="lg:col-span-6 flex flex-col justify-between bg-gradient-to-b from-[#22150c]/95 via-[#190e07]/95 to-[#120904]/98 backdrop-blur-md p-6 sm:p-8 rounded-3xl border border-amber-700/40 shadow-[0_20px_50px_rgba(0,0,0,0.7)] space-y-5">
+          <div className="lg:col-span-6 flex flex-col justify-between bookshop-card backdrop-blur-md p-6 sm:p-8 rounded-3xl space-y-5">
             <div className="space-y-4">
               {/* Category Badge & New Arrival Status */}
               <div className="flex flex-wrap items-center justify-between gap-2">
-                <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-amber-950/80 border border-amber-500/50 text-amber-300 text-xs font-bold uppercase tracking-wider shadow-inner">
-                  <Sparkles className="w-3.5 h-3.5 text-amber-400" />
+                <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-amber-50 border border-amber-200 text-amber-700 text-xs font-bold uppercase tracking-wider shadow-inner">
+                  <Sparkles className="w-3.5 h-3.5 text-amber-500" />
                   <span>NEW ARRIVAL</span>
                 </div>
 
                 {/* Ethiopian Flag Heritage Ribbon */}
-                <div className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-stone-950/80 border border-amber-900/50" title="Ethiopian Literary Heritage">
+                <div className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-white border border-slate-200" title="Ethiopian Literary Heritage">
                   <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 shadow-sm" />
                   <span className="w-2.5 h-2.5 rounded-full bg-amber-400 shadow-sm" />
                   <span className="w-2.5 h-2.5 rounded-full bg-rose-500 shadow-sm" />
@@ -136,7 +136,7 @@ export const LibraryEnvironmentHero: React.FC<LibraryEnvironmentHeroProps> = ({
               {/* Book Switcher Chips if multiple approved new arrivals */}
               {approvedNewArrivals.length > 1 && (
                 <div className="flex items-center gap-2 pt-1 pb-2 overflow-x-auto scrollbar-none">
-                  <span className="text-[10px] uppercase font-bold tracking-wider text-stone-400 whitespace-nowrap">
+                  <span className="text-[10px] uppercase font-bold tracking-wider text-slate-500 whitespace-nowrap">
                     New Books ({approvedNewArrivals.length}):
                   </span>
                   {approvedNewArrivals.map((bk, i) => (
@@ -146,7 +146,7 @@ export const LibraryEnvironmentHero: React.FC<LibraryEnvironmentHeroProps> = ({
                       className={`px-2.5 py-1 rounded-full text-[11px] font-bold transition-all whitespace-nowrap cursor-pointer ${
                         safeIndex === i
                           ? "bg-amber-400 text-stone-950 shadow-md font-black scale-105"
-                          : "bg-stone-900/80 text-stone-400 hover:text-white border border-stone-800"
+                          : "bg-white text-slate-600 hover:text-indigo-700 border border-slate-200"
                       }`}
                     >
                       {bk.title.split("(")[0].trim()}
@@ -156,21 +156,21 @@ export const LibraryEnvironmentHero: React.FC<LibraryEnvironmentHeroProps> = ({
               )}
 
               {/* Book Title */}
-              <h1 className="font-serif font-extrabold text-2xl sm:text-3xl lg:text-4xl text-white tracking-tight leading-snug">
+              <h1 className="font-serif font-extrabold text-2xl sm:text-3xl lg:text-4xl text-slate-900 tracking-tight leading-snug">
                 {activeBook.title}
               </h1>
 
               {/* Author & Attributes */}
-              <div className="flex flex-wrap items-center gap-3 text-xs sm:text-sm text-stone-300 font-medium">
-                <span>By <strong className="text-amber-300 font-serif font-bold text-base">{activeBook.authorName}</strong></span>
-                <span className="text-stone-600">•</span>
-                <span className="text-amber-400 font-semibold">{activeBook.categoryName}</span>
-                <span className="text-stone-600">•</span>
-                <span className="text-stone-300">{activeBook.language || "Amharic & English"}</span>
+              <div className="flex flex-wrap items-center gap-3 text-xs sm:text-sm text-slate-600 font-medium">
+                <span>By <strong className="text-indigo-700 font-serif font-bold text-base">{activeBook.authorName}</strong></span>
+                <span className="text-slate-300">•</span>
+                <span className="text-amber-600 font-semibold">{activeBook.categoryName}</span>
+                <span className="text-slate-300">•</span>
+                <span className="text-slate-600">{activeBook.language || "Amharic & English"}</span>
                 {activeBook.pages && (
                   <>
-                    <span className="text-stone-600">•</span>
-                    <span className="text-stone-400">{activeBook.pages} pages</span>
+                    <span className="text-slate-300">•</span>
+                    <span className="text-slate-500">{activeBook.pages} pages</span>
                   </>
                 )}
               </div>
@@ -179,11 +179,11 @@ export const LibraryEnvironmentHero: React.FC<LibraryEnvironmentHeroProps> = ({
               <div className="flex items-center gap-2.5">
                 <div className="flex items-center gap-1 text-amber-400 bg-amber-950/60 px-2.5 py-1 rounded-lg border border-amber-800/40">
                   <Star className="w-4 h-4 fill-amber-400 text-amber-400" />
-                  <span className="font-bold text-white text-sm">
+                  <span className="font-bold text-slate-900 text-sm">
                     {activeBook.ratingAverage ? activeBook.ratingAverage.toFixed(1) : "5.0"}
                   </span>
                 </div>
-                <span className="text-xs text-stone-400">
+                <span className="text-xs text-slate-500">
                   ({activeBook.reviewCount || 128} readers & reviews)
                 </span>
                 <span className="inline-flex items-center gap-1 text-[11px] text-emerald-300 ml-auto font-semibold">
@@ -193,20 +193,20 @@ export const LibraryEnvironmentHero: React.FC<LibraryEnvironmentHeroProps> = ({
               </div>
 
               {/* Book Description */}
-              <p className="text-stone-300/90 text-xs sm:text-sm leading-relaxed line-clamp-3 font-sans pt-1">
+              <p className="text-slate-600 text-xs sm:text-sm leading-relaxed line-clamp-3 font-sans pt-1">
                 {activeBook.description}
               </p>
             </div>
 
             {/* Price & Primary Store Actions */}
-            <div className="pt-4 border-t border-amber-900/50 space-y-4">
+            <div className="pt-4 border-t border-indigo-100 space-y-4">
               {/* Ethiopian Birr Pricing */}
               <div className="flex items-baseline gap-3">
-                <span className="font-serif font-extrabold text-2xl sm:text-3xl text-amber-300 tracking-tight">
-                  {activeBook.discountPrice || activeBook.price} <span className="text-xs font-sans font-bold text-amber-400">ETB</span>
+                <span className="font-serif font-extrabold text-2xl sm:text-3xl text-indigo-700 tracking-tight">
+                  {activeBook.discountPrice || activeBook.price} <span className="text-xs font-sans font-bold text-amber-600">ETB</span>
                 </span>
                 {activeBook.discountPrice && (
-                  <span className="text-sm text-stone-500 line-through">
+                  <span className="text-sm text-slate-400 line-through">
                     {activeBook.price} ETB
                   </span>
                 )}
@@ -224,7 +224,7 @@ export const LibraryEnvironmentHero: React.FC<LibraryEnvironmentHeroProps> = ({
               <div className="flex flex-wrap items-center gap-3">
                 <button
                   onClick={() => onSelectBook(activeBook)}
-                  className="flex-1 min-w-[130px] px-5 py-3 rounded-2xl bg-amber-500 hover:bg-amber-400 text-stone-950 font-extrabold text-xs uppercase tracking-wider transition-all shadow-lg shadow-amber-950/80 flex items-center justify-center gap-2 active:scale-95 cursor-pointer"
+                  className="flex-1 min-w-[130px] px-5 py-3 rounded-2xl bg-indigo-600 hover:bg-indigo-500 text-white font-extrabold text-xs uppercase tracking-wider transition-all shadow-lg shadow-indigo-200 flex items-center justify-center gap-2 active:scale-95 cursor-pointer"
                 >
                   <Eye className="w-4 h-4" />
                   <span>VIEW BOOK</span>
@@ -232,7 +232,7 @@ export const LibraryEnvironmentHero: React.FC<LibraryEnvironmentHeroProps> = ({
 
                 <button
                   onClick={handleAddToCart}
-                  className="flex-1 min-w-[140px] px-5 py-3 rounded-2xl bg-amber-900/90 hover:bg-amber-800 text-amber-100 font-extrabold text-xs uppercase tracking-wider border border-amber-600/50 transition-all flex items-center justify-center gap-2 active:scale-95 cursor-pointer shadow-lg shadow-black/40"
+                  className="flex-1 min-w-[140px] px-5 py-3 rounded-2xl bg-amber-400 hover:bg-amber-300 text-amber-950 font-extrabold text-xs uppercase tracking-wider border border-amber-300 transition-all flex items-center justify-center gap-2 active:scale-95 cursor-pointer shadow-lg shadow-amber-100"
                 >
                   <ShoppingBag className="w-4 h-4" />
                   <span>ADD TO CART</span>
@@ -243,7 +243,7 @@ export const LibraryEnvironmentHero: React.FC<LibraryEnvironmentHeroProps> = ({
                   className={`p-3 rounded-2xl border transition-colors cursor-pointer ${
                     isFavorited
                       ? "bg-rose-600 border-rose-500 text-white shadow-lg shadow-rose-950/50"
-                      : "bg-stone-950/80 border-stone-700 text-stone-300 hover:text-white"
+                      : "bg-white border-slate-200 text-slate-600 hover:text-indigo-700"
                   }`}
                   title="Wishlist"
                 >
