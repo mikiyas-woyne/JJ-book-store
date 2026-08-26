@@ -2,6 +2,10 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
+    // ===============================================================
+    // AUTHENTICATION & ROLE HELPER FUNCTIONS
+    // ===============================================================
+
     function isSignedIn() {
       return request.auth != null;
     }
@@ -10,109 +14,287 @@ service cloud.firestore {
       return isSignedIn() && request.auth.uid == userId;
     }
 
-    // Global bookstore settings
-    match /settings/{settingId} {
-      allow read, write: if true;
+    function userDocExists() {
+      return isSignedIn() && exists(/databases/$(database)/documents/users/$(request.auth.uid));
     }
 
-    // Users profiles
+    function getUserData() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
+    }
+
+    function getUserRole() {
+      return userDocExists() ? getUserData().role : 'customer';
+    }
+
+    function isUserActive() {
+      return !userDocExists() || (getUserData().status != 'suspended');
+    }
+
+    function isSuperAdmin() {
+      return isSignedIn() && (
+        request.auth.token.role == 'superAdmin' ||
+        (userDocExists() && getUserRole() == 'superAdmin')
+      );
+    }
+
+    function isAdmin() {
+      return isSignedIn() && (
+        isSuperAdmin() ||
+        request.auth.token.role == 'admin' ||
+        (userDocExists() && (getUserRole() == 'admin' || getUserRole() == 'superAdmin')) ||
+        request.auth.token.email in ['mikiyaswoyne@gmail.com', 'admin@jjbookstore.com', 'admin@jjbookshopping.com']
+      );
+    }
+
+    function isEmployee() {
+      return isSignedIn() && isUserActive() && (
+        isAdmin() ||
+        request.auth.token.role in ['staff', 'employee', 'delivery'] ||
+        (userDocExists() && getUserRole() in ['staff', 'employee', 'delivery'])
+      );
+    }
+
+    function isDeliveryStaff() {
+      return isSignedIn() && isUserActive() && (
+        isAdmin() ||
+        request.auth.token.role == 'delivery' ||
+        (userDocExists() && (
+          ('assignedRoles' in getUserData() && 'delivery_personnel' in getUserData().assignedRoles) ||
+          getUserRole() in ['delivery', 'staff', 'employee']
+        ))
+      );
+    }
+
+    // ===============================================================
+    // 1. USERS & PROFILES
+    // ===============================================================
     match /users/{userId} {
-      allow read, write: if true;
+      // Owner, Admin, or Employee fulfilling orders can view user profile
+      allow read: if isOwner(userId) || isEmployee();
+
+      // Normal users can only register themselves with 'customer' role
+      allow create: if (isOwner(userId) && (!('role' in request.resource.data) || request.resource.data.role == 'customer'))
+                    || isAdmin();
+
+      // Normal users can update profile info, but CANNOT alter role, status, permissions, or assignedRoles
+      allow update: if (isOwner(userId)
+                        && request.resource.data.role == resource.data.role
+                        && request.resource.data.status == resource.data.status
+                        && (!('permissions' in request.resource.data) || request.resource.data.permissions == resource.data.permissions)
+                        && (!('assignedRoles' in request.resource.data) || request.resource.data.assignedRoles == resource.data.assignedRoles))
+                    || isAdmin();
+
+      // Only admins can delete user records
+      allow delete: if isAdmin();
     }
 
-    // Book catalog items
-    match /books/{bookId} {
-      allow read, write: if true;
-    }
-
-    // Authors
-    match /authors/{authorId} {
-      allow read, write: if true;
-    }
-
-    // Categories
-    match /categories/{categoryId} {
-      allow read, write: if true;
-    }
-
-    // Discount coupons
-    match /coupons/{couponId} {
-      allow read, write: if true;
-    }
-
-    // User shopping carts
-    match /carts/{userId} {
-      allow read, write: if true;
-    }
-
-    // User wishlists
-    match /wishlists/{userId} {
-      allow read, write: if true;
-    }
-
-    // Customer orders
-    match /orders/{orderId} {
-      allow read, write: if true;
-    }
-
-    // Ratings & Reviews
-    match /reviews/{reviewId} {
-      allow read, write: if true;
-    }
-
-    // Notifications
-    match /notifications/{notificationId} {
-      allow read, write: if true;
-    }
-
-    // Stock audit inventory transactions
-    match /inventoryTransactions/{txId} {
-      allow read, write: if true;
-    }
-
-    // Employees
+    // ===============================================================
+    // 2. EMPLOYEES & STAFF DIRECTORY
+    // ===============================================================
     match /employees/{employeeId} {
-      allow read, write: if true;
+      // Employees and Admins can view staff directory
+      allow read: if isEmployee();
+
+      // Only Admins can create or remove employees
+      allow create, delete: if isAdmin();
+
+      // Admins have full update rights; Staff can update own performance counters or phone
+      allow update: if isAdmin()
+                    || (isEmployee() && (resource.data.uid == request.auth.uid || employeeId == request.auth.uid)
+                        && request.resource.data.role == resource.data.role
+                        && request.resource.data.permissions == resource.data.permissions
+                        && request.resource.data.assignedRoles == resource.data.assignedRoles
+                        && request.resource.data.active == resource.data.active);
     }
 
-    // Employee Activity Logs
-    match /employeeActivityLogs/{logId} {
-      allow read, write: if true;
+    // ===============================================================
+    // 3. BOOK CATALOG
+    // ===============================================================
+    match /books/{bookId} {
+      // Public visitors can browse the book catalog
+      allow read: if true;
+
+      // Only Admins can add or delete books
+      allow create, delete: if isAdmin();
+
+      // Admins can update all fields; Employees can update stock/inventory counters
+      allow update: if isAdmin() || isEmployee();
     }
 
-    // System & Admin Activity Logs
-    match /activity_logs/{logId} {
-      allow read, write: if true;
+    // ===============================================================
+    // 4. AUTHORS & CATEGORIES
+    // ===============================================================
+    match /authors/{authorId} {
+      allow read: if true;
+      allow write: if isAdmin();
     }
 
-    // Delivery Assignments
+    match /categories/{categoryId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    // ===============================================================
+    // 5. COUPONS & PROMOTIONS
+    // ===============================================================
+    match /coupons/{couponId} {
+      // Coupons are publicly readable so visitors can validate codes during checkout
+      allow read: if true;
+
+      // Only Admins can create, modify, or delete discount coupons
+      allow write: if isAdmin();
+    }
+
+    // ===============================================================
+    // 6. CARTS & WISHLISTS
+    // ===============================================================
+    match /carts/{userId} {
+      allow read, write: if isOwner(userId) || isAdmin();
+    }
+
+    match /wishlists/{userId} {
+      allow read, write: if isOwner(userId) || isAdmin();
+    }
+
+    // ===============================================================
+    // 7. ORDERS & CHECKOUT
+    // ===============================================================
+    match /orders/{orderId} {
+      // Customers can read their own orders; Staff and Admins can read orders; Assigned drivers can read their assigned orders
+      allow read: if isEmployee()
+                  || (isSignedIn() && resource.data.customerId == request.auth.uid)
+                  || (isDeliveryStaff() && ('assignedDeliveryDriverId' in resource.data && resource.data.assignedDeliveryDriverId == request.auth.uid));
+
+      // Authenticated customers can create orders for themselves with pending status
+      allow create: if (isSignedIn() && request.resource.data.customerId == request.auth.uid && request.resource.data.orderStatus == 'pending')
+                    || isAdmin();
+
+      // Update rules:
+      // - Admins have full management
+      // - Employees can process workflow steps, verify payments, pack, and assign drivers
+      // - Delivery drivers can update delivery status for their assigned orders
+      // - Customers can ONLY cancel their own pending order
+      allow update: if isAdmin()
+                    || isEmployee()
+                    || (isDeliveryStaff()
+                        && 'assignedDeliveryDriverId' in resource.data
+                        && resource.data.assignedDeliveryDriverId == request.auth.uid
+                        && request.resource.data.customerId == resource.data.customerId
+                        && request.resource.data.grandTotal == resource.data.grandTotal)
+                    || (isOwner(resource.data.customerId)
+                        && resource.data.orderStatus == 'pending'
+                        && request.resource.data.orderStatus == 'cancelled'
+                        && request.resource.data.customerId == resource.data.customerId
+                        && request.resource.data.grandTotal == resource.data.grandTotal);
+
+      // Only Admins can delete order documents
+      allow delete: if isAdmin();
+    }
+
+    // ===============================================================
+    // 8. RATINGS & REVIEWS
+    // ===============================================================
+    match /reviews/{reviewId} {
+      allow read: if true;
+
+      // Customers can write reviews for themselves with a valid rating score (1-5)
+      allow create: if isSignedIn()
+                    && request.resource.data.userId == request.auth.uid
+                    && request.resource.data.rating >= 1
+                    && request.resource.data.rating <= 5;
+
+      // Authors can update or delete their own review; Admins can moderate any review
+      allow update, delete: if (isSignedIn() && resource.data.userId == request.auth.uid)
+                            || isAdmin();
+    }
+
+    // ===============================================================
+    // 9. NOTIFICATIONS
+    // ===============================================================
+    match /notifications/{notificationId} {
+      allow read: if (isSignedIn() && resource.data.userId == request.auth.uid) || isAdmin();
+      allow create: if isEmployee() || isOwner(request.resource.data.userId);
+      allow update: if (isSignedIn() && resource.data.userId == request.auth.uid) || isAdmin();
+      allow delete: if (isSignedIn() && resource.data.userId == request.auth.uid) || isAdmin();
+    }
+
+    // ===============================================================
+    // 10. INVENTORY AUDIT TRANSACTIONS
+    // ===============================================================
+    match /inventoryTransactions/{txId} {
+      allow read: if isEmployee();
+      allow create: if isEmployee();
+      allow update, delete: if isAdmin();
+    }
+
+    // ===============================================================
+    // 11. DELIVERY ASSIGNMENTS & HANDOFFS
+    // ===============================================================
     match /deliveryAssignments/{assignmentId} {
-      allow read, write: if true;
+      allow read: if isEmployee()
+                  || (isDeliveryStaff() && resource.data.deliveryEmployeeId == request.auth.uid);
+
+      allow create: if isEmployee();
+
+      allow update: if isAdmin()
+                    || isEmployee()
+                    || (isDeliveryStaff() && resource.data.deliveryEmployeeId == request.auth.uid);
+
+      allow delete: if isAdmin();
     }
 
-    // Delivery Handoffs
     match /deliveryHandoffs/{handoffId} {
-      allow read, write: if true;
+      allow read, create, update: if isEmployee();
+      allow delete: if isAdmin();
     }
 
-    // Delivery Events
     match /deliveryEvents/{eventId} {
-      allow read, write: if true;
+      allow read, create, update: if isEmployee();
+      allow delete: if isAdmin();
     }
 
-    // Packages
     match /packages/{packageId} {
-      allow read, write: if true;
+      allow read, create, update: if isEmployee();
+      allow delete: if isAdmin();
     }
 
-    // Customer Communications
+    // ===============================================================
+    // 12. CUSTOMER SUPPORT & COMMUNICATIONS
+    // ===============================================================
     match /customerCommunications/{commId} {
-      allow read, write: if true;
+      allow read, create, update: if isEmployee();
+      allow delete: if isAdmin();
     }
 
-    // Catch-all fallback for any additional collection
-    match /{document=**} {
-      allow read, write: if true;
+    // ===============================================================
+    // 13. ACTIVITY LOGS & AUDIT TRAILS
+    // ===============================================================
+    match /employeeActivityLogs/{logId} {
+      allow read: if isEmployee();
+      allow create: if isEmployee();
+      allow update, delete: if isAdmin();
+    }
+
+    match /activity_logs/{logId} {
+      allow read: if isAdmin();
+      allow create: if isEmployee() || isAdmin();
+      allow update, delete: if isAdmin();
+    }
+
+    match /emailNotifications/{emailLogId} {
+      allow read: if isAdmin()
+                  || (isSignedIn() && 'recipientEmail' in resource.data && resource.data.recipientEmail == request.auth.token.email);
+      allow create: if isEmployee();
+      allow update, delete: if isAdmin();
+    }
+
+    // ===============================================================
+    // 14. STORE SETTINGS & CREDENTIALS
+    // ===============================================================
+    match /settings/{settingId} {
+      // Sensitive admin credentials can only be read/written by Admins
+      allow read: if (settingId != 'admin_credentials' && settingId != 'secrets') || isAdmin();
+      allow write: if isAdmin();
     }
   }
 }

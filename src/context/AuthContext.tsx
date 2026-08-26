@@ -15,6 +15,17 @@ import { collection, doc, getDoc, getDocs, query, setDoc, updateDoc, where } fro
 import { auth, db, googleProvider, cleanFirestoreData } from "../lib/firebase";
 import { UserProfile, UserRole } from "../types";
 
+const KNOWN_ADMIN_EMAILS = [
+  "mikiyaswoyne@gmail.com",
+  "admin@jjbookstore.com",
+  "admin@jjbookshopping.com"
+];
+
+function isAuthorizedAdminEmail(email?: string | null): boolean {
+  if (!email) return false;
+  return KNOWN_ADMIN_EMAILS.includes(email.trim().toLowerCase());
+}
+
 interface AuthContextType {
   currentUser: User | null;
   userProfile: UserProfile | null;
@@ -74,22 +85,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
     }
 
-    // Builds/updates this user's Firestore profile and puts them into
-    // React state. Shared by BOTH the normal auth-state listener below
-    // AND the redirect-result handler further down, so a Google sign-in
-    // that completes via redirect is registered exactly the same way as
-    // one that completes via popup or email/password.
     const syncUserProfile = (user: User) => {
       setCurrentUser(user);
-      const isAdminEmail =
-        user.email === "mikiyaswoyne@gmail.com" ||
-        user.email === "admin@jjbookstore.com" ||
-        user.email?.includes("admin");
+      const isAdminEmail = isAuthorizedAdminEmail(user.email);
 
-      // Authentication and Firestore are separate network operations.  Do
-      // not keep the signed-in UI waiting for a Firestore request: a slow
-      // connection, offline persistence, or restrictive rules must not make
-      // a successfully authenticated Google user appear to be signed out.
       setUserProfile((previous) =>
         previous?.uid === user.uid
           ? {
@@ -162,14 +161,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setLoading(false);
     });
 
-    // If the last Google sign-in attempt used the redirect fallback (see
-    // loginWithGoogle below), the browser has just navigated back from
-    // Google. Previously we only logged errors here and relied on
-    // onAuthStateChanged to notice the new session on its own - but on
-    // some browsers that never fires reliably right after a redirect,
-    // so the app kept showing "logged out" even though Google sign-in
-    // had actually succeeded. Now we read the signed-in user directly
-    // from the redirect result and register them immediately.
     getRedirectResult(auth)
       .then((redirectResultData) => {
         if (redirectResultData?.user) {
@@ -339,9 +330,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     } catch (err: any) {
       console.warn("Firebase email auth attempt failed, running fallback login pipeline:", err?.code || err?.message);
 
-      // Perform fallback login for customer or staff accounts seamlessly
-      const isRoleAdmin = cleanedEmail.includes("admin") || cleanedEmail === savedAdminUser;
-      const isRoleStaff = cleanedEmail.includes("staff") || cleanedEmail.includes("employee");
+      const isRoleAdmin = isAuthorizedAdminEmail(cleanedEmail) || cleanedEmail === savedAdminUser;
+      const isRoleStaff = cleanedEmail === "employee@jjbookstore.com" || cleanedEmail === "staff@jjbookstore.com";
 
       let existingProfile: UserProfile | null = null;
       try {
@@ -397,6 +387,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const registerWithEmail = async (email: string, pass: string, fullName: string) => {
     const cleanedEmail = email.trim().toLowerCase();
     const cleanedName = fullName.trim() || cleanedEmail.split("@")[0];
+    const isAuthorizedAdmin = isAuthorizedAdminEmail(cleanedEmail);
 
     try {
       const cred = await createUserWithEmailAndPassword(auth, cleanedEmail, pass);
@@ -406,7 +397,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           uid: cred.user.uid,
           fullName: cleanedName,
           email: cleanedEmail,
-          role: cleanedEmail.includes("admin") ? "admin" : "customer",
+          role: isAuthorizedAdmin ? "admin" : "customer",
           status: "active",
           createdAt: new Date().toISOString(),
           updatedAt: new Date().toISOString()
@@ -422,7 +413,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         uid: customUid,
         fullName: cleanedName,
         email: cleanedEmail,
-        role: cleanedEmail.includes("admin") ? "admin" : "customer",
+        role: isAuthorizedAdmin ? "admin" : "customer",
         status: "active",
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString()
@@ -448,7 +439,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const loginWithGoogle = async (directEmail?: string) => {
     if (directEmail && directEmail.trim()) {
       const targetEmail = directEmail.trim().toLowerCase();
-      const isAdmin = targetEmail === "mikiyaswoyne@gmail.com" || targetEmail === "admin@jjbookstore.com" || targetEmail.includes("admin");
+      const isAdmin = isAuthorizedAdminEmail(targetEmail);
       const googleUid = `google-${targetEmail.replace(/[^a-zA-Z0-9]/g, "-")}`;
       const displayName = targetEmail.split("@")[0].replace(/[._-]/g, " ").replace(/\b\w/g, (c) => c.toUpperCase()) || "Google User";
 
@@ -483,17 +474,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     try {
       const cred = await signInWithPopup(auth, googleProvider);
       if (cred.user) {
-        const isAdminEmail =
-          cred.user.email === "mikiyaswoyne@gmail.com" ||
-          cred.user.email === "admin@jjbookstore.com" ||
-          cred.user.email?.includes("admin");
+        const isAdmin = isAuthorizedAdminEmail(cred.user.email);
         setCurrentUser(cred.user);
         setUserProfile({
           uid: cred.user.uid,
           fullName: cred.user.displayName || "Google User",
           email: cred.user.email || "",
           photoURL: cred.user.photoURL || "",
-          role: isAdminEmail ? "admin" : "customer",
+          role: isAdmin ? "admin" : "customer",
           status: "active",
           createdAt: new Date().toISOString(),
           updatedAt: new Date().toISOString()
@@ -504,15 +492,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     } catch (popupErr: any) {
       console.warn("Google popup error:", popupErr?.code, popupErr?.message);
 
-      // The browser (or the sandboxed preview window this app is often
-      // shown in) blocked the popup window before Google could open in
-      // it. A full-page redirect is the normal fallback for that - but
-      // if this app itself is embedded inside another page (an iframe),
-      // that redirect would try to navigate the iframe, which embedded
-      // preview windows typically block too, causing the sign-in to
-      // hang forever instead of failing. So: only attempt the redirect
-      // fallback when we're NOT inside an iframe. Inside an iframe, we
-      // fail immediately with a clear, actionable error instead.
       const isEmbeddedInIframe = typeof window !== "undefined" && window.self !== window.top;
 
       if (popupErr?.code === "auth/popup-blocked" && !isEmbeddedInIframe) {
@@ -549,8 +528,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const updateUserProfile = async (data: Partial<UserProfile>) => {
     if (!currentUser) return;
     const userDocRef = doc(db, "users", currentUser.uid);
+
+    // Filter out restricted authorization fields that only admins can update
+    const { role, status, permissions, assignedRoles, uid, ...safeData } = data as any;
+
     const updated = {
-      ...data,
+      ...safeData,
       updatedAt: new Date().toISOString()
     };
     await updateDoc(userDocRef, cleanFirestoreData(updated));
