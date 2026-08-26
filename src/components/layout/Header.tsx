@@ -9,7 +9,6 @@ import {
   Menu,
   X,
   LogOut,
-  Sparkles,
   LayoutDashboard
 } from "lucide-react";
 import { useAuth } from "../../context/AuthContext";
@@ -40,17 +39,16 @@ export const Header: React.FC<HeaderProps> = ({
   const [userDropdownOpen, setUserDropdownOpen] = useState(false);
 
   return (
-    <header className="sticky top-0 z-40 bg-white/95 text-slate-800 shadow-sm border-b border-indigo-100 backdrop-blur-md">
+    <header className="sticky top-0 z-40 bg-white/95 text-slate-800 shadow-sm border-b border-emerald-100 backdrop-blur-md">
       {/* Top Banner Ticker */}
-      <div className="bg-gradient-to-r from-indigo-700 via-indigo-600 to-violet-600 text-indigo-50 text-xs py-2 px-4 border-b border-indigo-500/30">
+      <div className="bg-gradient-to-r from-emerald-800 via-emerald-700 to-green-700 text-emerald-50 text-xs py-2 px-4 border-b border-emerald-600/30">
         <div className="max-w-7xl mx-auto w-full flex items-center justify-between gap-4">
           <p className="flex items-center gap-2 mx-auto sm:mx-0 font-medium tracking-wide">
-            <Sparkles className="w-3.5 h-3.5 text-amber-300 animate-pulse shrink-0" />
             <span>Fast Express Delivery in Addis Ababa & Regions • Use promo code <strong className="text-amber-200 underline font-semibold tracking-wider">WELCOME15</strong> for 15% Off!</span>
           </p>
-          <div className="hidden sm:flex items-center gap-5 text-indigo-100 text-[11px] font-semibold tracking-wider uppercase">
+          <div className="hidden sm:flex items-center gap-5 text-emerald-100 text-[11px] font-semibold tracking-wider uppercase">
             <span className="flex items-center gap-1.5"><span className="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>ETB (የኢትዮጵያ ብር)</span>
-            <span className="text-indigo-200/50">|</span>
+            <span className="text-emerald-200/50">|</span>
             <span>Support: +251 938 014 055</span>
           </div>
         </div>
@@ -66,12 +64,12 @@ export const Header: React.FC<HeaderProps> = ({
           }}
           className="flex items-center gap-3.5 text-left group"
         >
-          <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-indigo-600 to-violet-600 text-white flex items-center justify-center font-bold shadow-lg shadow-indigo-200 group-hover:from-indigo-500 group-hover:to-violet-500 transition-all duration-300 transform group-hover:scale-105">
+          <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-emerald-700 to-green-700 text-white flex items-center justify-center font-bold shadow-lg shadow-emerald-200 group-hover:from-emerald-600 group-hover:to-green-600 transition-all duration-300 transform group-hover:scale-105">
             <BookOpen className="w-6 h-6 stroke-[2.2]" />
           </div>
           <div>
             <span className="font-serif font-extrabold text-xl sm:text-2xl tracking-tight text-slate-900 block leading-none">
-              JJ Book<span className="text-indigo-600 font-serif italic font-normal ml-1">Shopping</span>
+              JJ Book<span className="text-emerald-700 font-serif italic font-normal ml-1">Shopping</span>
             </span>
             <span className="text-[10px] tracking-[0.2em] uppercase text-slate-400 font-semibold block mt-1">
               Ethiopia's Premier Literary House
@@ -85,8 +83,8 @@ export const Header: React.FC<HeaderProps> = ({
             onClick={() => onNavigate("home")}
             className={`px-4 py-2 rounded-xl transition-all duration-200 ${
               activePage === "home"
-                ? "bg-indigo-50 text-indigo-700 font-semibold border border-indigo-100 shadow-inner"
-                : "hover:bg-indigo-50 hover:text-indigo-700"
+                ? "bg-emerald-50 text-emerald-800 font-semibold border border-emerald-100 shadow-inner"
+                : "hover:bg-emerald-50 hover:text-emerald-800"
             }`}
           >
             Home
@@ -95,8 +93,8 @@ export const Header: React.FC<HeaderProps> = ({
             onClick={() => onNavigate("shop")}
             className={`px-4 py-2 rounded-xl transition-all duration-200 ${
               activePage === "shop"
-                ? "bg-indigo-50 text-indigo-700 font-semibold border border-indigo-100 shadow-inner"
-                : "hover:bg-indigo-50 hover:text-indigo-700"
+                ? "bg-emerald-50 text-emerald-800 font-semibold border border-emerald-100 shadow-inner"
+                : "hover:bg-emerald-50 hover:text-emerald-800"
             }`}
           >
             Shop Books
@@ -105,8 +103,8 @@ export const Header: React.FC<HeaderProps> = ({
             onClick={() => onNavigate("categories")}
             className={`px-4 py-2 rounded-xl transition-all duration-200 ${
               activePage === "categories"
-                ? "bg-indigo-50 text-indigo-700 font-semibold border border-indigo-100 shadow-inner"
-                : "hover:bg-indigo-50 hover:text-indigo-700"
+                ? "bg-emerald-50 text-emerald-800 font-semibold border border-emerald-100 shadow-inner"
+                : "hover:bg-emerald-50 hover:text-emerald-800"
             }`}
           >
             Categories
@@ -115,8 +113,8 @@ export const Header: React.FC<HeaderProps> = ({
             onClick={() => onNavigate("authors")}
             className={`px-4 py-2 rounded-xl transition-all duration-200 ${
               activePage === "authors"
-                ? "bg-indigo-50 text-indigo-700 font-semibold border border-indigo-100 shadow-inner"
-                : "hover:bg-indigo-50 hover:text-indigo-700"
+                ? "bg-emerald-50 text-emerald-800 font-semibold border border-emerald-100 shadow-inner"
+                : "hover:bg-emerald-50 hover:text-emerald-800"
             }`}
           >
             Authors
@@ -124,7 +122,7 @@ export const Header: React.FC<HeaderProps> = ({
           {onOpenAbout && (
             <button
               onClick={onOpenAbout}
-              className="px-3.5 py-2 rounded-xl hover:bg-indigo-50 hover:text-indigo-700 text-slate-600 transition-all duration-200"
+              className="px-3.5 py-2 rounded-xl hover:bg-emerald-50 hover:text-emerald-800 text-slate-600 transition-all duration-200"
             >
               About
             </button>
@@ -132,7 +130,7 @@ export const Header: React.FC<HeaderProps> = ({
           {onOpenContact && (
             <button
               onClick={onOpenContact}
-              className="px-3.5 py-2 rounded-xl hover:bg-indigo-50 hover:text-indigo-700 text-slate-600 transition-all duration-200"
+              className="px-3.5 py-2 rounded-xl hover:bg-emerald-50 hover:text-emerald-800 text-slate-600 transition-all duration-200"
             >
               Contact
             </button>
@@ -144,10 +142,10 @@ export const Header: React.FC<HeaderProps> = ({
           {/* Quick Search trigger */}
           <button
             onClick={onOpenSearch}
-            className="p-2.5 rounded-xl bg-white hover:bg-indigo-50 text-slate-700 transition-all flex items-center gap-2 border border-slate-200 hover:border-indigo-200 shadow-sm"
+            className="p-2.5 rounded-xl bg-white hover:bg-emerald-50 text-slate-700 transition-all flex items-center gap-2 border border-slate-200 hover:border-emerald-200 shadow-sm"
             title="Search catalog..."
           >
-            <Search className="w-4 h-4 text-indigo-600" />
+            <Search className="w-4 h-4 text-emerald-700" />
             <span className="hidden lg:inline text-xs font-medium text-slate-600">Search books...</span>
           </button>
 
@@ -168,13 +166,13 @@ export const Header: React.FC<HeaderProps> = ({
           {/* Cart Button */}
           <button
             onClick={onOpenCart}
-            className="relative px-3.5 py-2.5 rounded-xl bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-500 hover:to-violet-500 text-white font-bold transition-all duration-200 flex items-center gap-2 shadow-lg shadow-indigo-200 transform hover:-translate-y-0.5 active:translate-y-0"
+            className="relative px-3.5 py-2.5 rounded-xl bg-gradient-to-r from-orange-700 to-orange-600 hover:from-orange-600 hover:to-amber-500 text-white font-bold transition-all duration-200 flex items-center gap-2 shadow-lg shadow-orange-100 transform hover:-translate-y-0.5 active:translate-y-0"
             title="Shopping Cart"
           >
             <ShoppingBag className="w-4 h-4 stroke-[2.5]" />
             <span className="hidden sm:inline text-xs font-extrabold uppercase tracking-wider">Cart</span>
             {totalItemCount > 0 && (
-              <span className="bg-white text-indigo-700 text-[11px] font-extrabold px-2 py-0.5 rounded-full border border-indigo-100">
+              <span className="bg-white text-emerald-800 text-[11px] font-extrabold px-2 py-0.5 rounded-full border border-emerald-100">
                 {totalItemCount}
               </span>
             )}
@@ -184,7 +182,7 @@ export const Header: React.FC<HeaderProps> = ({
           <div className="relative">
             <button
               onClick={() => setUserDropdownOpen(!userDropdownOpen)}
-              className="p-2 sm:px-3 sm:py-2 rounded-xl bg-indigo-50 hover:bg-indigo-100 text-indigo-700 transition-colors flex items-center gap-2 border border-indigo-100"
+              className="p-2 sm:px-3 sm:py-2 rounded-xl bg-emerald-50 hover:bg-emerald-100 text-emerald-800 transition-colors flex items-center gap-2 border border-emerald-100"
             >
               {userProfile?.photoURL || currentUser?.photoURL ? (
                 <img
@@ -194,7 +192,7 @@ export const Header: React.FC<HeaderProps> = ({
                   referrerPolicy="no-referrer"
                 />
               ) : (
-                <UserIcon className="w-5 h-5 text-indigo-600" />
+                <UserIcon className="w-5 h-5 text-emerald-700" />
               )}
               {currentUser && (
                 <span className="hidden sm:inline text-xs font-semibold max-w-[100px] truncate">
@@ -205,7 +203,7 @@ export const Header: React.FC<HeaderProps> = ({
 
             {/* Dropdown Menu */}
             {userDropdownOpen && (
-              <div className="absolute right-0 mt-2 w-64 bg-white border border-indigo-100 rounded-2xl shadow-2xl py-2 z-50 text-slate-700 text-sm animate-in fade-in slide-in-from-top-2">
+              <div className="absolute right-0 mt-2 w-64 bg-white border border-emerald-100 rounded-2xl shadow-2xl py-2 z-50 text-slate-700 text-sm animate-in fade-in slide-in-from-top-2">
                 {currentUser ? (
                   <>
                     <div className="px-4 py-3 border-b border-amber-900/60 flex items-center gap-3">

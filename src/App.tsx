@@ -33,7 +33,6 @@ import {
 } from "./lib/sampleData";
 import {
   BookOpen,
-  Sparkles,
   ArrowRight,
   Filter,
   CheckCircle2,
@@ -337,11 +336,11 @@ function MainAppContent() {
         {activePage === "shop" && (
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 space-y-6">
             {/* Header & Controls Bar */}
-            <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 border-b border-indigo-100 pb-6">
+            <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 border-b border-emerald-100 pb-6">
               <div>
                 <h1 className="font-serif font-extrabold text-2xl sm:text-3xl text-slate-900 flex items-center gap-3">
                   <span>Digital Library Catalog</span>
-                  <span className="text-xs font-sans font-bold bg-indigo-50 text-indigo-700 border border-indigo-100 px-2.5 py-1 rounded-full">
+                  <span className="text-xs font-sans font-bold bg-emerald-50 text-emerald-800 border border-emerald-100 px-2.5 py-1 rounded-full">
                     {sortedBooks.length} Available
                   </span>
                 </h1>
@@ -355,7 +354,7 @@ function MainAppContent() {
                 <select
                   value={selectedCategoryId}
                   onChange={(e) => setSelectedCategoryId(e.target.value)}
-                  className="px-3.5 py-2 rounded-xl border border-indigo-100 bg-white text-xs font-bold text-slate-700 focus:outline-none focus:border-indigo-500"
+                  className="px-3.5 py-2 rounded-xl border border-emerald-100 bg-white text-xs font-bold text-slate-700 focus:outline-none focus:border-emerald-600"
                 >
                   <option value="all">All Categories ({categories.length})</option>
                   {categories.map((c) => (
@@ -368,7 +367,7 @@ function MainAppContent() {
                 <select
                   value={selectedAuthorId}
                   onChange={(e) => setSelectedAuthorId(e.target.value)}
-                  className="px-3.5 py-2 rounded-xl border border-indigo-100 bg-white text-xs font-bold text-slate-700 focus:outline-none focus:border-indigo-500"
+                  className="px-3.5 py-2 rounded-xl border border-emerald-100 bg-white text-xs font-bold text-slate-700 focus:outline-none focus:border-emerald-600"
                 >
                   <option value="all">All Authors ({authors.length})</option>
                   {authors.map((a) => (
@@ -381,7 +380,7 @@ function MainAppContent() {
                 <select
                   value={selectedSort}
                   onChange={(e) => setSelectedSort(e.target.value)}
-                  className="px-3.5 py-2 rounded-xl border border-indigo-100 bg-white text-xs font-bold text-slate-700 focus:outline-none focus:border-indigo-500"
+                  className="px-3.5 py-2 rounded-xl border border-emerald-100 bg-white text-xs font-bold text-slate-700 focus:outline-none focus:border-emerald-600"
                 >
                   <option value="newest">Newest Titles</option>
                   <option value="bestselling">Most Popular</option>
@@ -401,7 +400,7 @@ function MainAppContent() {
                 className={`px-3.5 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap transition-all shrink-0 ${
                   selectedCategoryId === "all"
                     ? "bg-amber-500 text-stone-950 shadow-md"
-                    : "bg-white text-slate-600 hover:text-indigo-700 hover:bg-indigo-50 border border-indigo-100"
+                    : "bg-white text-slate-600 hover:text-emerald-800 hover:bg-emerald-50 border border-emerald-100"
                 }`}
               >
                 All Genres ({books.length})
@@ -416,12 +415,12 @@ function MainAppContent() {
                     className={`px-3.5 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap transition-all shrink-0 flex items-center gap-1.5 ${
                       isSelected
                         ? "bg-amber-500 text-stone-950 shadow-md"
-                        : "bg-white text-slate-600 hover:text-indigo-700 hover:bg-indigo-50 border border-indigo-100"
+                        : "bg-white text-slate-600 hover:text-emerald-800 hover:bg-emerald-50 border border-emerald-100"
                     }`}
                   >
                     <span>{cat.name}</span>
                     {count > 0 && (
-                      <span className={`text-[10px] px-1.5 py-0.2 rounded-full ${isSelected ? "bg-indigo-950/10 text-indigo-950" : "bg-slate-100 text-slate-500"}`}>
+                      <span className={`text-[10px] px-1.5 py-0.2 rounded-full ${isSelected ? "bg-emerald-950/10 text-emerald-950" : "bg-slate-100 text-slate-500"}`}>
                         {count}
                       </span>
                     )}
@@ -527,7 +526,7 @@ function MainAppContent() {
                     setSelectedAuthorId(auth.id);
                     handleNavigate("shop");
                   }}
-                  className="p-6 rounded-3xl bookshop-card hover:border-indigo-300 cursor-pointer transition-all space-y-4 group"
+                  className="p-6 rounded-3xl bookshop-card hover:border-emerald-300 cursor-pointer transition-all space-y-4 group"
                 >
                   <div className="flex items-center gap-4">
                     <img
@@ -536,10 +535,10 @@ function MainAppContent() {
                       className="w-16 h-16 rounded-full object-cover border-2 border-amber-400 group-hover:scale-105 transition-transform"
                     />
                     <div>
-                      <h3 className="font-serif font-bold text-slate-900 text-base group-hover:text-indigo-700">
+                      <h3 className="font-serif font-bold text-slate-900 text-base group-hover:text-emerald-800">
                         {auth.name}
                       </h3>
-                      <span className="text-xs font-semibold text-indigo-700 bg-indigo-50 px-2.5 py-0.5 rounded-full border border-indigo-100">
+                      <span className="text-xs font-semibold text-emerald-800 bg-emerald-50 px-2.5 py-0.5 rounded-full border border-emerald-100">
                         Author
                       </span>
                     </div>
@@ -549,7 +548,7 @@ function MainAppContent() {
                     {auth.bio}
                   </p>
 
-                  <div className="pt-2 border-t border-indigo-100 flex items-center justify-between text-xs font-bold text-indigo-600">
+                  <div className="pt-2 border-t border-emerald-100 flex items-center justify-between text-xs font-bold text-emerald-700">
                     <span>View Books by {auth.name.split(" ")[0]}</span>
                     <ArrowRight className="w-4 h-4" />
                   </div>
