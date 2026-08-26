@@ -484,13 +484,26 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
       // The browser (or the sandboxed preview window this app is often
       // shown in) blocked the popup window before Google could open in
-      // it. Falling back to a full-page redirect avoids the popup
-      // blocker entirely. When this succeeds, the browser navigates
-      // away to Google and back; the redirect result is then picked up
-      // by getRedirectResult() and onAuthStateChanged() further up.
-      if (popupErr?.code === "auth/popup-blocked") {
+      // it. A full-page redirect is the normal fallback for that - but
+      // if this app itself is embedded inside another page (an iframe),
+      // that redirect would try to navigate the iframe, which embedded
+      // preview windows typically block too, causing the sign-in to
+      // hang forever instead of failing. So: only attempt the redirect
+      // fallback when we're NOT inside an iframe. Inside an iframe, we
+      // fail immediately with a clear, actionable error instead.
+      const isEmbeddedInIframe = typeof window !== "undefined" && window.self !== window.top;
+
+      if (popupErr?.code === "auth/popup-blocked" && !isEmbeddedInIframe) {
         await signInWithRedirect(auth, googleProvider);
         return;
+      }
+
+      if (popupErr?.code === "auth/popup-blocked" && isEmbeddedInIframe) {
+        const embeddedError: any = new Error(
+          "Google Sign-In can't run inside this embedded preview window. Open the site in its own browser tab and try again."
+        );
+        embeddedError.code = "auth/popup-blocked";
+        throw embeddedError;
       }
 
       throw popupErr;

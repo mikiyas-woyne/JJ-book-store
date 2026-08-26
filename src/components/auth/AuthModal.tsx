@@ -70,11 +70,34 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, reasonNot
 
   const handleGoogleSignIn = async (directEmailOverride?: string) => {
     setLoading(true);
+
+    // Some preview/embedded windows block BOTH the Google sign-in popup
+    // AND the full-page redirect we fall back to (see AuthContext). In
+    // that case the underlying Firebase call never resolves or rejects,
+    // which used to leave this button spinning forever with the user
+    // never actually getting signed in. This timeout guarantees we always
+    // stop loading and tell the user what's going on, even if Firebase
+    // itself never gets back to us.
+    let timedOut = false;
+    const timeoutId = setTimeout(() => {
+      timedOut = true;
+      setLoading(false);
+      showToast(
+        "Google Sign-In Unavailable Here",
+        "This preview window is blocking Google's sign-in popup and redirect. Open this site in its own browser tab (not embedded/preview) and try again, or sign in with email instead.",
+        "error"
+      );
+    }, 10000);
+
     try {
       await loginWithGoogle(directEmailOverride);
+      if (timedOut) return; // the timeout already reported this attempt as failed
+      clearTimeout(timeoutId);
       showToast("Google Sign-In Successful", "Welcome to JJ Book Shopping!", "success");
       onClose();
     } catch (err: any) {
+      if (timedOut) return; // the timeout already reported this attempt as failed
+      clearTimeout(timeoutId);
       console.error("Google auth error:", err);
       if (
         err?.code === "auth/popup-closed-by-user" ||
@@ -90,7 +113,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, reasonNot
         showToast("Google Sign-In Failed", err?.message || "Unable to complete Google Sign-In.", "error");
       }
     } finally {
-      setLoading(false);
+      if (!timedOut) setLoading(false);
     }
   };
 
