@@ -39,7 +39,7 @@ export const Header: React.FC<HeaderProps> = ({
   const [userDropdownOpen, setUserDropdownOpen] = useState(false);
 
   return (
-    <header className="sticky top-0 z-40 bg-white/95 text-slate-800 shadow-sm border-b border-emerald-100 backdrop-blur-md">
+    <header className="sticky top-0 z-40 bg-[#faf7ef]/95 text-slate-800 shadow-sm border-b border-emerald-100 backdrop-blur-md">
       {/* Top Banner Ticker */}
       <div className="bg-gradient-to-r from-emerald-800 via-emerald-700 to-green-700 text-emerald-50 text-xs py-2 px-4 border-b border-emerald-600/30">
         <div className="max-w-7xl mx-auto w-full flex items-center justify-between gap-4">
@@ -142,7 +142,7 @@ export const Header: React.FC<HeaderProps> = ({
           {/* Quick Search trigger */}
           <button
             onClick={onOpenSearch}
-            className="p-2.5 rounded-xl bg-white hover:bg-emerald-50 text-slate-700 transition-all flex items-center gap-2 border border-slate-200 hover:border-emerald-200 shadow-sm"
+            className="p-2.5 rounded-xl bg-[#faf7ef] hover:bg-emerald-50 text-slate-700 transition-all flex items-center gap-2 border border-slate-200 hover:border-emerald-200 shadow-sm"
             title="Search catalog..."
           >
             <Search className="w-4 h-4 text-emerald-700" />
@@ -152,7 +152,7 @@ export const Header: React.FC<HeaderProps> = ({
           {/* Wishlist Button */}
           <button
             onClick={() => onNavigate("account", { tab: "wishlist" })}
-            className="relative p-2.5 rounded-xl bg-white hover:bg-rose-50 text-slate-700 transition-all border border-slate-200 hover:border-rose-200 shadow-sm"
+            className="relative p-2.5 rounded-xl bg-[#faf7ef] hover:bg-rose-50 text-slate-700 transition-all border border-slate-200 hover:border-rose-200 shadow-sm"
             title="Wishlist"
           >
             <Heart className="w-4 h-4 text-rose-500" />
@@ -172,7 +172,7 @@ export const Header: React.FC<HeaderProps> = ({
             <ShoppingBag className="w-4 h-4 stroke-[2.5]" />
             <span className="hidden sm:inline text-xs font-extrabold uppercase tracking-wider">Cart</span>
             {totalItemCount > 0 && (
-              <span className="bg-white text-emerald-800 text-[11px] font-extrabold px-2 py-0.5 rounded-full border border-emerald-100">
+              <span className="bg-[#faf7ef] text-emerald-800 text-[11px] font-extrabold px-2 py-0.5 rounded-full border border-emerald-100">
                 {totalItemCount}
               </span>
             )}
@@ -203,7 +203,7 @@ export const Header: React.FC<HeaderProps> = ({
 
             {/* Dropdown Menu */}
             {userDropdownOpen && (
-              <div className="absolute right-0 mt-2 w-64 bg-white border border-emerald-100 rounded-2xl shadow-2xl py-2 z-50 text-slate-700 text-sm animate-in fade-in slide-in-from-top-2">
+              <div className="absolute right-0 mt-2 w-64 bg-[#faf7ef] border border-emerald-100 rounded-2xl shadow-2xl py-2 z-50 text-slate-700 text-sm animate-in fade-in slide-in-from-top-2">
                 {currentUser ? (
                   <>
                     <div className="px-4 py-3 border-b border-amber-900/60 flex items-center gap-3">

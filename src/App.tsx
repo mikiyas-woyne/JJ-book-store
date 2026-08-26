@@ -300,7 +300,7 @@ function MainAppContent() {
   });
 
   return (
-    <div className="min-h-screen bg-[#fffdf7] flex flex-col text-slate-800 font-sans antialiased">
+    <div className="min-h-screen bg-[#f4efe4] flex flex-col text-slate-800 font-sans antialiased">
       {/* Header Navigation */}
       <Header
         onOpenSearch={() => setIsSearchOpen(true)}
@@ -354,7 +354,7 @@ function MainAppContent() {
                 <select
                   value={selectedCategoryId}
                   onChange={(e) => setSelectedCategoryId(e.target.value)}
-                  className="px-3.5 py-2 rounded-xl border border-emerald-100 bg-white text-xs font-bold text-slate-700 focus:outline-none focus:border-emerald-600"
+                  className="px-3.5 py-2 rounded-xl border border-emerald-100 bg-[#faf7ef] text-xs font-bold text-slate-700 focus:outline-none focus:border-emerald-600"
                 >
                   <option value="all">All Categories ({categories.length})</option>
                   {categories.map((c) => (
@@ -367,7 +367,7 @@ function MainAppContent() {
                 <select
                   value={selectedAuthorId}
                   onChange={(e) => setSelectedAuthorId(e.target.value)}
-                  className="px-3.5 py-2 rounded-xl border border-emerald-100 bg-white text-xs font-bold text-slate-700 focus:outline-none focus:border-emerald-600"
+                  className="px-3.5 py-2 rounded-xl border border-emerald-100 bg-[#faf7ef] text-xs font-bold text-slate-700 focus:outline-none focus:border-emerald-600"
                 >
                   <option value="all">All Authors ({authors.length})</option>
                   {authors.map((a) => (
@@ -380,7 +380,7 @@ function MainAppContent() {
                 <select
                   value={selectedSort}
                   onChange={(e) => setSelectedSort(e.target.value)}
-                  className="px-3.5 py-2 rounded-xl border border-emerald-100 bg-white text-xs font-bold text-slate-700 focus:outline-none focus:border-emerald-600"
+                  className="px-3.5 py-2 rounded-xl border border-emerald-100 bg-[#faf7ef] text-xs font-bold text-slate-700 focus:outline-none focus:border-emerald-600"
                 >
                   <option value="newest">Newest Titles</option>
                   <option value="bestselling">Most Popular</option>
@@ -400,7 +400,7 @@ function MainAppContent() {
                 className={`px-3.5 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap transition-all shrink-0 ${
                   selectedCategoryId === "all"
                     ? "bg-amber-500 text-stone-950 shadow-md"
-                    : "bg-white text-slate-600 hover:text-emerald-800 hover:bg-emerald-50 border border-emerald-100"
+                    : "bg-[#faf7ef] text-slate-600 hover:text-emerald-800 hover:bg-emerald-50 border border-emerald-100"
                 }`}
               >
                 All Genres ({books.length})
@@ -415,7 +415,7 @@ function MainAppContent() {
                     className={`px-3.5 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap transition-all shrink-0 flex items-center gap-1.5 ${
                       isSelected
                         ? "bg-amber-500 text-stone-950 shadow-md"
-                        : "bg-white text-slate-600 hover:text-emerald-800 hover:bg-emerald-50 border border-emerald-100"
+                        : "bg-[#faf7ef] text-slate-600 hover:text-emerald-800 hover:bg-emerald-50 border border-emerald-100"
                     }`}
                   >
                     <span>{cat.name}</span>
