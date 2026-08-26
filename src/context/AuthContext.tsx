@@ -74,47 +74,57 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
     }
 
+    // Builds/updates this user's Firestore profile and puts them into
+    // React state. Shared by BOTH the normal auth-state listener below
+    // AND the redirect-result handler further down, so a Google sign-in
+    // that completes via redirect is registered exactly the same way as
+    // one that completes via popup or email/password.
+    const syncUserProfile = async (user: User) => {
+      setCurrentUser(user);
+      try {
+        const userDocRef = doc(db, "users", user.uid);
+        const userSnap = await getDoc(userDocRef);
+
+        if (userSnap.exists()) {
+          const data = userSnap.data() as UserProfile;
+          // Ensure designated emails maintain admin role
+          if (user.email === "mikiyaswoyne@gmail.com" || user.email === "admin@jjbookstore.com" || user.email?.includes("admin")) {
+            data.role = "admin";
+          }
+          setUserProfile(data);
+        } else {
+          const isAdminEmail =
+            user.email === "mikiyaswoyne@gmail.com" ||
+            user.email === "admin@jjbookstore.com" ||
+            user.email?.includes("admin");
+          const newProfile: UserProfile = {
+            uid: user.uid,
+            fullName: user.displayName || (isAdminEmail ? "Store Administrator" : "JJ Bookstore Customer"),
+            email: user.email || "",
+            photoURL: user.photoURL || "",
+            role: isAdminEmail ? "admin" : "customer",
+            status: "active",
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString()
+          };
+          await setDoc(userDocRef, cleanFirestoreData(newProfile));
+          setUserProfile(newProfile);
+        }
+      } catch (err) {
+        console.error("Error fetching user profile:", err);
+      }
+    };
+
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
       if (localStorage.getItem("jj_admin_session") || localStorage.getItem("jj_customer_session")) {
         setLoading(false);
         return;
       }
 
-      setCurrentUser(user);
       if (user) {
-        try {
-          const userDocRef = doc(db, "users", user.uid);
-          const userSnap = await getDoc(userDocRef);
-
-          if (userSnap.exists()) {
-            const data = userSnap.data() as UserProfile;
-            // Ensure designated emails maintain admin role
-            if (user.email === "mikiyaswoyne@gmail.com" || user.email === "admin@jjbookstore.com" || user.email?.includes("admin")) {
-              data.role = "admin";
-            }
-            setUserProfile(data);
-          } else {
-            const isAdminEmail =
-              user.email === "mikiyaswoyne@gmail.com" ||
-              user.email === "admin@jjbookstore.com" ||
-              user.email?.includes("admin");
-            const newProfile: UserProfile = {
-              uid: user.uid,
-              fullName: user.displayName || (isAdminEmail ? "Store Administrator" : "JJ Bookstore Customer"),
-              email: user.email || "",
-              photoURL: user.photoURL || "",
-              role: isAdminEmail ? "admin" : "customer",
-              status: "active",
-              createdAt: new Date().toISOString(),
-              updatedAt: new Date().toISOString()
-            };
-            await setDoc(userDocRef, cleanFirestoreData(newProfile));
-            setUserProfile(newProfile);
-          }
-        } catch (err) {
-          console.error("Error fetching user profile:", err);
-        }
+        await syncUserProfile(user);
       } else {
+        setCurrentUser(null);
         setUserProfile(null);
       }
       setLoading(false);
@@ -122,12 +132,21 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     // If the last Google sign-in attempt used the redirect fallback (see
     // loginWithGoogle below), the browser has just navigated back from
-    // Google. This checks for that result so we can log/report any error.
-    // On success, onAuthStateChanged above already handles building the
-    // user profile, so nothing else needs to happen here.
-    getRedirectResult(auth).catch((redirectErr) => {
-      console.warn("Google redirect sign-in error:", redirectErr?.code, redirectErr?.message);
-    });
+    // Google. Previously we only logged errors here and relied on
+    // onAuthStateChanged to notice the new session on its own - but on
+    // some browsers that never fires reliably right after a redirect,
+    // so the app kept showing "logged out" even though Google sign-in
+    // had actually succeeded. Now we read the signed-in user directly
+    // from the redirect result and register them immediately.
+    getRedirectResult(auth)
+      .then((redirectResultData) => {
+        if (redirectResultData?.user) {
+          syncUserProfile(redirectResultData.user);
+        }
+      })
+      .catch((redirectErr) => {
+        console.warn("Google redirect sign-in error:", redirectErr?.code, redirectErr?.message);
+      });
 
     return () => unsubscribe();
   }, []);
