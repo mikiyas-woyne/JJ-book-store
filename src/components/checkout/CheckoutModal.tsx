@@ -148,52 +148,9 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
 
     setLoading(true);
     try {
-      // 1. Server Side Total Verification
-      let trustedSubtotal = subtotal;
-      let trustedDiscount = discount;
-      let trustedShippingFee = shippingOption === "pickup" ? 0 : shippingFee;
-      let trustedTax = tax;
-      let trustedGrandTotal = grandTotal;
-
-      try {
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 2000);
-        const res = await fetch("/api/checkout/validate", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          signal: controller.signal,
-          body: JSON.stringify({
-            items: cartItems.map((i) => ({
-              bookId: i.bookId,
-              price: Number(i.book.price || 0),
-              discountPrice: i.book.discountPrice ? Number(i.book.discountPrice) : undefined,
-              quantity: Number(i.quantity || 1)
-            })),
-            couponCode: appliedCoupon?.code
-          })
-        });
-        clearTimeout(timeoutId);
-
-        if (res.ok) {
-          const validatedData = await res.json();
-          if (validatedData && validatedData.success) {
-            if (typeof validatedData.subtotal === "number") trustedSubtotal = validatedData.subtotal;
-            if (typeof validatedData.discount === "number") trustedDiscount = validatedData.discount;
-            if (typeof validatedData.shippingFee === "number") {
-              trustedShippingFee = shippingOption === "pickup" ? 0 : validatedData.shippingFee;
-            }
-            if (typeof validatedData.tax === "number") trustedTax = validatedData.tax;
-            trustedGrandTotal = Math.max(0, trustedSubtotal - trustedDiscount + trustedTax + trustedShippingFee);
-          }
-        }
-      } catch (validateErr) {
-        console.warn("Validation endpoint notice, using local calculated totals:", validateErr);
-      }
-
-      const orderNumber = `JJ-${new Date().getFullYear()}-${Math.floor(10000 + Math.random() * 90000)}`;
       const formattedPhone = getFullPhoneNumber();
       const finalStreet = streetAddress.trim() || (region === "Addis Ababa" ? `${subcity} Area` : `${city} Town`);
-      const finalRef = paymentReference.trim() || (paymentMethod === "cod" ? "Cash on Arrival" : "Pending Transfer Verification");
+      const finalRef = paymentReference.trim() || (paymentMethod === "cod" ? "Cash on Delivery" : "Pending Verification");
 
       const shippingAddressObj: EthiopianAddress = {
         fullName: customerName.trim() || "Customer",
@@ -206,116 +163,131 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
         deliveryNotes: deliveryNotes.trim()
       };
 
-      const newOrderData: Omit<Order, "id"> = {
-        orderId: orderNumber,
-        customerId: currentUser?.uid || "guest_customer",
-        customerName: customerName.trim() || "Customer",
-        customerEmail: customerEmail.trim() || "customer@example.com",
-        customerPhone: formattedPhone,
-        items: cartItems.map((i) => ({
-          bookId: i.bookId,
-          title: i.book.title,
-          coverImage: i.book.coverImage,
-          authorName: i.book.authorName || "",
-          price: i.book.discountPrice || i.book.price,
-          quantity: i.quantity,
-          total: (i.book.discountPrice || i.book.price) * i.quantity
-        })),
-        subtotal: trustedSubtotal,
-        discount: trustedDiscount,
-        tax: trustedTax,
-        shippingFee: trustedShippingFee,
-        grandTotal: trustedGrandTotal,
-        paymentMethod,
-        paymentStatus: paymentMethod === "cod" ? "pending" : (paymentReference.trim() ? "paid" : "pending"),
-        paymentReference: finalRef,
-        orderStatus: "pending",
-        shippingAddress: shippingAddressObj,
-        couponCode: appliedCoupon?.code || "",
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-        statusHistory: [
-          {
-            status: "pending",
-            timestamp: new Date().toISOString(),
-            note: "Order placed. Awaiting staff payment & address verification."
-          }
-        ]
-      };
+      let fullOrder: Order | null = null;
+      const idempotencyKey = `idemp_${currentUser?.uid || "guest"}_${Date.now()}_${Math.floor(Math.random() * 10000)}`;
 
-      // Create in Firestore with graceful timeout
-      let createdDocId = `local_${Date.now()}`;
+      // 1. Authoritative Server-Side Order Creation (Atomic Stock & Price Validation)
       try {
-        const firestorePromise = addDoc(collection(db, "orders"), cleanFirestoreData(newOrderData));
-        const timeoutPromise = new Promise<never>((_, reject) =>
-          setTimeout(() => reject(new Error("Firestore timeout")), 4000)
-        );
-        const docRef = (await Promise.race([firestorePromise, timeoutPromise])) as any;
-        if (docRef?.id) {
-          createdDocId = docRef.id;
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 4500);
+
+        const res = await fetch("/api/orders/create", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          signal: controller.signal,
+          body: JSON.stringify({
+            items: cartItems.map((i) => ({
+              bookId: i.bookId,
+              quantity: i.quantity
+            })),
+            couponCode: appliedCoupon?.code,
+            customerId: currentUser?.uid || "guest_customer",
+            customerName: customerName.trim() || "Customer",
+            customerEmail: customerEmail.trim() || "customer@example.com",
+            customerPhone: formattedPhone,
+            shippingAddress: shippingAddressObj,
+            paymentMethod,
+            paymentReference: finalRef,
+            deliveryNotes: deliveryNotes.trim(),
+            idempotencyKey
+          })
+        });
+        clearTimeout(timeoutId);
+
+        if (res.ok) {
+          const data = await res.json();
+          if (data.success && data.order) {
+            fullOrder = data.order as Order;
+          }
+        } else {
+          const errData = await res.json().catch(() => ({}));
+          if (errData?.message) {
+            showToast("Order Rejected", errData.message, "error");
+            setLoading(false);
+            return;
+          }
         }
-      } catch (fsErr) {
-        console.warn("Firestore order write notice (using fallback):", fsErr);
+      } catch (apiErr: any) {
+        console.warn("Server API order creation notice (falling back to direct Firestore):", apiErr?.message);
       }
 
-      const fullOrder: Order = { id: createdDocId, ...newOrderData };
+      // 2. Fallback direct creation if server endpoint is in offline mode
+      if (!fullOrder) {
+        const orderNumber = `JJ-${new Date().getFullYear()}-${Math.floor(10000 + Math.random() * 90000)}`;
+        const fallbackOrderData: Omit<Order, "id"> = {
+          orderId: orderNumber,
+          customerId: currentUser?.uid || "guest_customer",
+          customerName: customerName.trim() || "Customer",
+          customerEmail: customerEmail.trim() || "customer@example.com",
+          customerPhone: formattedPhone,
+          items: cartItems.map((i) => ({
+            bookId: i.bookId,
+            title: i.book.title,
+            coverImage: i.book.coverImage,
+            authorName: i.book.authorName || "",
+            price: i.book.discountPrice || i.book.price,
+            quantity: i.quantity,
+            total: (i.book.discountPrice || i.book.price) * i.quantity
+          })),
+          subtotal,
+          discount,
+          tax,
+          shippingFee: shippingOption === "pickup" ? 0 : shippingFee,
+          grandTotal,
+          paymentMethod,
+          paymentStatus: "pending",
+          paymentReference: finalRef,
+          orderStatus: "pending",
+          isReceiptVerified: false,
+          shippingAddress: shippingAddressObj,
+          deliveryNotes: deliveryNotes.trim(),
+          couponCode: appliedCoupon?.code || "",
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+          statusHistory: [
+            {
+              status: "pending",
+              timestamp: new Date().toISOString(),
+              note: "Order placed. Awaiting staff payment & address verification."
+            }
+          ]
+        };
 
-      // Save to localStorage so orders persist locally regardless of network
+        let createdDocId = `local_${Date.now()}`;
+        try {
+          const docRef = await addDoc(collection(db, "orders"), cleanFirestoreData(fallbackOrderData));
+          if (docRef?.id) createdDocId = docRef.id;
+        } catch (fsErr) {
+          console.warn("Direct Firestore fallback write notice:", fsErr);
+        }
+
+        fullOrder = { id: createdDocId, ...fallbackOrderData };
+      }
+
+      // Persist in localStorage for resilient offline order history
       try {
         const existing = JSON.parse(localStorage.getItem("jj_local_orders") || "[]");
         localStorage.setItem("jj_local_orders", JSON.stringify([fullOrder, ...existing]));
-      } catch (e) {
-        console.warn("Local storage write notice:", e);
-      }
+      } catch (e) {}
 
-      // Instantly advance order state & clear cart so user is never blocked!
+      // Advance UI & notify user
       setCreatedOrder(fullOrder);
       clearCart();
       setStep(6);
       onOrderCompleted(fullOrder);
-      showToast("Order Confirmed!", `Order ${orderNumber} has been successfully placed.`, "success");
+      showToast("Order Confirmed!", `Order ${fullOrder.orderId} has been successfully placed.`, "success");
 
-      // Non-blocking Background Tasks
-      // 1. Record Activity Log
-      addDoc(collection(db, "activity_logs"), {
-        title: `New Order #${orderNumber}`,
-        description: `${customerName} placed order for ${cartItems.length} item(s) totalling ${trustedGrandTotal.toLocaleString()} ETB via ${paymentMethod.toUpperCase()}`,
-        category: "orders",
-        type: "order_created",
-        orderId: orderNumber,
-        amount: trustedGrandTotal,
-        timestamp: new Date().toISOString()
-      }).catch(logErr => console.warn("Activity log warning:", logErr));
-
-      // 2. Send Order Confirmation Emails (Admin & Customer)
-      fetch("/api/orders/notify-email", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ order: fullOrder })
-      }).catch(emailErr => console.warn("Order email notification dispatch notice:", emailErr));
-
-      // 3. Log In-App Customer Notification Document
+      // Non-blocking in-app customer notification log
       sendCustomerOrderEmail(
         fullOrder,
         "approved",
         "JJ Order System",
         paymentReference || "N/A",
         "Your order has been recorded and is being prepared for dispatch."
-      ).catch(inAppEmailErr => console.warn("In-app email log notice:", inAppEmailErr));
-
-      // 4. Update Book Inventory Stock & Sold Counts
-      Promise.allSettled(
-        cartItems.map((item) => {
-          const bookRef = doc(db, "books", item.bookId);
-          return updateDoc(bookRef, {
-            stock: increment(-item.quantity),
-            soldCount: increment(item.quantity)
-          });
-        })
-      ).catch(err => console.warn("Stock update notice:", err));
-    } catch (err) {
+      ).catch(() => {});
+    } catch (err: any) {
       console.error("Error creating order:", err);
-      showToast("Checkout Error", "Failed to place order. Please try again.", "error");
+      showToast("Checkout Error", err?.message || "Failed to place order. Please try again.", "error");
     } finally {
       setLoading(false);
     }

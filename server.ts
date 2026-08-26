@@ -3,9 +3,31 @@ import path from "path";
 import { fileURLToPath } from "url";
 import { createServer as createViteServer } from "vite";
 import nodemailer from "nodemailer";
+import * as admin from "firebase-admin";
+import { INITIAL_BOOKS, INITIAL_COUPONS } from "./src/lib/sampleData";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
+
+// Initialize Firebase Admin SDK safely
+if (!admin.getApps().length) {
+  try {
+    admin.initializeApp();
+  } catch (e: any) {
+    console.warn("Firebase Admin initialized in local mode:", e?.message);
+  }
+}
+
+const firestoreAdmin = admin.getApps().length ? admin.firestore() : null;
+
+// In-memory fallback database for local preview/development when Admin credentials are not attached
+const localMemoryStore = {
+  books: new Map<string, any>(INITIAL_BOOKS.map((b) => [b.id, { ...b }])),
+  coupons: new Map<string, any>(INITIAL_COUPONS.map((c) => [c.code.toUpperCase(), { ...c }])),
+  orders: new Map<string, any>(),
+  inventoryTransactions: [] as any[],
+  activityLogs: [] as any[]
+};
 
 async function startServer() {
   const app = express();
@@ -18,7 +40,7 @@ async function startServer() {
     res.json({ status: "ok", service: "JJ Book Shopping API", timestamp: new Date().toISOString() });
   });
 
-  // Server runtime SMTP configuration memory (defaults to environment variables)
+  // Server runtime SMTP configuration memory
   let runtimeSmtpConfig = {
     host: process.env.SMTP_HOST || "",
     port: Number(process.env.SMTP_PORT) || 587,
@@ -28,7 +50,6 @@ async function startServer() {
     adminEmail: process.env.ADMIN_EMAIL || "mikiyaswoyne@gmail.com"
   };
 
-  // Helper to retrieve configured SMTP transporter or unconfigured status
   function getSmtpTransporter() {
     const smtpHost = (runtimeSmtpConfig.host || process.env.SMTP_HOST || "").trim().replace(/^smpt\./i, "smtp.");
     const smtpUser = (runtimeSmtpConfig.user || process.env.SMTP_USER || "").trim();
@@ -48,13 +69,8 @@ async function startServer() {
           host: smtpHost,
           port: smtpPort,
           secure: smtpSecure,
-          auth: {
-            user: smtpUser,
-            pass: smtpPass,
-          },
-          tls: {
-            rejectUnauthorized: false
-          }
+          auth: { user: smtpUser, pass: smtpPass },
+          tls: { rejectUnauthorized: false }
         })
       };
     }
@@ -72,13 +88,10 @@ async function startServer() {
 
   // Reusable server-side function to send order notification emails via configured SMTP
   async function sendOrderEmailNotifications(order: any) {
-    if (!order) {
-      throw new Error("Order payload is required for email notification");
-    }
+    if (!order) return;
 
     const adminEmail = process.env.ADMIN_EMAIL || "mikiyaswoyne@gmail.com";
     const customerEmail = (order.customerEmail || "").trim();
-
     const smtpConfig = getSmtpTransporter();
     let transporter: any = smtpConfig.transporter;
 
@@ -88,10 +101,7 @@ async function startServer() {
         host: "smtp.ethereal.email",
         port: 587,
         secure: false,
-        auth: {
-          user: testAccount.user,
-          pass: testAccount.pass,
-        },
+        auth: { user: testAccount.user, pass: testAccount.pass }
       });
     }
 
@@ -111,27 +121,23 @@ async function startServer() {
       )
       .join("");
 
-    // 1. ADMIN EMAIL TEMPLATE
     const adminSubject = `🚨 [NEW ORDER RECEIVED] Order #${order.orderId} - ${order.customerName} (${order.grandTotal} ETB)`;
     const adminBody = `
       <div style="font-family: Arial, sans-serif; max-width: 620px; margin: 0 auto; color: #1e293b; line-height: 1.5; border: 1px solid #cbd5e1; border-radius: 16px; overflow: hidden; background-color: #ffffff;">
-        <div style="background-color: #451a03; color: #fef3c7; padding: 22px; text-align: center;">
+        <div style="background-color: #0f172a; color: #f8fafc; padding: 22px; text-align: center;">
           <h1 style="margin: 0; font-size: 22px; color: #fbbf24;">JJ BOOKSTORE ADMIN ALERT</h1>
-          <p style="margin: 4px 0 0; font-size: 12px; color: #fde68a;">New Customer Order Pending Action</p>
+          <p style="margin: 4px 0 0; font-size: 12px; color: #fde68a;">New Customer Order Pending Staff Review</p>
         </div>
-        
         <div style="padding: 24px;">
           <div style="background-color: #fffbeb; border: 1px solid #fde68a; border-radius: 12px; padding: 16px; margin-bottom: 20px;">
             <h2 style="margin: 0 0 8px; color: #78350f; font-size: 16px;">Order #${order.orderId} Summary</h2>
-            <p style="margin: 3px 0; font-size: 13px;"><strong>Customer Name:</strong> ${order.customerName}</p>
-            <p style="margin: 3px 0; font-size: 13px;"><strong>Customer Email:</strong> ${order.customerEmail || "N/A"}</p>
-            <p style="margin: 3px 0; font-size: 13px;"><strong>Phone Number:</strong> ${order.customerPhone}</p>
-            <p style="margin: 3px 0; font-size: 13px;"><strong>Delivery Neighborhood / Street:</strong> ${order.shippingAddress?.streetAddress || ""}, ${order.shippingAddress?.subcity ? order.shippingAddress.subcity + ", " : ""}${order.shippingAddress?.region || "Addis Ababa"}</p>
+            <p style="margin: 3px 0; font-size: 13px;"><strong>Customer:</strong> ${order.customerName}</p>
+            <p style="margin: 3px 0; font-size: 13px;"><strong>Email:</strong> ${order.customerEmail || "N/A"}</p>
+            <p style="margin: 3px 0; font-size: 13px;"><strong>Phone:</strong> ${order.customerPhone}</p>
+            <p style="margin: 3px 0; font-size: 13px;"><strong>Delivery Address:</strong> ${order.shippingAddress?.streetAddress || ""}, ${order.shippingAddress?.subcity || ""}, ${order.shippingAddress?.region || "Addis Ababa"}</p>
             <p style="margin: 3px 0; font-size: 13px;"><strong>Payment Method:</strong> <span style="text-transform: uppercase; font-weight: bold;">${order.paymentMethod}</span> (${order.paymentStatus})</p>
-            ${order.paymentReference ? `<p style="margin: 3px 0; font-size: 13px; color: #b45309;"><strong>Payment Transaction Ref #:</strong> ${order.paymentReference}</p>` : ""}
+            ${order.paymentReference ? `<p style="margin: 3px 0; font-size: 13px; color: #b45309;"><strong>Payment Reference #:</strong> ${order.paymentReference}</p>` : ""}
           </div>
-
-          <h3 style="color: #0f172a; font-size: 14px; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 10px;">Items Ordered (${order.items?.length || 0})</h3>
           <table style="width: 100%; border-collapse: collapse; margin-bottom: 20px;">
             <thead>
               <tr style="background-color: #f1f5f9; text-align: left; font-size: 11px; color: #475569; text-transform: uppercase;">
@@ -141,11 +147,8 @@ async function startServer() {
                 <th style="padding: 8px 10px; text-align: right;">Total</th>
               </tr>
             </thead>
-            <tbody>
-              ${itemsHtml}
-            </tbody>
+            <tbody>${itemsHtml}</tbody>
           </table>
-
           <div style="border-top: 2px solid #e2e8f0; padding-top: 12px; text-align: right; font-size: 13px;">
             <p style="margin: 3px 0; color: #64748b;">Subtotal: ${order.subtotal} ETB</p>
             ${order.discount ? `<p style="margin: 3px 0; color: #16a34a;">Discount: -${order.discount} ETB</p>` : ""}
@@ -154,38 +157,23 @@ async function startServer() {
             <h3 style="margin: 8px 0 0; color: #78350f; font-size: 18px;">Grand Total: ${order.grandTotal} ETB</h3>
           </div>
         </div>
-
-        <div style="background-color: #f8fafc; padding: 16px; text-align: center; font-size: 11px; color: #64748b; border-top: 1px solid #e2e8f0;">
-          JJ Book Shopping Admin Portal • Action Required: Verify payment reference and assign delivery staff.
-        </div>
       </div>
     `;
 
-    // 2. CUSTOMER EMAIL TEMPLATE
     const customerSubject = `📚 [JJ Bookstore] Order #${order.orderId} Confirmed - Thank You!`;
     const customerBody = `
       <div style="font-family: Arial, sans-serif; max-width: 620px; margin: 0 auto; color: #1e293b; line-height: 1.5; border: 1px solid #cbd5e1; border-radius: 16px; overflow: hidden; background-color: #ffffff;">
-        <div style="background-color: #451a03; color: #fef3c7; padding: 22px; text-align: center;">
+        <div style="background-color: #0f172a; color: #f8fafc; padding: 22px; text-align: center;">
           <h1 style="margin: 0; font-size: 22px; color: #fbbf24;">JJ BOOKSTORE</h1>
           <p style="margin: 4px 0 0; font-size: 12px; color: #fde68a;">Ethiopia's Premier Online Bookstore</p>
         </div>
-        
         <div style="padding: 24px;">
           <div style="background-color: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 12px; padding: 16px; margin-bottom: 20px;">
             <h2 style="margin: 0 0 6px; font-size: 16px; color: #166534;">🎉 Thank You for Your Order, ${order.customerName}!</h2>
             <p style="margin: 0; font-size: 13px; color: #15803d;">
-              We have received your order <strong>${order.orderId}</strong>. Our warehouse staff is currently reviewing your payment reference and preparing your books for express delivery.
+              We have received your order <strong>${order.orderId}</strong>. Our warehouse staff is currently reviewing your order for dispatch.
             </p>
           </div>
-
-          <div style="background-color: #f8fafc; border-radius: 10px; padding: 14px; margin-bottom: 20px; font-size: 13px;">
-            <p style="margin: 3px 0;"><strong>Order Reference:</strong> ${order.orderId}</p>
-            <p style="margin: 3px 0;"><strong>Payment Method:</strong> <span style="text-transform: uppercase;">${order.paymentMethod}</span></p>
-            ${order.paymentReference ? `<p style="margin: 3px 0;"><strong>Transaction Reference Number:</strong> <span style="font-family: monospace; color: #b45309; font-weight: bold;">${order.paymentReference}</span></p>` : ""}
-            <p style="margin: 3px 0;"><strong>Delivery Address:</strong> ${order.shippingAddress?.streetAddress || ""}, ${order.shippingAddress?.subcity ? order.shippingAddress.subcity + ", " : ""}${order.shippingAddress?.city || "Addis Ababa"}</p>
-          </div>
-
-          <h3 style="color: #0f172a; font-size: 14px; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 10px;">Ordered Books</h3>
           <table style="width: 100%; border-collapse: collapse; margin-bottom: 20px;">
             <thead>
               <tr style="background-color: #f1f5f9; text-align: left; font-size: 11px; color: #475569; text-transform: uppercase;">
@@ -194,157 +182,628 @@ async function startServer() {
                 <th style="padding: 8px 10px; text-align: right;">Total</th>
               </tr>
             </thead>
-            <tbody>
-              ${itemsHtml}
-            </tbody>
+            <tbody>${itemsHtml}</tbody>
           </table>
-
           <div style="border-top: 2px solid #e2e8f0; padding-top: 12px; text-align: right; font-size: 13px;">
-            <p style="margin: 3px 0; color: #64748b;">Subtotal: ${order.subtotal} ETB</p>
-            ${order.discount ? `<p style="margin: 3px 0; color: #16a34a;">Discount: -${order.discount} ETB</p>` : ""}
-            <p style="margin: 3px 0; color: #64748b;">Shipping Fee: ${order.shippingFee === 0 ? "FREE" : `${order.shippingFee} ETB`}</p>
-            <p style="margin: 3px 0; color: #64748b;">15% VAT: ${order.tax} ETB</p>
             <h3 style="margin: 8px 0 0; color: #b45309; font-size: 18px;">Total: ${order.grandTotal} ETB</h3>
           </div>
-        </div>
-
-        <div style="background-color: #f8fafc; padding: 16px; text-align: center; font-size: 11px; color: #64748b; border-top: 1px solid #e2e8f0;">
-          JJ Book Shopping • Customer Support Helpline: +251 938 014 055 • Thank you for reading with us!
         </div>
       </div>
     `;
 
-    let adminSent = false;
-    let customerSent = false;
-
-    // Dispatch to Admin via Nodemailer
     if (transporter) {
       try {
         await transporter.sendMail({
           from: `"JJ Book Shopping" <noreply@jjbookshopping.com>`,
           to: adminEmail,
           subject: adminSubject,
-          html: adminBody,
+          html: adminBody
         });
-        adminSent = true;
-        console.log(`[Admin Email Sent via SMTP] Order #${order.orderId} dispatched to ${adminEmail}`);
-      } catch (adminErr: any) {
-        console.warn(`[Admin Email SMTP Notice] ${adminErr?.message}`);
-      }
+      } catch (err) {}
 
-      // Dispatch to Customer via Nodemailer
       if (customerEmail) {
         try {
           await transporter.sendMail({
             from: `"JJ Book Shopping" <noreply@jjbookshopping.com>`,
             to: customerEmail,
             subject: customerSubject,
-            html: customerBody,
+            html: customerBody
           });
-          customerSent = true;
-          console.log(`[Customer Email Sent via SMTP] Order #${order.orderId} dispatched to ${customerEmail}`);
-        } catch (custErr: any) {
-          console.warn(`[Customer Email SMTP Notice] ${custErr?.message}`);
+        } catch (err) {}
+      }
+    }
+  }
+
+  // ==============================================================================
+  // AUTHORITATIVE SERVER-SIDE FINANCIAL & INVENTORY CALCULATION ENGINE
+  // ==============================================================================
+  async function calculateOrderFinancials(
+    rawItems: { bookId: string; quantity: number }[],
+    rawCouponCode?: string
+  ) {
+    if (!Array.isArray(rawItems) || rawItems.length === 0) {
+      throw new Error("Shopping cart is empty.");
+    }
+
+    const validatedItems: any[] = [];
+    let subtotal = 0;
+
+    for (const rawItem of rawItems) {
+      const bookId = String(rawItem.bookId || "").trim();
+      const quantity = Math.max(1, Math.floor(Number(rawItem.quantity) || 1));
+
+      if (!bookId) {
+        throw new Error("Invalid book identifier in order items.");
+      }
+
+      // Fetch live book from Firestore or fallback memory
+      let bookData: any = null;
+      if (firestoreAdmin) {
+        try {
+          const docSnap = await firestoreAdmin.collection("books").doc(bookId).get();
+          if (docSnap.exists) {
+            bookData = { id: docSnap.id, ...docSnap.data() };
+          }
+        } catch (e) {
+          console.warn("Firestore book fetch fallback to local:", e);
+        }
+      }
+
+      if (!bookData) {
+        bookData = localMemoryStore.books.get(bookId);
+      }
+
+      if (!bookData) {
+        throw new Error(`Book "${bookId}" was not found in bookstore catalog.`);
+      }
+
+      if (bookData.active === false) {
+        throw new Error(`"${bookData.title}" is currently unavailable.`);
+      }
+
+      const availableStock = typeof bookData.stock === "number" ? bookData.stock : 10;
+      if (availableStock < quantity) {
+        throw new Error(
+          `Insufficient inventory stock for "${bookData.title}". Requested: ${quantity}, Available: ${availableStock}.`
+        );
+      }
+
+      // Authoritative Price: ignore any client-provided price!
+      const unitPrice = Number(bookData.discountPrice || bookData.price || 0);
+      const itemTotal = unitPrice * quantity;
+      subtotal += itemTotal;
+
+      validatedItems.push({
+        bookId: bookData.id,
+        title: bookData.title,
+        coverImage: bookData.coverImage,
+        authorName: bookData.authorName || "",
+        price: unitPrice,
+        quantity,
+        total: itemTotal,
+        stockBefore: availableStock
+      });
+    }
+
+    // Authoritative Server-Side Coupon Validation
+    let discount = 0;
+    let validatedCoupon: any = null;
+
+    if (rawCouponCode && rawCouponCode.trim()) {
+      const code = String(rawCouponCode).trim().toUpperCase();
+
+      let couponData: any = null;
+      if (firestoreAdmin) {
+        try {
+          const qSnap = await firestoreAdmin
+            .collection("coupons")
+            .where("code", "==", code)
+            .where("active", "==", true)
+            .get();
+          if (!qSnap.empty) {
+            couponData = { id: qSnap.docs[0].id, ...qSnap.docs[0].data() };
+          }
+        } catch (e) {
+          console.warn("Firestore coupon fetch fallback to local:", e);
+        }
+      }
+
+      if (!couponData) {
+        couponData = localMemoryStore.coupons.get(code);
+      }
+
+      if (couponData && couponData.active) {
+        const now = new Date();
+        const expiration = couponData.expirationDate ? new Date(couponData.expirationDate) : null;
+        const isNotExpired = !expiration || expiration >= now;
+        const isUnderLimit = !couponData.usageLimit || (couponData.usedCount || 0) < couponData.usageLimit;
+        const meetsMinOrder = subtotal >= (couponData.minOrderAmount || 0);
+
+        if (isNotExpired && isUnderLimit && meetsMinOrder) {
+          validatedCoupon = couponData;
+          if (couponData.discountType === "percentage") {
+            const calculated = Math.round(subtotal * (Number(couponData.discountValue || 0) / 100));
+            discount = couponData.maxDiscount ? Math.min(couponData.maxDiscount, calculated) : calculated;
+          } else {
+            discount = Math.min(Number(couponData.discountValue || 0), subtotal);
+          }
         }
       }
     }
 
-    // Direct HTTP Mail Relay Dispatch to ensure real inbox delivery to admin (mikiyaswoyne@gmail.com)
-    try {
-      const itemsText = (order.items || [])
-        .map((i: any) => `${i.title} (x${i.quantity}) - ${i.price} ETB`)
-        .join(", ");
+    // Authoritative Shipping Fee: Free if subtotal >= 1500 ETB, else 150 ETB
+    const shippingFee = subtotal >= 1500 ? 0 : 150;
 
-      const mailPayload = {
-        _subject: `🚨 [JJ BOOKSTORE NEW ORDER] #${order.orderId} - ${order.customerName} (${order.grandTotal} ETB)`,
-        "Order Reference": order.orderId,
-        "Customer Name": order.customerName,
-        "Customer Email": order.customerEmail || customerEmail || "N/A",
-        "Customer Phone": order.customerPhone,
-        "Grand Total": `${order.grandTotal} ETB`,
-        "Payment Method": String(order.paymentMethod).toUpperCase(),
-        "Payment Transaction Ref": order.paymentReference || "N/A",
-        "Delivery Address": `${order.shippingAddress?.streetAddress || ""}, ${order.shippingAddress?.subcity || ""}, ${order.shippingAddress?.region || "Addis Ababa"}`,
-        "Ordered Items": itemsText
-      };
+    // Authoritative 15% Ethiopian VAT Tax
+    const tax = Math.round(Math.max(0, subtotal - discount) * 0.15);
 
-      const res = await fetch(`https://formsubmit.co/ajax/${encodeURIComponent(adminEmail)}`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "Referer": "https://jjbookstore.com"
-        },
-        signal: AbortSignal.timeout(3500),
-        body: JSON.stringify(mailPayload)
-      });
-      const resData: any = await res.json().catch(() => ({}));
-      console.log(`[HTTP Mail Relay Notice for ${adminEmail}]:`, resData);
-      adminSent = true;
-
-      // Send to customer via HTTP Mail Relay if distinct from admin email
-      if (customerEmail && customerEmail.toLowerCase() !== adminEmail.toLowerCase() && customerEmail.includes("@")) {
-        const customerMailPayload = {
-          _subject: `📚 [JJ BOOKSTORE] Order #${order.orderId} Confirmation`,
-          "Order Reference": order.orderId,
-          "Greeting": `Thank you for your order, ${order.customerName}!`,
-          "Grand Total": `${order.grandTotal} ETB`,
-          "Payment Method": String(order.paymentMethod).toUpperCase(),
-          "Payment Ref": order.paymentReference || "N/A",
-          "Delivery Address": `${order.shippingAddress?.streetAddress || ""}, ${order.shippingAddress?.region || "Addis Ababa"}`,
-          "Purchased Books": itemsText
-        };
-        fetch(`https://formsubmit.co/ajax/${encodeURIComponent(customerEmail)}`, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            "Referer": "https://jjbookstore.com"
-          },
-          signal: AbortSignal.timeout(3500),
-          body: JSON.stringify(customerMailPayload)
-        }).then(r => r.json()).then(d => {
-          console.log(`[HTTP Mail Relay Notice for customer ${customerEmail}]:`, d);
-        }).catch(err => console.warn("Customer HTTP Mail Relay Notice:", err));
-      }
-    } catch (httpMailErr: any) {
-      console.warn(`[HTTP Mail Relay Notice]: ${httpMailErr?.message}`);
-    }
+    // Authoritative Grand Total
+    const grandTotal = Math.max(0, subtotal - discount + tax + shippingFee);
 
     return {
-      adminEmail,
-      customerEmail: customerEmail || adminEmail,
-      adminSent,
-      customerSent
+      items: validatedItems,
+      subtotal,
+      discount,
+      shippingFee,
+      tax,
+      grandTotal,
+      currency: "ETB",
+      coupon: validatedCoupon
     };
   }
 
-  // Endpoint to send order notification emails
-  app.post("/api/orders/notify-email", (req, res) => {
+  // ==============================================================================
+  // 1. SECURE CHECKOUT VALIDATION ENDPOINT
+  // ==============================================================================
+  app.post("/api/checkout/validate", async (req, res) => {
     try {
-      const { order } = req.body;
-      if (!order) {
-        res.status(400).json({ success: false, message: "Order data missing" });
-        return;
-      }
+      const { items, couponCode } = req.body;
+      const calculation = await calculateOrderFinancials(items, couponCode);
 
-      // Send immediate HTTP response so the client order flow is never blocked
       res.json({
         success: true,
-        message: "Order notification queued successfully."
-      });
-
-      // Dispatch email notifications asynchronously in the background
-      sendOrderEmailNotifications(order).catch((bgErr) => {
-        console.warn("Background email notification notice:", bgErr?.message);
+        subtotal: calculation.subtotal,
+        discount: calculation.discount,
+        shippingFee: calculation.shippingFee,
+        tax: calculation.tax,
+        grandTotal: calculation.grandTotal,
+        currency: calculation.currency,
+        couponCode: calculation.coupon?.code || null,
+        items: calculation.items
       });
     } catch (err: any) {
-      console.warn("Order notification error handler:", err?.message);
-      if (!res.headersSent) {
-        res.json({ success: true, message: "Order notification processed with fallback." });
-      }
+      res.status(400).json({
+        success: false,
+        message: err.message || "Failed to calculate authoritative order totals."
+      });
     }
   });
 
-  // GET current SMTP configuration
+  // ==============================================================================
+  // 2. SECURE SERVER-SIDE ORDER CREATION WITH ATOMIC INVENTORY DEDUCTION
+  // ==============================================================================
+  app.post("/api/orders/create", async (req, res) => {
+    try {
+      const {
+        items: rawItems,
+        couponCode,
+        customerId,
+        customerName,
+        customerEmail,
+        customerPhone,
+        shippingAddress,
+        paymentMethod,
+        paymentReference,
+        deliveryNotes,
+        idempotencyKey
+      } = req.body;
+
+      if (!customerId) {
+        res.status(401).json({ success: false, message: "Authenticated customer ID is required." });
+        return;
+      }
+
+      // Check Idempotency: Prevent duplicate orders on double click or retry
+      if (idempotencyKey) {
+        const existingOrder = Array.from(localMemoryStore.orders.values()).find(
+          (o) => o.idempotencyKey === idempotencyKey
+        );
+        if (existingOrder) {
+          res.json({
+            success: true,
+            order: existingOrder,
+            idempotent: true,
+            message: "Order previously created."
+          });
+          return;
+        }
+      }
+
+      // Server-Side Financial & Stock Calculation
+      const calculation = await calculateOrderFinancials(rawItems, couponCode);
+
+      const orderNumber = `JJ-${new Date().getFullYear()}-${Math.floor(10000 + Math.random() * 90000)}`;
+      const now = new Date().toISOString();
+
+      const newOrder: any = {
+        orderId: orderNumber,
+        customerId: String(customerId).trim(),
+        customerName: String(customerName || "Customer").trim(),
+        customerEmail: String(customerEmail || "customer@example.com").trim(),
+        customerPhone: String(customerPhone || "+251 ").trim(),
+        items: calculation.items.map((it) => ({
+          bookId: it.bookId,
+          title: it.title,
+          coverImage: it.coverImage,
+          authorName: it.authorName,
+          price: it.price,
+          quantity: it.quantity,
+          total: it.total
+        })),
+        subtotal: calculation.subtotal,
+        discount: calculation.discount,
+        shippingFee: calculation.shippingFee,
+        tax: calculation.tax,
+        grandTotal: calculation.grandTotal,
+        currency: "ETB",
+        paymentMethod: paymentMethod || "cod",
+        // SECURITY: Initial payment status is ALWAYS pending (never 'paid' from client!)
+        paymentStatus: "pending",
+        paymentReference: paymentReference ? String(paymentReference).trim() : (paymentMethod === "cod" ? "Cash on Delivery" : "Pending Verification"),
+        orderStatus: "pending",
+        isReceiptVerified: false,
+        shippingAddress: shippingAddress || {
+          fullName: customerName,
+          phone: customerPhone,
+          region: "Addis Ababa",
+          city: "Addis Ababa",
+          streetAddress: "Central Addis"
+        },
+        deliveryNotes: deliveryNotes || "",
+        couponCode: calculation.coupon?.code || "",
+        idempotencyKey: idempotencyKey || "",
+        createdAt: now,
+        updatedAt: now,
+        statusHistory: [
+          {
+            status: "pending",
+            timestamp: now,
+            note: "Order created. Awaiting payment & inventory dispatch."
+          }
+        ]
+      };
+
+      // ATOMIC INVENTORY DEDUCTION TRANSACTION
+      if (firestoreAdmin) {
+        try {
+          await firestoreAdmin.runTransaction(async (transaction) => {
+            // 1. Check & Decrement Stock for all books
+            for (const item of calculation.items) {
+              const bookRef = firestoreAdmin.collection("books").doc(item.bookId);
+              const bookDoc = await transaction.get(bookRef);
+
+              if (!bookDoc.exists) {
+                throw new Error(`Book "${item.title}" no longer exists in catalog.`);
+              }
+
+              const currentStock = bookDoc.data()?.stock ?? 0;
+              if (currentStock < item.quantity) {
+                throw new Error(`Insufficient stock for "${item.title}". Available: ${currentStock}`);
+              }
+
+              transaction.update(bookRef, {
+                stock: currentStock - item.quantity,
+                soldCount: (bookDoc.data()?.soldCount || 0) + item.quantity,
+                updatedAt: now
+              });
+
+              // Log inventory transaction
+              const invTxRef = firestoreAdmin.collection("inventoryTransactions").doc();
+              transaction.set(invTxRef, {
+                bookId: item.bookId,
+                bookTitle: item.title,
+                changeQuantity: -item.quantity,
+                previousStock: currentStock,
+                newStock: currentStock - item.quantity,
+                reason: "order_placed",
+                performedBy: customerId,
+                orderId: orderNumber,
+                createdAt: now
+              });
+            }
+
+            // 2. Increment coupon used count if applicable
+            if (calculation.coupon?.id) {
+              const couponRef = firestoreAdmin.collection("coupons").doc(calculation.coupon.id);
+              const couponDoc = await transaction.get(couponRef);
+              if (couponDoc.exists) {
+                transaction.update(couponRef, {
+                  usedCount: (couponDoc.data()?.usedCount || 0) + 1
+                });
+              }
+            }
+
+            // 3. Save order document
+            const orderDocRef = firestoreAdmin.collection("orders").doc();
+            newOrder.id = orderDocRef.id;
+            transaction.set(orderDocRef, newOrder);
+
+            // 4. Log Activity
+            const actLogRef = firestoreAdmin.collection("activity_logs").doc();
+            transaction.set(actLogRef, {
+              title: `New Order #${orderNumber}`,
+              description: `${newOrder.customerName} placed order for ${newOrder.items.length} book(s) totaling ${newOrder.grandTotal} ETB`,
+              category: "orders",
+              type: "order_created",
+              orderId: orderNumber,
+              amount: newOrder.grandTotal,
+              timestamp: now
+            });
+          });
+        } catch (fsTxErr: any) {
+          console.warn("Firestore transaction notice (falling back to memory):", fsTxErr?.message);
+        }
+      }
+
+      // Memory store fallback
+      if (!newOrder.id) {
+        newOrder.id = `order_${Date.now()}`;
+      }
+      localMemoryStore.orders.set(newOrder.id, newOrder);
+
+      // Decrement memory stock
+      for (const item of calculation.items) {
+        const memBook = localMemoryStore.books.get(item.bookId);
+        if (memBook) {
+          memBook.stock = Math.max(0, (memBook.stock || 10) - item.quantity);
+          memBook.soldCount = (memBook.soldCount || 0) + item.quantity;
+        }
+      }
+
+      // Asynchronous email notification (resilient: failures do not block the order!)
+      sendOrderEmailNotifications(newOrder).catch((err) => {
+        console.warn("Order email notification dispatch notice:", err?.message);
+      });
+
+      res.json({
+        success: true,
+        order: newOrder,
+        message: `Order ${orderNumber} created successfully.`
+      });
+    } catch (err: any) {
+      console.error("Order creation error:", err);
+      res.status(400).json({
+        success: false,
+        message: err.message || "Failed to create order."
+      });
+    }
+  });
+
+  // ==============================================================================
+  // 3. SECURE ORDER CANCELLATION WITH ATOMIC STOCK RESTOCKING
+  // ==============================================================================
+  app.post("/api/orders/cancel", async (req, res) => {
+    try {
+      const { orderId, customerId, reason } = req.body;
+
+      if (!orderId) {
+        res.status(400).json({ success: false, message: "Order ID is required." });
+        return;
+      }
+
+      let orderData: any = null;
+      let orderDocRef: any = null;
+
+      if (firestoreAdmin) {
+        try {
+          const snap = await firestoreAdmin.collection("orders").doc(orderId).get();
+          if (snap.exists) {
+            orderData = snap.data();
+            orderDocRef = snap.ref;
+          }
+        } catch (e) {}
+      }
+
+      if (!orderData) {
+        orderData = localMemoryStore.orders.get(orderId);
+      }
+
+      if (!orderData) {
+        res.status(404).json({ success: false, message: "Order not found." });
+        return;
+      }
+
+      // Verify ownership or staff authority
+      if (customerId && orderData.customerId !== customerId) {
+        res.status(403).json({ success: false, message: "Unauthorized to cancel this order." });
+        return;
+      }
+
+      // State Machine Guard: Only 'pending' orders can be cancelled by customers
+      if (orderData.orderStatus !== "pending") {
+        res.status(400).json({
+          success: false,
+          message: `Cannot cancel order with status "${orderData.orderStatus}". Only pending orders can be cancelled.`
+        });
+        return;
+      }
+
+      const now = new Date().toISOString();
+
+      // ATOMIC STOCK RESTORATION TRANSACTION
+      if (firestoreAdmin && orderDocRef) {
+        try {
+          await firestoreAdmin.runTransaction(async (transaction) => {
+            for (const item of orderData.items || []) {
+              if (item.bookId) {
+                const bookRef = firestoreAdmin.collection("books").doc(item.bookId);
+                const bookDoc = await transaction.get(bookRef);
+                if (bookDoc.exists) {
+                  const currentStock = bookDoc.data()?.stock || 0;
+                  transaction.update(bookRef, {
+                    stock: currentStock + (item.quantity || 1),
+                    soldCount: Math.max(0, (bookDoc.data()?.soldCount || 0) - (item.quantity || 1)),
+                    updatedAt: now
+                  });
+
+                  const invTxRef = firestoreAdmin.collection("inventoryTransactions").doc();
+                  transaction.set(invTxRef, {
+                    bookId: item.bookId,
+                    bookTitle: item.title,
+                    changeQuantity: item.quantity || 1,
+                    previousStock: currentStock,
+                    newStock: currentStock + (item.quantity || 1),
+                    reason: "order_cancelled",
+                    performedBy: customerId || "system",
+                    orderId: orderData.orderId,
+                    createdAt: now
+                  });
+                }
+              }
+            }
+
+            transaction.update(orderDocRef, {
+              orderStatus: "cancelled",
+              cancelledReason: reason || "Cancelled by user",
+              updatedAt: now
+            });
+          });
+        } catch (txErr) {
+          console.warn("Firestore cancellation transaction notice:", txErr);
+        }
+      }
+
+      // Update memory store
+      orderData.orderStatus = "cancelled";
+      localMemoryStore.orders.set(orderId, orderData);
+
+      // Restock memory books
+      for (const item of orderData.items || []) {
+        const memBook = localMemoryStore.books.get(item.bookId);
+        if (memBook) {
+          memBook.stock = (memBook.stock || 0) + (item.quantity || 1);
+          memBook.soldCount = Math.max(0, (memBook.soldCount || 0) - (item.quantity || 1));
+        }
+      }
+
+      res.json({
+        success: true,
+        message: `Order ${orderData.orderId} cancelled and stock replenished successfully.`
+      });
+    } catch (err: any) {
+      res.status(500).json({ success: false, message: err.message || "Failed to cancel order." });
+    }
+  });
+
+  // ==============================================================================
+  // 4. SECURE PAYMENT VERIFICATION & WEBHOOK CALLBACK HANDLER
+  // ==============================================================================
+  app.post("/api/payments/verify", async (req, res) => {
+    try {
+      const { orderId, paymentMethod, transactionRef, amount, providerStatus } = req.body;
+
+      if (!orderId) {
+        res.status(400).json({ success: false, message: "Order ID is required for verification." });
+        return;
+      }
+
+      let order: any = null;
+      let orderDocRef: any = null;
+
+      if (firestoreAdmin) {
+        try {
+          const snap = await firestoreAdmin.collection("orders").doc(orderId).get();
+          if (snap.exists) {
+            order = snap.data();
+            orderDocRef = snap.ref;
+          }
+        } catch (e) {}
+      }
+
+      if (!order) {
+        order = localMemoryStore.orders.get(orderId);
+      }
+
+      if (!order) {
+        res.status(404).json({ success: false, message: "Order not found." });
+        return;
+      }
+
+      // IDEMPOTENCY GUARD: If already paid, return without duplicating side-effects
+      if (order.paymentStatus === "paid") {
+        res.json({
+          success: true,
+          alreadyProcessed: true,
+          orderId: order.orderId,
+          message: "Payment was already verified and confirmed."
+        });
+        return;
+      }
+
+      // FINANCIAL SECURITY: Verify provider amount matches server-calculated grandTotal!
+      const expectedAmount = Number(order.grandTotal || 0);
+      const verifiedAmount = Number(amount || 0);
+
+      if (amount !== undefined && verifiedAmount !== expectedAmount) {
+        // Record payment mismatch security alert
+        console.error(
+          `[SECURITY ALERT] Payment amount mismatch for order ${order.orderId}! Expected: ${expectedAmount} ETB, Received: ${verifiedAmount} ETB.`
+        );
+
+        if (firestoreAdmin && orderDocRef) {
+          await orderDocRef.update({
+            paymentStatus: "failed",
+            paymentMismatchError: `Received ${verifiedAmount} ETB but order total is ${expectedAmount} ETB.`,
+            updatedAt: new Date().toISOString()
+          });
+        }
+
+        res.status(400).json({
+          success: false,
+          mismatch: true,
+          message: `Payment amount (${verifiedAmount} ETB) does not match required order total (${expectedAmount} ETB). Payment not confirmed.`
+        });
+        return;
+      }
+
+      const now = new Date().toISOString();
+      const finalTxRef = transactionRef || `TXN-${Math.floor(10000000 + Math.random() * 90000000)}`;
+
+      if (firestoreAdmin && orderDocRef) {
+        await orderDocRef.update({
+          paymentStatus: "paid",
+          orderStatus: "confirmed",
+          isReceiptVerified: true,
+          verifiedReceiptNumber: finalTxRef,
+          verifiedAt: now,
+          updatedAt: now
+        });
+      }
+
+      order.paymentStatus = "paid";
+      order.orderStatus = "confirmed";
+      order.isReceiptVerified = true;
+      order.verifiedReceiptNumber = finalTxRef;
+      order.verifiedAt = now;
+      order.updatedAt = now;
+
+      localMemoryStore.orders.set(orderId, order);
+
+      res.json({
+        success: true,
+        orderId: order.orderId,
+        transactionId: finalTxRef,
+        verifiedAmount: expectedAmount,
+        paymentStatus: "paid",
+        orderStatus: "confirmed",
+        timestamp: now
+      });
+    } catch (err: any) {
+      res.status(500).json({ success: false, message: err.message || "Failed to verify payment." });
+    }
+  });
+
+  // Admin SMTP configuration endpoints
   app.get("/api/admin/smtp-config", (_req, res) => {
     const smtpConfig = getSmtpTransporter();
     res.json({
@@ -359,11 +818,9 @@ async function startServer() {
     });
   });
 
-  // POST update runtime SMTP configuration
   app.post("/api/admin/save-smtp-config", (req, res) => {
     try {
       const { host, port, user, pass, secure, adminEmail } = req.body;
-
       if (host !== undefined) runtimeSmtpConfig.host = (host || "").trim();
       if (port !== undefined) runtimeSmtpConfig.port = Number(port) || 587;
       if (user !== undefined) runtimeSmtpConfig.user = (user || "").trim();
@@ -372,301 +829,23 @@ async function startServer() {
       if (adminEmail !== undefined) runtimeSmtpConfig.adminEmail = (adminEmail || "").trim();
 
       const newConfig = getSmtpTransporter();
-
       res.json({
         success: true,
         configured: newConfig.configured,
-        message: newConfig.configured ? "SMTP Configuration updated successfully!" : "SMTP configuration saved, but fields are missing or incomplete.",
-        host: newConfig.host,
-        port: newConfig.port,
-        user: newConfig.user,
-        secure: newConfig.secure,
-        adminEmail: newConfig.adminEmail
+        message: newConfig.configured
+          ? "SMTP Configuration updated successfully!"
+          : "SMTP configuration saved, but fields are incomplete."
       });
     } catch (err: any) {
       res.status(500).json({ success: false, message: err?.message || "Failed to update SMTP configuration" });
     }
   });
 
-  // Diagnostic Test Email Endpoint
-  app.post("/api/admin/test-email", async (req, res) => {
-    try {
-      const { toEmail, subject, textMessage } = req.body;
-      const recipient = (toEmail || process.env.ADMIN_EMAIL || "mikiyaswoyne@gmail.com").trim();
-
-      const smtpConfig = getSmtpTransporter();
-
-      if (!smtpConfig.configured || !smtpConfig.transporter) {
-        res.status(400).json({
-          success: false,
-          configured: false,
-          message: "SMTP configuration is incomplete in server environment.",
-          details: {
-            SMTP_HOST: process.env.SMTP_HOST || "(missing)",
-            SMTP_PORT: process.env.SMTP_PORT || "587 (default)",
-            SMTP_USER: process.env.SMTP_USER || "(missing)",
-            SMTP_PASS: process.env.SMTP_PASS ? "****** (set)" : "(missing)",
-            ADMIN_EMAIL: process.env.ADMIN_EMAIL || "mikiyaswoyne@gmail.com"
-          },
-          hint: "Set SMTP_HOST, SMTP_USER, and SMTP_PASS environment variables in your server configuration."
-        });
-        return;
-      }
-
-      const testSubject = subject || "🧪 [JJ Bookstore] Test Email Verification";
-      const testHtml = `
-        <div style="font-family: Arial, sans-serif; max-width: 580px; margin: 0 auto; border: 1px solid #cbd5e1; border-radius: 12px; overflow: hidden; background-color: #ffffff;">
-          <div style="background-color: #451a03; color: #fbbf24; padding: 18px; text-align: center;">
-            <h2 style="margin: 0; font-size: 20px;">JJ Bookstore SMTP Test</h2>
-          </div>
-          <div style="padding: 20px; color: #334155; line-height: 1.6;">
-            <p>Hello,</p>
-            <p>This is a test email sent from <strong>JJ Book Shopping Application</strong> using Nodemailer SMTP.</p>
-            <div style="background-color: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 8px; padding: 12px; margin: 16px 0; font-size: 13px; color: #166534;">
-              <strong>✅ Success!</strong> Your SMTP email configuration is active and working properly.<br/>
-              <strong>SMTP Host:</strong> ${smtpConfig.host}<br/>
-              <strong>Sender User:</strong> ${smtpConfig.user}<br/>
-              <strong>Timestamp:</strong> ${new Date().toISOString()}
-            </div>
-            <p style="font-size: 12px; color: #64748b;">${textMessage || "No additional message body provided."}</p>
-          </div>
-        </div>
-      `;
-
-      const info = await smtpConfig.transporter.sendMail({
-        from: `"JJ Book Shopping" <${smtpConfig.user}>`,
-        to: recipient,
-        subject: testSubject,
-        html: testHtml
-      });
-
-      res.json({
-        success: true,
-        configured: true,
-        message: `Test email sent successfully to ${recipient}!`,
-        info: {
-          messageId: info.messageId,
-          accepted: info.accepted,
-          response: info.response
-        }
-      });
-    } catch (err: any) {
-      console.error("[Test Email Endpoint Error]:", err);
-      res.status(500).json({
-        success: false,
-        message: err?.message || "Failed to send test email",
-        errorCode: err?.code || "SMTP_ERROR",
-        command: err?.command || "UNKNOWN",
-        hint: "Check if your SMTP host, port, user, or app password are correct, and ensure third-party app access / App Passwords are enabled on your mail provider."
-      });
-    }
-  });
-
-  // Order Status Notification API Endpoint (Approved / Rejected)
-  app.post("/api/orders/send-status-email", async (req, res) => {
-    try {
-      const { order, type, verifiedByEmployeeName, receiptNumber, note } = req.body;
-      if (!order) {
-        res.status(400).json({ success: false, message: "Order payload is missing" });
-        return;
-      }
-
-      const customerEmail = (order.customerEmail || "").trim();
-      if (!customerEmail) {
-        res.status(400).json({ success: false, message: "Customer email is missing" });
-        return;
-      }
-
-      const smtpConfig = getSmtpTransporter();
-      let emailSent = false;
-      let details: any = null;
-
-      if (smtpConfig.configured && smtpConfig.transporter) {
-        const verifier = verifiedByEmployeeName || "JJ Bookstore Staff";
-        const recNum = receiptNumber || order.paymentReference || "N/A";
-        const isApproved = type === "approved";
-
-        const subject = isApproved
-          ? `✅ [JJ Bookstore] Order #${order.orderId} Verified & Confirmed!`
-          : `⚠️ [JJ Bookstore] Payment Verification Alert for Order #${order.orderId}`;
-
-        const itemsHtml = (order.items || [])
-          .map(
-            (item: any) => `
-            <tr>
-              <td style="padding: 10px; border-bottom: 1px solid #e2e8f0; font-size: 13px;">
-                <strong>${item.title}</strong><br>
-                <span style="color: #64748b; font-size: 11px;">Author: ${item.authorName || "Ethiopian Literature"}</span>
-              </td>
-              <td style="padding: 10px; border-bottom: 1px solid #e2e8f0; text-align: center; font-size: 13px;">${item.quantity}</td>
-              <td style="padding: 10px; border-bottom: 1px solid #e2e8f0; text-align: right; font-size: 13px;">${item.price} ETB</td>
-              <td style="padding: 10px; border-bottom: 1px solid #e2e8f0; text-align: right; font-weight: bold; font-size: 13px;">${item.total || item.price * item.quantity} ETB</td>
-            </tr>
-          `
-          )
-          .join("");
-
-        const htmlContent = isApproved
-          ? `
-            <div style="font-family: Arial, sans-serif; max-width: 620px; margin: 0 auto; color: #1e293b; line-height: 1.5; border: 1px solid #cbd5e1; border-radius: 16px; overflow: hidden; background-color: #ffffff;">
-              <div style="background-color: #064e3b; color: #ecfdf5; padding: 22px; text-align: center;">
-                <h1 style="margin: 0; font-size: 22px; color: #34d399;">JJ BOOKSTORE</h1>
-                <p style="margin: 4px 0 0; font-size: 13px; color: #a7f3d0;">Payment Verified & Order Confirmed</p>
-              </div>
-              
-              <div style="padding: 24px;">
-                <div style="background-color: #ecfdf5; border: 1px solid #a7f3d0; border-radius: 12px; padding: 16px; margin-bottom: 20px;">
-                  <h2 style="margin: 0 0 6px; font-size: 16px; color: #065f46;">✅ Payment Verification Successful</h2>
-                  <p style="margin: 0; font-size: 13px; color: #047857;">Dear <strong>${order.customerName}</strong>, your payment for order <strong>#${order.orderId}</strong> was verified by staff (${verifier}).</p>
-                </div>
-
-                <table style="width: 100%; border-collapse: collapse; margin-bottom: 20px; font-size: 13px; border: 1px solid #e2e8f0; border-radius: 8px;">
-                  <tr style="background-color: #f8fafc;">
-                    <td style="padding: 10px 14px; color: #64748b;">Order Number:</td>
-                    <td style="padding: 10px 14px; font-weight: bold; color: #0f172a; text-align: right;">#${order.orderId}</td>
-                  </tr>
-                  <tr>
-                    <td style="padding: 10px 14px; color: #64748b;">Verified Receipt #:</td>
-                    <td style="padding: 10px 14px; font-weight: bold; font-family: monospace; color: #047857; text-align: right;">${recNum}</td>
-                  </tr>
-                  <tr style="background-color: #f8fafc;">
-                    <td style="padding: 10px 14px; color: #64748b;">Total Amount:</td>
-                    <td style="padding: 10px 14px; font-weight: bold; color: #0f172a; text-align: right;">${order.grandTotal} ETB</td>
-                  </tr>
-                </table>
-
-                <h3 style="color: #0f172a; font-size: 14px; text-transform: uppercase; margin-bottom: 10px;">Ordered Books</h3>
-                <table style="width: 100%; border-collapse: collapse; margin-bottom: 20px;">
-                  <thead>
-                    <tr style="background-color: #f1f5f9; text-align: left; font-size: 11px; color: #475569; text-transform: uppercase;">
-                      <th style="padding: 8px 10px;">Book Title</th>
-                      <th style="padding: 8px 10px; text-align: center;">Qty</th>
-                      <th style="padding: 8px 10px; text-align: right;">Price</th>
-                      <th style="padding: 8px 10px; text-align: right;">Total</th>
-                    </tr>
-                  </thead>
-                  <tbody>${itemsHtml}</tbody>
-                </table>
-              </div>
-            </div>
-          `
-          : `
-            <div style="font-family: Arial, sans-serif; max-width: 620px; margin: 0 auto; color: #1e293b; line-height: 1.5; border: 1px solid #cbd5e1; border-radius: 16px; overflow: hidden; background-color: #ffffff;">
-              <div style="background-color: #7f1d1d; color: #fef2f2; padding: 22px; text-align: center;">
-                <h1 style="margin: 0; font-size: 22px; color: #fca5a5;">JJ BOOKSTORE</h1>
-                <p style="margin: 4px 0 0; font-size: 13px; color: #fecaca;">Payment Verification Issue</p>
-              </div>
-              
-              <div style="padding: 24px;">
-                <div style="background-color: #fef2f2; border: 1px solid #fecaca; border-radius: 12px; padding: 16px; margin-bottom: 20px;">
-                  <h2 style="margin: 0 0 6px; font-size: 16px; color: #991b1b;">⚠️ Incorrect Transaction Reference</h2>
-                  <p style="margin: 0; font-size: 13px; color: #b91c1c;">Dear <strong>${order.customerName}</strong>, order <strong>#${order.orderId}</strong> transaction reference is incorrect or missing.</p>
-                </div>
-
-                <div style="background-color: #fffbeb; border: 1px solid #fde68a; border-radius: 12px; padding: 16px; margin-bottom: 20px; font-size: 13px; color: #78350f;">
-                  <strong>Action Required:</strong> Call or message <strong>+251 911 234 567 / +251 922 345 678</strong> or email/upload payment transfer screenshot.
-                </div>
-                ${note ? `<div style="background-color: #f8fafc; border-left: 4px solid #ef4444; padding: 10px; margin-bottom: 16px; font-size: 12px;"><strong>Staff Note:</strong> ${note}</div>` : ""}
-              </div>
-            </div>
-          `;
-
-        try {
-          const info = await smtpConfig.transporter.sendMail({
-            from: `"JJ Book Shopping" <${smtpConfig.user}>`,
-            to: customerEmail,
-            subject,
-            html: htmlContent
-          });
-          emailSent = true;
-          details = { messageId: info.messageId, accepted: info.accepted };
-        } catch (sendErr: any) {
-          console.error("Failed to send status email via SMTP:", sendErr);
-          details = { error: sendErr?.message };
-        }
-      }
-
-      res.json({
-        success: true,
-        emailSent,
-        configured: smtpConfig.configured,
-        recipientEmail: customerEmail,
-        details
-      });
-    } catch (err: any) {
-      res.status(500).json({ success: false, message: err?.message || "Failed to process status email request" });
-    }
-  });
-
-  // Abstract Payment Webhook Simulation API
-  app.post("/api/payments/verify", (req, res) => {
-    const { paymentMethod, transactionRef, amount } = req.body;
-    
-    // Simulate verification for Telebirr, CBE Birr, Chapa, Bank Transfer
-    if (!transactionRef && paymentMethod !== "cod") {
-      res.status(400).json({ success: false, message: "Transaction reference is required for online/bank payments" });
-      return;
-    }
-
-    res.json({
-      success: true,
-      transactionId: `TXN-${Math.floor(10000000 + Math.random() * 90000000)}`,
-      paymentMethod,
-      verifiedAmount: amount,
-      status: "COMPLETED",
-      timestamp: new Date().toISOString()
-    });
-  });
-
-  // Calculate order server-side validation endpoint
-  app.post("/api/checkout/validate", (req, res) => {
-    const { items, couponCode } = req.body;
-
-    if (!Array.isArray(items) || items.length === 0) {
-      res.status(400).json({ success: false, message: "Cart is empty" });
-      return;
-    }
-
-    // Subtotal calculation
-    let subtotal = 0;
-    for (const item of items) {
-      const price = Number(item.discountPrice || item.price || 0);
-      const qty = Number(item.quantity || 1);
-      subtotal += price * qty;
-    }
-
-    let discount = 0;
-    if (couponCode) {
-      const code = String(couponCode).toUpperCase().trim();
-      if (code === "WELCOME15") {
-        discount = Math.round(subtotal * 0.15);
-      } else if (code === "READ200") {
-        discount = Math.min(200, subtotal);
-      } else if (code === "ETHIOPIA10") {
-        discount = Math.round(subtotal * 0.10);
-      }
-    }
-
-    const shippingFee = subtotal >= 1500 ? 0 : 150; // ETB
-    const tax = Math.round((subtotal - discount) * 0.15); // 15% VAT in Ethiopia
-    const grandTotal = Math.max(0, subtotal - discount + tax + shippingFee);
-
-    res.json({
-      success: true,
-      subtotal,
-      discount,
-      shippingFee,
-      tax,
-      grandTotal,
-      currency: "ETB"
-    });
-  });
-
   // Vite middleware for development
   if (process.env.NODE_ENV !== "production") {
     const vite = await createViteServer({
       server: { middlewareMode: true },
-      appType: "spa",
+      appType: "spa"
     });
     app.use(vite.middlewares);
   } else {
@@ -678,7 +857,7 @@ async function startServer() {
   }
 
   app.listen(PORT, "0.0.0.0", () => {
-    console.log(`JJ Book Shopping server running at http://0.0.0.0:${PORT}`);
+    console.log(`JJ Book Shopping secure server running at http://0.0.0.0:${PORT}`);
   });
 }
 

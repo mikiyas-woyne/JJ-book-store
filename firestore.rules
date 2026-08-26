@@ -69,14 +69,11 @@ service cloud.firestore {
     // 1. USERS & PROFILES
     // ===============================================================
     match /users/{userId} {
-      // Owner, Admin, or Employee fulfilling orders can view user profile
       allow read: if isOwner(userId) || isEmployee();
 
-      // Normal users can only register themselves with 'customer' role
       allow create: if (isOwner(userId) && (!('role' in request.resource.data) || request.resource.data.role == 'customer'))
                     || isAdmin();
 
-      // Normal users can update profile info, but CANNOT alter role, status, permissions, or assignedRoles
       allow update: if (isOwner(userId)
                         && request.resource.data.role == resource.data.role
                         && request.resource.data.status == resource.data.status
@@ -84,7 +81,6 @@ service cloud.firestore {
                         && (!('assignedRoles' in request.resource.data) || request.resource.data.assignedRoles == resource.data.assignedRoles))
                     || isAdmin();
 
-      // Only admins can delete user records
       allow delete: if isAdmin();
     }
 
@@ -92,13 +88,8 @@ service cloud.firestore {
     // 2. EMPLOYEES & STAFF DIRECTORY
     // ===============================================================
     match /employees/{employeeId} {
-      // Employees and Admins can view staff directory
       allow read: if isEmployee();
-
-      // Only Admins can create or remove employees
       allow create, delete: if isAdmin();
-
-      // Admins have full update rights; Staff can update own performance counters or phone
       allow update: if isAdmin()
                     || (isEmployee() && (resource.data.uid == request.auth.uid || employeeId == request.auth.uid)
                         && request.resource.data.role == resource.data.role
@@ -111,13 +102,8 @@ service cloud.firestore {
     // 3. BOOK CATALOG
     // ===============================================================
     match /books/{bookId} {
-      // Public visitors can browse the book catalog
       allow read: if true;
-
-      // Only Admins can add or delete books
       allow create, delete: if isAdmin();
-
-      // Admins can update all fields; Employees can update stock/inventory counters
       allow update: if isAdmin() || isEmployee();
     }
 
@@ -138,10 +124,7 @@ service cloud.firestore {
     // 5. COUPONS & PROMOTIONS
     // ===============================================================
     match /coupons/{couponId} {
-      // Coupons are publicly readable so visitors can validate codes during checkout
       allow read: if true;
-
-      // Only Admins can create, modify, or delete discount coupons
       allow write: if isAdmin();
     }
 
@@ -157,37 +140,52 @@ service cloud.firestore {
     }
 
     // ===============================================================
-    // 7. ORDERS & CHECKOUT
+    // 7. ORDERS & CHECKOUT (FINANCIAL & STATUS SECURITY ENFORCED)
     // ===============================================================
     match /orders/{orderId} {
-      // Customers can read their own orders; Staff and Admins can read orders; Assigned drivers can read their assigned orders
+      // Read access: Staff/Admin, Order Owner, or Assigned Driver
       allow read: if isEmployee()
                   || (isSignedIn() && resource.data.customerId == request.auth.uid)
                   || (isDeliveryStaff() && ('assignedDeliveryDriverId' in resource.data && resource.data.assignedDeliveryDriverId == request.auth.uid));
 
-      // Authenticated customers can create orders for themselves with pending status
-      allow create: if (isSignedIn() && request.resource.data.customerId == request.auth.uid && request.resource.data.orderStatus == 'pending')
+      // Order creation: Only pending orders with pending payment status can be created
+      allow create: if (isSignedIn()
+                        && request.resource.data.customerId == request.auth.uid
+                        && request.resource.data.orderStatus == 'pending'
+                        && (!('paymentStatus' in request.resource.data) || request.resource.data.paymentStatus == 'pending')
+                        && (!('isReceiptVerified' in request.resource.data) || request.resource.data.isReceiptVerified != true))
                     || isAdmin();
 
-      // Update rules:
-      // - Admins have full management
-      // - Employees can process workflow steps, verify payments, pack, and assign drivers
-      // - Delivery drivers can update delivery status for their assigned orders
-      // - Customers can ONLY cancel their own pending order
+      // Order updates: Strict field immutability for financials & statuses
       allow update: if isAdmin()
-                    || isEmployee()
+                    // Employees can update workflow statuses & verification, but CANNOT alter financial amounts
+                    || (isEmployee()
+                        && request.resource.data.customerId == resource.data.customerId
+                        && request.resource.data.grandTotal == resource.data.grandTotal
+                        && request.resource.data.subtotal == resource.data.subtotal
+                        && request.resource.data.items == resource.data.items)
+                    // Delivery staff can update delivery progression for assigned orders
                     || (isDeliveryStaff()
                         && 'assignedDeliveryDriverId' in resource.data
                         && resource.data.assignedDeliveryDriverId == request.auth.uid
                         && request.resource.data.customerId == resource.data.customerId
-                        && request.resource.data.grandTotal == resource.data.grandTotal)
+                        && request.resource.data.grandTotal == resource.data.grandTotal
+                        && request.resource.data.subtotal == resource.data.subtotal)
+                    // Customer can ONLY cancel own pending order; financial & payment fields are immutable
                     || (isOwner(resource.data.customerId)
                         && resource.data.orderStatus == 'pending'
                         && request.resource.data.orderStatus == 'cancelled'
                         && request.resource.data.customerId == resource.data.customerId
-                        && request.resource.data.grandTotal == resource.data.grandTotal);
+                        && request.resource.data.grandTotal == resource.data.grandTotal
+                        && request.resource.data.subtotal == resource.data.subtotal
+                        && request.resource.data.discount == resource.data.discount
+                        && request.resource.data.tax == resource.data.tax
+                        && request.resource.data.shippingFee == resource.data.shippingFee
+                        && request.resource.data.paymentStatus == resource.data.paymentStatus
+                        && request.resource.data.paymentReference == resource.data.paymentReference
+                        && (!('isReceiptVerified' in resource.data) || request.resource.data.isReceiptVerified == resource.data.isReceiptVerified));
 
-      // Only Admins can delete order documents
+      // Only Admins can delete order records
       allow delete: if isAdmin();
     }
 
@@ -196,16 +194,11 @@ service cloud.firestore {
     // ===============================================================
     match /reviews/{reviewId} {
       allow read: if true;
-
-      // Customers can write reviews for themselves with a valid rating score (1-5)
       allow create: if isSignedIn()
                     && request.resource.data.userId == request.auth.uid
                     && request.resource.data.rating >= 1
                     && request.resource.data.rating <= 5;
-
-      // Authors can update or delete their own review; Admins can moderate any review
-      allow update, delete: if (isSignedIn() && resource.data.userId == request.auth.uid)
-                            || isAdmin();
+      allow update, delete: if (isSignedIn() && resource.data.userId == request.auth.uid) || isAdmin();
     }
 
     // ===============================================================
@@ -222,8 +215,7 @@ service cloud.firestore {
     // 10. INVENTORY AUDIT TRANSACTIONS
     // ===============================================================
     match /inventoryTransactions/{txId} {
-      allow read: if isEmployee();
-      allow create: if isEmployee();
+      allow read, create: if isEmployee();
       allow update, delete: if isAdmin();
     }
 
@@ -231,15 +223,9 @@ service cloud.firestore {
     // 11. DELIVERY ASSIGNMENTS & HANDOFFS
     // ===============================================================
     match /deliveryAssignments/{assignmentId} {
-      allow read: if isEmployee()
-                  || (isDeliveryStaff() && resource.data.deliveryEmployeeId == request.auth.uid);
-
+      allow read: if isEmployee() || (isDeliveryStaff() && resource.data.deliveryEmployeeId == request.auth.uid);
       allow create: if isEmployee();
-
-      allow update: if isAdmin()
-                    || isEmployee()
-                    || (isDeliveryStaff() && resource.data.deliveryEmployeeId == request.auth.uid);
-
+      allow update: if isAdmin() || isEmployee() || (isDeliveryStaff() && resource.data.deliveryEmployeeId == request.auth.uid);
       allow delete: if isAdmin();
     }
 
@@ -270,8 +256,7 @@ service cloud.firestore {
     // 13. ACTIVITY LOGS & AUDIT TRAILS
     // ===============================================================
     match /employeeActivityLogs/{logId} {
-      allow read: if isEmployee();
-      allow create: if isEmployee();
+      allow read, create: if isEmployee();
       allow update, delete: if isAdmin();
     }
 
@@ -282,8 +267,7 @@ service cloud.firestore {
     }
 
     match /emailNotifications/{emailLogId} {
-      allow read: if isAdmin()
-                  || (isSignedIn() && 'recipientEmail' in resource.data && resource.data.recipientEmail == request.auth.token.email);
+      allow read: if isAdmin() || (isSignedIn() && 'recipientEmail' in resource.data && resource.data.recipientEmail == request.auth.token.email);
       allow create: if isEmployee();
       allow update, delete: if isAdmin();
     }
@@ -292,7 +276,6 @@ service cloud.firestore {
     // 14. STORE SETTINGS & CREDENTIALS
     // ===============================================================
     match /settings/{settingId} {
-      // Sensitive admin credentials can only be read/written by Admins
       allow read: if (settingId != 'admin_credentials' && settingId != 'secrets') || isAdmin();
       allow write: if isAdmin();
     }
