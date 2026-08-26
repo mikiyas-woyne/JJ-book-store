@@ -1,413 +1,375 @@
-import { doc, collection, addDoc } from "firebase/firestore";
-import { db, cleanFirestoreData } from "./firebase";
-import { Order, EmailNotificationLog } from "../types";
+import { Book } from "../types";
 
-/**
- * Generates styled HTML email templates for JJ Bookstore order verifications.
- */
-export function generateOrderApprovalEmailHtml(
-  order: Order,
-  verifiedByEmployeeName: string,
-  receiptNumber: string,
-  note?: string
-): { subject: string; htmlBody: string } {
-  const subject = `✅ [JJ Bookstore] Order #${order.orderId} Verified & Approved!`;
-  
-  const itemsHtml = order.items
-    .map(
-      (item) => `
-        <tr>
-          <td style="padding: 10px; border-bottom: 1px solid #e2e8f0; font-size: 13px; color: #1e293b;">
-            <strong>${item.title}</strong><br/>
-            <span style="font-size: 11px; color: #64748b;">Author: ${item.authorName}</span>
-          </td>
-          <td style="padding: 10px; border-bottom: 1px solid #e2e8f0; font-size: 13px; text-align: center; color: #1e293b;">
-            ${item.quantity}
-          </td>
-          <td style="padding: 10px; border-bottom: 1px solid #e2e8f0; font-size: 13px; text-align: right; color: #1e293b; font-weight: bold;">
-            ${item.total || item.price * item.quantity} ETB
-          </td>
-        </tr>
-      `
-    )
-    .join("");
-
-  const htmlBody = `
-    <!DOCTYPE html>
-    <html>
-    <head>
-      <meta charset="utf-8"/>
-      <title>Order Verified</title>
-    </head>
-    <body style="font-family: Arial, sans-serif; background-color: #f8fafc; margin: 0; padding: 20px; color: #334155;">
-      <div style="max-width: 600px; margin: 0 auto; background-color: #ffffff; border-radius: 16px; overflow: hidden; box-shadow: 0 4px 20px rgba(0,0,0,0.08); border: 1px solid #e2e8f0;">
-        
-        <!-- Header -->
-        <div style="background-color: #451a03; padding: 24px; text-align: center; color: #ffffff;">
-          <h1 style="margin: 0; font-size: 22px; font-weight: bold; color: #fbbf24;">JJ BOOKSTORE</h1>
-          <p style="margin: 4px 0 0; font-size: 12px; color: #fde68a; letter-spacing: 1px;">ETHIOPIA'S PREMIER ONLINE BOOKSTORE</p>
-        </div>
-
-        <!-- Body Content -->
-        <div style="padding: 24px;">
-          <div style="background-color: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 12px; padding: 16px; margin-bottom: 20px;">
-            <h2 style="margin: 0 0 6px; font-size: 16px; color: #166534; font-weight: bold;">
-              🎉 Payment Verified & Order Confirmed!
-            </h2>
-            <p style="margin: 0; font-size: 13px; color: #15803d; line-height: 1.5;">
-              Dear <strong>${order.customerName}</strong>, your order <strong>${order.orderId}</strong> payment receipt has been successfully verified by our staff (${verifiedByEmployeeName}). Your books are now being packed for delivery.
-            </p>
-          </div>
-
-          <!-- Order Summary Details -->
-          <table style="width: 100%; border-collapse: collapse; margin-bottom: 20px; background-color: #f8fafc; border-radius: 8px; font-size: 13px;">
-            <tr>
-              <td style="padding: 10px 14px; color: #64748b;">Order Number:</td>
-              <td style="padding: 10px 14px; font-weight: bold; color: #0f172a; text-align: right;">${order.orderId}</td>
-            </tr>
-            <tr>
-              <td style="padding: 10px 14px; color: #64748b;">Verified Receipt #:</td>
-              <td style="padding: 10px 14px; font-weight: bold; color: #d97706; text-align: right;">${receiptNumber}</td>
-            </tr>
-            <tr>
-              <td style="padding: 10px 14px; color: #64748b;">Payment Method:</td>
-              <td style="padding: 10px 14px; font-weight: bold; color: #0f172a; text-align: right; text-transform: uppercase;">${order.paymentMethod}</td>
-            </tr>
-            <tr>
-              <td style="padding: 10px 14px; color: #64748b;">Verified By Staff:</td>
-              <td style="padding: 10px 14px; font-weight: bold; color: #0f172a; text-align: right;">${verifiedByEmployeeName}</td>
-            </tr>
-            ${note ? `
-            <tr>
-              <td style="padding: 10px 14px; color: #64748b;">Staff Verification Note:</td>
-              <td style="padding: 10px 14px; font-style: italic; color: #334155; text-align: right;">"${note}"</td>
-            </tr>
-            ` : ""}
-          </table>
-
-          <!-- Items Table -->
-          <h3 style="font-size: 14px; margin: 0 0 10px; color: #0f172a; text-transform: uppercase; letter-spacing: 0.5px;">Ordered Books</h3>
-          <table style="width: 100%; border-collapse: collapse; margin-bottom: 20px;">
-            <thead>
-              <tr style="background-color: #f1f5f9; text-align: left; font-size: 11px; color: #475569; text-transform: uppercase;">
-                <th style="padding: 8px 10px;">Item</th>
-                <th style="padding: 8px 10px; text-align: center;">Qty</th>
-                <th style="padding: 8px 10px; text-align: right;">Subtotal</th>
-              </tr>
-            </thead>
-            <tbody>
-              ${itemsHtml}
-            </tbody>
-            <tfoot>
-              <tr>
-                <td colspan="2" style="padding: 12px 10px; font-size: 14px; font-weight: bold; color: #0f172a; text-align: right;">Grand Total:</td>
-                <td style="padding: 12px 10px; font-size: 16px; font-weight: font-extrabold; color: #b45309; text-align: right;">${order.grandTotal} ETB</td>
-              </tr>
-            </tfoot>
-          </table>
-
-          <!-- Delivery Address -->
-          <div style="background-color: #f8fafc; border-radius: 8px; padding: 14px; margin-bottom: 20px; font-size: 12px;">
-            <strong style="color: #0f172a; display: block; margin-bottom: 4px;">📍 Shipping Address:</strong>
-            <span style="color: #475569;">
-              ${order.shippingAddress.subcity || ""}, ${order.shippingAddress.streetAddress || ""}, ${order.shippingAddress.city || "Addis Ababa"}<br/>
-              Phone: <strong>${order.shippingAddress.phone || order.customerPhone}</strong>
-            </span>
-
-          </div>
-
-          <p style="font-size: 12px; color: #64748b; line-height: 1.5; margin: 0;">
-            Thank you for buying from JJ Bookstore! If you have any questions, contact support at <strong>orders@jjbookshopping.com</strong> or call <strong>+251 911 234 567</strong>.
-          </p>
-        </div>
-
-        <!-- Footer -->
-        <div style="background-color: #f1f5f9; padding: 16px; text-align: center; font-size: 11px; color: #94a3b8; border-top: 1px solid #e2e8f0;">
-          © ${new Date().getFullYear()} JJ Bookstore Ethiopia. All rights reserved.
-        </div>
-      </div>
-    </body>
-    </html>
-  `;
-
-  return { subject, htmlBody };
+export interface CuratedShelfBook {
+  id: string;
+  title: string;
+  titleAmharic?: string;
+  author: string;
+  category: string;
+  price: number;
+  discountPrice?: number;
+  currency: string;
+  coverImage: string;
+  spineColor: string;
+  spineTextColor: string;
+  accentColor: string;
+  quote: string;
+  quoteAttribution: string;
+  synopsis: string;
+  pages: number;
+  rating: number;
+  reviews: number;
+  stock: number;
 }
 
-export function generateOrderRejectionEmailHtml(
-  order: Order,
-  verifiedByEmployeeName: string,
-  reasonNote?: string
-): { subject: string; htmlBody: string } {
-  const subject = `⚠️ [JJ Bookstore] Payment Verification Alert for Order #${order.orderId}`;
-
-  const htmlBody = `
-    <!DOCTYPE html>
-    <html>
-    <head>
-      <meta charset="utf-8"/>
-      <title>Incorrect Transaction Reference Alert</title>
-    </head>
-    <body style="font-family: Arial, sans-serif; background-color: #f8fafc; margin: 0; padding: 20px; color: #334155;">
-      <div style="max-width: 600px; margin: 0 auto; background-color: #ffffff; border-radius: 16px; overflow: hidden; box-shadow: 0 4px 20px rgba(0,0,0,0.08); border: 1px solid #e2e8f0;">
-        
-        <!-- Header -->
-        <div style="background-color: #451a03; padding: 24px; text-align: center; color: #ffffff;">
-          <h1 style="margin: 0; font-size: 22px; font-weight: bold; color: #fbbf24;">JJ BOOKSTORE</h1>
-          <p style="margin: 4px 0 0; font-size: 12px; color: #fde68a; letter-spacing: 1px;">ETHIOPIA'S PREMIER ONLINE BOOKSTORE</p>
-        </div>
-
-        <!-- Body Content -->
-        <div style="padding: 24px;">
-          <div style="background-color: #fef2f2; border: 1px solid #fecaca; border-radius: 12px; padding: 16px; margin-bottom: 20px;">
-            <h2 style="margin: 0 0 6px; font-size: 16px; color: #991b1b; font-weight: bold;">
-              ⚠️ Incorrect or Missing Transaction Reference
-            </h2>
-            <p style="margin: 0; font-size: 13px; color: #b91c1c; line-height: 1.5;">
-              Dear <strong>${order.customerName}</strong>, our verification staff (${verifiedByEmployeeName}) checked your order <strong>#${order.orderId}</strong> and found that the transaction reference provided is incorrect or does not exist in our payment logs.
-            </p>
-          </div>
-
-          <!-- Direct Action Message required by Store Policy -->
-          <div style="background-color: #fffbeb; border: 1px solid #fde68a; border-radius: 12px; padding: 16px; margin-bottom: 20px; font-size: 13px; color: #78350f; line-height: 1.6;">
-            <p style="margin: 0 0 8px; font-weight: bold; font-size: 14px; color: #92400e;">
-              📞 Action Required to Confirm Your Books:
-            </p>
-            <p style="margin: 0 0 8px;">
-              <strong>Incorrect transaction number!</strong> Please contact our support team directly by calling or messaging:
-            </p>
-            <p style="margin: 4px 0 8px; font-size: 15px; font-weight: bold; color: #b45309; font-family: monospace;">
-              📱 +251 911 234 567 / +251 922 345 678
-            </p>
-            <p style="margin: 0;">
-              Or upload / email the official payment transfer <strong>screenshot from Telebirr or Bank App (CBE / BOA / Awash)</strong> to confirm your payment and dispatch your books.
-            </p>
-          </div>
-
-          <!-- Reason & Notes -->
-          <div style="background-color: #f8fafc; border-left: 4px solid #ef4444; border-radius: 4px; padding: 14px; margin-bottom: 20px; font-size: 13px;">
-            <strong style="color: #0f172a; display: block; margin-bottom: 4px;">Staff Verification Feedback:</strong>
-            <span style="color: #475569; font-style: italic;">
-              "${reasonNote || "Incorrect transaction number. Please contact us at +251 911 234 567 or upload the screenshot from Telebirr/Bank."}"
-            </span>
-          </div>
-
-          <!-- Order Summary Details -->
-          <table style="width: 100%; border-collapse: collapse; margin-bottom: 20px; background-color: #f8fafc; border-radius: 8px; font-size: 13px;">
-            <tr>
-              <td style="padding: 10px 14px; color: #64748b;">Order Number:</td>
-              <td style="padding: 10px 14px; font-weight: bold; color: #0f172a; text-align: right;">${order.orderId}</td>
-            </tr>
-            <tr>
-              <td style="padding: 10px 14px; color: #64748b;">Order Status:</td>
-              <td style="padding: 10px 14px; font-weight: bold; color: #dc2626; text-align: right;">ACTION REQUIRED / UNVERIFIED</td>
-            </tr>
-            <tr>
-              <td style="padding: 10px 14px; color: #64748b;">Total Order Amount:</td>
-              <td style="padding: 10px 14px; font-weight: bold; color: #0f172a; text-align: right;">${order.grandTotal} ETB</td>
-            </tr>
-            <tr>
-              <td style="padding: 10px 14px; color: #64748b;">Verifying Employee:</td>
-              <td style="padding: 10px 14px; font-weight: bold; color: #0f172a; text-align: right;">${verifiedByEmployeeName}</td>
-            </tr>
-          </table>
-        </div>
-
-        <!-- Footer -->
-        <div style="background-color: #f1f5f9; padding: 16px; text-align: center; font-size: 11px; color: #94a3b8; border-top: 1px solid #e2e8f0;">
-          © ${new Date().getFullYear()} JJ Bookstore Ethiopia. All rights reserved.
-        </div>
-      </div>
-    </body>
-    </html>
-  `;
-
-  return { subject, htmlBody };
-}
-
-/**
- * Dispatch and record an automated customer email notification to Firestore.
- */
-export async function sendCustomerOrderEmail(
-  order: Order,
-  type: "approved" | "rejected",
-  verifiedByEmployeeName: string,
-  receiptNumber?: string,
-  note?: string
-): Promise<EmailNotificationLog> {
-  const recipientEmail = order.customerEmail || "customer@example.com";
-  const recipientName = order.customerName || "Valued Customer";
-  const now = new Date().toISOString();
-
-  let subject = "";
-  let htmlBody = "";
-
-  if (type === "approved") {
-    const generated = generateOrderApprovalEmailHtml(
-      order,
-      verifiedByEmployeeName,
-      receiptNumber || order.paymentReference || "N/A",
-      note
-    );
-    subject = generated.subject;
-    htmlBody = generated.htmlBody;
-  } else {
-    const generated = generateOrderRejectionEmailHtml(
-      order,
-      verifiedByEmployeeName,
-      note
-    );
-    subject = generated.subject;
-    htmlBody = generated.htmlBody;
+export const CURATED_SHELF_BOOKS: CuratedShelfBook[] = [
+  {
+    id: "curated-zero-to-one",
+    title: "Zero to One",
+    titleAmharic: "ዜሮ ወደ አንድ",
+    author: "Peter Thiel",
+    category: "Business & Startups",
+    price: 340,
+    discountPrice: 290,
+    currency: "ETB",
+    coverImage: "https://images-na.ssl-images-amazon.com/images/S/compressed.photo.goodreads.com/books/1630663847i/18050143.jpg",
+    spineColor: "#111827",
+    spineTextColor: "#f8fafc",
+    accentColor: "#38bdf8",
+    quote: "The best entrepreneurs know this: every great business is built on a secret that's hidden from the outside.",
+    quoteAttribution: "ZERO TO ONE • PETER THIEL",
+    synopsis: "Notes on startups, or how to build the future. Peter Thiel shows how we can find singular ways to create new things.",
+    pages: 224,
+    rating: 4.8,
+    reviews: 1420,
+    stock: 28,
+  },
+  {
+    id: "curated-lean-startup",
+    title: "The Lean Startup",
+    titleAmharic: "ዘ ሊን ስታርታፕ",
+    author: "Eric Ries",
+    category: "Entrepreneurship",
+    price: 380,
+    discountPrice: 320,
+    currency: "ETB",
+    coverImage: "https://images-na.ssl-images-amazon.com/images/S/compressed.photo.goodreads.com/books/1629999184i/10127019.jpg",
+    spineColor: "#14532d",
+    spineTextColor: "#ffffff",
+    accentColor: "#4ade80",
+    quote: "The only way to win is to learn faster than anyone else through continuous validated learning.",
+    quoteAttribution: "THE LEAN STARTUP • ERIC RIES",
+    synopsis: "How today's entrepreneurs use continuous innovation to create radically successful businesses.",
+    pages: 336,
+    rating: 4.7,
+    reviews: 980,
+    stock: 35,
+  },
+  {
+    id: "curated-good-to-great",
+    title: "Good to Great",
+    titleAmharic: "ከጥሩ ወደ ድንቅ",
+    author: "Jim Collins",
+    category: "Leadership & Strategy",
+    price: 360,
+    currency: "ETB",
+    coverImage: "https://images-na.ssl-images-amazon.com/images/S/compressed.photo.goodreads.com/books/1546097703i/76865.jpg",
+    spineColor: "#7f1d1d",
+    spineTextColor: "#fef2f2",
+    accentColor: "#f87171",
+    quote: "Good is the enemy of great. And that is one of the key reasons why we have so little that becomes great.",
+    quoteAttribution: "GOOD TO GREAT • JIM COLLINS",
+    synopsis: "Why some companies make the leap and others don't. A five-year study of 1,435 firms identifying the disciplines of Level 5 leadership.",
+    pages: 320,
+    rating: 4.9,
+    reviews: 2150,
+    stock: 42,
+  },
+  {
+    id: "curated-atomic-habits",
+    title: "Atomic Habits",
+    titleAmharic: "አቶሚክ ልማዶች",
+    author: "James Clear",
+    category: "Personal Growth",
+    price: 390,
+    discountPrice: 350,
+    currency: "ETB",
+    coverImage: "https://images-na.ssl-images-amazon.com/images/S/compressed.photo.goodreads.com/books/1655988385i/40121378.jpg",
+    spineColor: "#d6c99c",
+    spineTextColor: "#1c1917",
+    accentColor: "#ca8a04",
+    quote: "You do not rise to the level of your goals. You fall to the level of your systems.",
+    quoteAttribution: "ATOMIC HABITS • JAMES CLEAR",
+    synopsis: "An easy and proven way to build good habits and break bad ones. Tiny changes produce remarkable compound results.",
+    pages: 320,
+    rating: 5.0,
+    reviews: 3410,
+    stock: 60,
+  },
+  {
+    id: "curated-shoe-dog",
+    title: "Shoe Dog",
+    titleAmharic: "ሹ ዶግ",
+    author: "Phil Knight",
+    category: "Biography & Business",
+    price: 370,
+    currency: "ETB",
+    coverImage: "https://images-na.ssl-images-amazon.com/images/S/compressed.photo.goodreads.com/books/1457284880i/27220736.jpg",
+    spineColor: "#c2410c",
+    spineTextColor: "#ffffff",
+    accentColor: "#fed7aa",
+    quote: "Don't tell people how to do things, tell them what to do and let them surprise you with their results.",
+    quoteAttribution: "SHOE DOG • PHIL KNIGHT",
+    synopsis: "A memoir by the creator of Nike. Phil Knight shares the inside story of the startup's early days and its evolution into an iconic global brand.",
+    pages: 400,
+    rating: 4.9,
+    reviews: 1890,
+    stock: 25,
+  },
+  {
+    id: "curated-hard-thing",
+    title: "The Hard Thing About Hard Things",
+    titleAmharic: "ከባድ ነገሮች",
+    author: "Ben Horowitz",
+    category: "Management",
+    price: 350,
+    currency: "ETB",
+    coverImage: "https://images-na.ssl-images-amazon.com/images/S/compressed.photo.goodreads.com/books/1393605333i/18174387.jpg",
+    spineColor: "#18181b",
+    spineTextColor: "#fbbf24",
+    accentColor: "#fbbf24",
+    quote: "There are no silver bullets, only lead bullets. Hard decisions require embracing the struggle.",
+    quoteAttribution: "THE HARD THING ABOUT HARD THINGS • BEN HOROWITZ",
+    synopsis: "Building a business when there are no easy answers. Essential advice on managing tough problems where business school offers no playbook.",
+    pages: 304,
+    rating: 4.8,
+    reviews: 1120,
+    stock: 19,
+  },
+  {
+    id: "curated-4-hour-workweek",
+    title: "The 4-Hour Workweek",
+    titleAmharic: "የ 4 ሰዓት የሥራ ሳምንት",
+    author: "Tim Ferriss",
+    category: "Productivity & Lifestyle",
+    price: 390,
+    discountPrice: 330,
+    currency: "ETB",
+    coverImage: "https://images-na.ssl-images-amazon.com/images/S/compressed.photo.goodreads.com/books/1442957271i/368593.jpg",
+    spineColor: "#d97706",
+    spineTextColor: "#ffffff",
+    accentColor: "#fde047",
+    quote: "Focus on being productive instead of busy. Tomorrow becomes never; no matter how small the task, take the first step now.",
+    quoteAttribution: "THE 4-HOUR WORKWEEK • TIM FERRISS",
+    synopsis: "Escape 9-5, live anywhere, and join the new rich. A blueprint for designing your ideal life through lifestyle design and automation.",
+    pages: 416,
+    rating: 4.7,
+    reviews: 2400,
+    stock: 33,
+  },
+  {
+    id: "curated-principles",
+    title: "Principles",
+    titleAmharic: "መሠረታዊ ሕጎች",
+    author: "Ray Dalio",
+    category: "Philosophy & Economics",
+    price: 420,
+    discountPrice: 380,
+    currency: "ETB",
+    coverImage: "https://images-na.ssl-images-amazon.com/images/S/compressed.photo.goodreads.com/books/1521074128i/34536488.jpg",
+    spineColor: "#172554",
+    spineTextColor: "#ffffff",
+    accentColor: "#93c5fd",
+    quote: "Pain + Reflection = Progress. Truth — more precisely, an accurate understanding of reality — is the essential foundation for producing good outcomes.",
+    quoteAttribution: "PRINCIPLES • RAY DALIO",
+    synopsis: "Life and Work principles from one of the world's most successful investors and entrepreneurs, Ray Dalio.",
+    pages: 592,
+    rating: 4.8,
+    reviews: 1650,
+    stock: 22,
+  },
+  {
+    id: "curated-rework",
+    title: "Rework",
+    titleAmharic: "ሪወርክ",
+    author: "Jason Fried & DHH",
+    category: "Modern Business",
+    price: 310,
+    currency: "ETB",
+    coverImage: "https://images-na.ssl-images-amazon.com/images/S/compressed.photo.goodreads.com/books/1391275636i/6732019.jpg",
+    spineColor: "#e2e8f0",
+    spineTextColor: "#0f172a",
+    accentColor: "#cbd5e1",
+    quote: "What you do is what matters, not what you think or say or plan. Build half a product, not a half-assed product.",
+    quoteAttribution: "REWORK • JASON FRIED & DAVID HEINEMEIER HANSSON",
+    synopsis: "Change the way you work forever. A better, faster, easier way to succeed in business without endless meetings or bloated plans.",
+    pages: 288,
+    rating: 4.7,
+    reviews: 1280,
+    stock: 29,
+  },
+  {
+    id: "curated-innovators-dilemma",
+    title: "The Innovator's Dilemma",
+    titleAmharic: "የፈጣሪው አጣብቂኝ",
+    author: "Clayton Christensen",
+    category: "Technology & Innovation",
+    price: 360,
+    currency: "ETB",
+    coverImage: "https://images-na.ssl-images-amazon.com/images/S/compressed.photo.goodreads.com/books/1347648937i/2615.jpg",
+    spineColor: "#1e293b",
+    spineTextColor: "#e2e8f0",
+    accentColor: "#38bdf8",
+    quote: "Disruptive technology should be framed as a marketing challenge, not a technological challenge.",
+    quoteAttribution: "THE INNOVATOR'S DILEMMA • CLAYTON CHRISTENSEN",
+    synopsis: "When new technologies cause great firms to fail. The revolutionary book that changed how the world thinks about disruptive innovation.",
+    pages: 288,
+    rating: 4.8,
+    reviews: 940,
+    stock: 16,
+  },
+  {
+    id: "curated-start-with-why",
+    title: "Start with Why",
+    titleAmharic: "በለምን ጀምር",
+    author: "Simon Sinek",
+    category: "Inspiration & Leadership",
+    price: 340,
+    discountPrice: 295,
+    currency: "ETB",
+    coverImage: "https://images-na.ssl-images-amazon.com/images/S/compressed.photo.goodreads.com/books/1560846505i/6716075.jpg",
+    spineColor: "#881337",
+    spineTextColor: "#ffffff",
+    accentColor: "#f472b6",
+    quote: "People don't buy what you do; they buy why you do it. And what you do simply proves what you believe.",
+    quoteAttribution: "START WITH WHY • SIMON SINEK",
+    synopsis: "How great leaders inspire everyone to take action. Discover the Golden Circle and learn how to communicate from the inside out.",
+    pages: 256,
+    rating: 4.9,
+    reviews: 2800,
+    stock: 45,
+  },
+  {
+    id: "curated-built-to-last",
+    title: "Built to Last",
+    titleAmharic: "ዘላቂ እንዲሆን የተገነባ",
+    author: "Jim Collins & Jerry Porras",
+    category: "Strategy & Legacy",
+    price: 370,
+    currency: "ETB",
+    coverImage: "https://images-na.ssl-images-amazon.com/images/S/compressed.photo.goodreads.com/books/1388180373i/4059.jpg",
+    spineColor: "#3b0764",
+    spineTextColor: "#fef08a",
+    accentColor: "#e879f9",
+    quote: "Preserve the core, stimulate progress. Build a clock instead of merely telling time.",
+    quoteAttribution: "BUILT TO LAST • JIM COLLINS & JERRY PORRAS",
+    synopsis: "Successful habits of visionary companies. A six-year research project examining eighteen exceptional and long-lasting companies.",
+    pages: 368,
+    rating: 4.8,
+    reviews: 1450,
+    stock: 31,
+  },
+  {
+    id: "curated-fikir-eske-mekabir",
+    title: "ፍቅር እስከ መቃብር (Fikir Eske Mekabir)",
+    titleAmharic: "ፍቅር እስከ መቃብር",
+    author: "Haddis Alemayehu",
+    category: "Ethiopian Classic",
+    price: 350,
+    discountPrice: 300,
+    currency: "ETB",
+    coverImage: "https://m.media-amazon.com/images/S/compressed.photo.goodreads.com/books/1436443449i/25877188.jpg",
+    spineColor: "#451a03",
+    spineTextColor: "#fef3c7",
+    accentColor: "#f59e0b",
+    quote: "“ፍቅር የሕይወት ቅመም ናት፤ ያለ እሷ የተሠራ ሕይወት ጨው እንደሌለው ወጥ ይጣፍጣል?”",
+    quoteAttribution: "ፍቅር እስከ መቃብር • ሀዲስ ዓለማየሁ",
+    synopsis: "The crowning jewel of Ethiopian romantic and historical literature. The timeless tale of Bezabih and Seblewongel in feudal Gojjam.",
+    pages: 341,
+    rating: 5.0,
+    reviews: 4200,
+    stock: 50,
+  },
+  {
+    id: "curated-oromay",
+    title: "ኦሮማይ (Oromay)",
+    titleAmharic: "ኦሮማይ",
+    author: "Baalu Girma",
+    category: "Historical Fiction",
+    price: 360,
+    discountPrice: 310,
+    currency: "ETB",
+    coverImage: "https://m.media-amazon.com/images/S/compressed.photo.goodreads.com/books/1437481485i/25950435.jpg",
+    spineColor: "#18181b",
+    spineTextColor: "#fef08a",
+    accentColor: "#eab308",
+    quote: "“እውነት መቼም አትሞትም፤ ብትቀበርም በጊዜ ሂደት አብባ ትወጣለች።”",
+    quoteAttribution: "ኦሮማይ • በአሉ ግርማ",
+    synopsis: "Baalu Girma's legendary and gripping novel chronicling the Red Star Campaign in Asmara during the Derg era.",
+    pages: 339,
+    rating: 4.9,
+    reviews: 3100,
+    stock: 38,
+  },
+  {
+    id: "curated-yetoqolefebet-kulf",
+    title: "የተቆለፈበት ቁልፍ (Yetekolefebet Kulf)",
+    titleAmharic: "የተቆለፈበት ቁልፍ",
+    author: "Dr. Mehret Debebe",
+    category: "Psychology & Life",
+    price: 380,
+    currency: "ETB",
+    coverImage: "https://m.media-amazon.com/images/S/compressed.photo.goodreads.com/books/1553887556i/44654924.jpg",
+    spineColor: "#1e1b4b",
+    spineTextColor: "#e0e7ff",
+    accentColor: "#818cf8",
+    quote: "“የአእምሮህ ቁልፍ በእጅህ እስካለ ድረስ የትኛውም የተዘጋ በር መክፈት ትችላለህ።”",
+    quoteAttribution: "የተቆለፈበት ቁልፍ • ዶ/ር ምሕረት ደበበ",
+    synopsis: "A groundbreaking exploration into human psychology, mental resilience, and unlocking the inner faculties of personal triumph.",
+    pages: 400,
+    rating: 4.9,
+    reviews: 2600,
+    stock: 44,
   }
+];
 
-  const logPayload = {
-    orderId: order.orderId,
-    dbOrderId: order.id,
-    recipientEmail,
-    recipientName,
-    subject,
-    emailType: type,
-    status: "sent",
-    verifiedByEmployeeName,
-    receiptNumber: receiptNumber || order.paymentReference || "",
-    note: note || "",
-    sentAt: now,
-    htmlBody,
-    createdAt: now
+export function mapCuratedToStoreBook(curated: CuratedShelfBook, storeBooks: Book[]): Book {
+  const match = storeBooks.find(
+    (b) =>
+      b.title.toLowerCase().includes(curated.title.toLowerCase()) ||
+      b.slug.toLowerCase().includes(curated.id.replace("curated-", "")) ||
+      (curated.titleAmharic && b.title.includes(curated.titleAmharic))
+  );
+
+  if (match) return match;
+
+  // Fallback valid book object
+  return {
+    id: curated.id,
+    title: curated.title,
+    slug: curated.id,
+    description: curated.synopsis,
+    authorId: `auth-${curated.author.toLowerCase().replace(/[^a-z0-9]/g, "-")}`,
+    authorName: curated.author,
+    categoryId: "cat-curated",
+    categoryName: curated.category,
+    price: curated.price,
+    discountPrice: curated.discountPrice,
+    currency: "ETB",
+    coverImage: curated.coverImage,
+    ISBN: "978-99944-" + Math.floor(100000 + Math.random() * 900000),
+    publisher: "JJ Bookstore Editions",
+    publicationDate: "2024",
+    pages: curated.pages,
+    language: curated.titleAmharic ? "Amharic & English" : "English",
+    stock: curated.stock,
+    soldCount: curated.reviews,
+    ratingAverage: curated.rating,
+    reviewCount: curated.reviews,
+    featured: true,
+    newArrival: false,
+    active: true,
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
   };
-
-  try {
-    // Dispatch actual SMTP email via backend Express endpoint
-    fetch("/api/orders/send-status-email", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        order,
-        type,
-        verifiedByEmployeeName,
-        receiptNumber,
-        note
-      })
-    }).catch((fetchErr) => console.warn("Backend status email endpoint notice:", fetchErr));
-
-    // Save to emailNotifications collection in Firestore
-    const docRef = await addDoc(collection(db, "emailNotifications"), cleanFirestoreData(logPayload));
-
-    // Also add a store notification record for customer in-app updates
-    await addDoc(collection(db, "notifications"), cleanFirestoreData({
-      userId: order.customerId || "guest",
-      title: type === "approved" ? "Order Verified & Confirmed" : "Order Payment Declined",
-      message: type === "approved"
-        ? `Your order ${order.orderId} receipt #${receiptNumber || order.paymentReference} was verified by ${verifiedByEmployeeName}. Email notification dispatched to ${recipientEmail}.`
-        : `Order ${order.orderId} payment verification was declined. Check your email ${recipientEmail} for details.`,
-      type: "order",
-      read: false,
-      createdAt: now
-    }));
-
-    return {
-      id: docRef.id,
-      ...logPayload
-    } as EmailNotificationLog;
-  } catch (err) {
-    console.warn("Failed to log email notification to Firestore:", err);
-    return {
-      id: `local-${Date.now()}`,
-      ...logPayload
-    } as EmailNotificationLog;
-  }
 }
-
-/**
- * Fetches current active SMTP configuration from the server.
- */
-export async function getSmtpConfig(): Promise<{
-  success: boolean;
-  configured: boolean;
-  host: string;
-  port: number;
-  user: string;
-  hasPass: boolean;
-  secure: boolean;
-  adminEmail: string;
-}> {
-  try {
-    const res = await fetch("/api/admin/smtp-config");
-    return await res.json();
-  } catch (err: any) {
-    return {
-      success: false,
-      configured: false,
-      host: "",
-      port: 587,
-      user: "",
-      hasPass: false,
-      secure: false,
-      adminEmail: "mikiyaswoyne@gmail.com"
-    };
-  }
-}
-
-/**
- * Saves updated SMTP configuration to the server.
- */
-export async function saveSmtpConfig(config: {
-  host: string;
-  port: number;
-  user: string;
-  pass?: string;
-  secure: boolean;
-  adminEmail: string;
-}): Promise<{
-  success: boolean;
-  configured: boolean;
-  message: string;
-  host?: string;
-  port?: number;
-  user?: string;
-  secure?: boolean;
-  adminEmail?: string;
-}> {
-  try {
-    const res = await fetch("/api/admin/save-smtp-config", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(config)
-    });
-    return await res.json();
-  } catch (err: any) {
-    return {
-      success: false,
-      configured: false,
-      message: err?.message || "Failed to update SMTP configuration"
-    };
-  }
-}
-
-/**
- * Sends a test verification email via the backend /api/admin/test-email endpoint.
- */
-export async function sendTestEmail(toEmail?: string, subject?: string, textMessage?: string): Promise<{
-  success: boolean;
-  configured?: boolean;
-  message: string;
-  details?: any;
-  hint?: string;
-  errorCode?: string;
-}> {
-  try {
-    const res = await fetch("/api/admin/test-email", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ toEmail, subject, textMessage })
-    });
-    return await res.json();
-  } catch (err: any) {
-    return {
-      success: false,
-      message: err?.message || "Network request failed while sending test email."
-    };
-  }
-}
-
-
