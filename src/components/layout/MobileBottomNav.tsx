@@ -31,14 +31,14 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({
   const { wishlistIds } = useWishlist();
 
   return (
-    <nav className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-[#16120e]/95 backdrop-blur-xl border-t border-amber-950/80 px-2 py-1.5 shadow-[0_-8px_24px_rgba(0,0,0,0.5)] flex items-center justify-around text-stone-300 active:touch-manipulation select-none">
+    <nav className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-white/95 backdrop-blur-xl border-t border-slate-200 px-2 py-1.5 shadow-[0_-4px_20px_rgba(0,0,0,0.06)] flex items-center justify-around text-slate-600 active:touch-manipulation select-none">
       {/* Home */}
       <button
         onClick={() => onNavigate("home")}
-        className={`flex flex-col items-center justify-center py-1 px-2.5 rounded-xl transition-all duration-200 min-w-[56px] min-h-[48px] active:scale-95 ${
+        className={`flex flex-col items-center justify-center py-1 px-2.5 rounded-xl transition-all duration-200 min-w-[56px] min-h-[48px] active:scale-95 cursor-pointer ${
           activePage === "home"
-            ? "text-amber-400 font-extrabold"
-            : "text-stone-400 hover:text-stone-200"
+            ? "text-amber-700 font-extrabold"
+            : "text-slate-500 hover:text-slate-800"
         }`}
       >
         <Home className={`w-5 h-5 ${activePage === "home" ? "stroke-[2.5]" : "stroke-[1.8]"}`} />
@@ -48,10 +48,10 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({
       {/* Shop Books */}
       <button
         onClick={() => onNavigate("shop")}
-        className={`flex flex-col items-center justify-center py-1 px-2.5 rounded-xl transition-all duration-200 min-w-[56px] min-h-[48px] active:scale-95 ${
+        className={`flex flex-col items-center justify-center py-1 px-2.5 rounded-xl transition-all duration-200 min-w-[56px] min-h-[48px] active:scale-95 cursor-pointer ${
           activePage === "shop"
-            ? "text-amber-400 font-extrabold"
-            : "text-stone-400 hover:text-stone-200"
+            ? "text-amber-700 font-extrabold"
+            : "text-slate-500 hover:text-slate-800"
         }`}
       >
         <BookOpen className={`w-5 h-5 ${activePage === "shop" ? "stroke-[2.5]" : "stroke-[1.8]"}`} />
@@ -61,7 +61,7 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({
       {/* Quick Search */}
       <button
         onClick={onOpenSearch}
-        className="flex flex-col items-center justify-center py-1 px-2.5 rounded-xl text-stone-400 hover:text-stone-200 transition-all duration-200 min-w-[56px] min-h-[48px] active:scale-95"
+        className="flex flex-col items-center justify-center py-1 px-2.5 rounded-xl text-slate-500 hover:text-slate-800 transition-all duration-200 min-w-[56px] min-h-[48px] active:scale-95 cursor-pointer"
       >
         <Search className="w-5 h-5 stroke-[1.8]" />
         <span className="text-[10px] tracking-tight mt-0.5 font-bold">Search</span>
@@ -70,12 +70,12 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({
       {/* Cart (with Badge) */}
       <button
         onClick={onOpenCart}
-        className="relative flex flex-col items-center justify-center py-1 px-2.5 rounded-xl text-stone-400 hover:text-amber-400 transition-all duration-200 min-w-[56px] min-h-[48px] active:scale-95"
+        className="relative flex flex-col items-center justify-center py-1 px-2.5 rounded-xl text-slate-500 hover:text-amber-700 transition-all duration-200 min-w-[56px] min-h-[48px] active:scale-95 cursor-pointer"
       >
         <div className="relative">
           <ShoppingBag className="w-5 h-5 stroke-[1.8]" />
           {totalItemCount > 0 && (
-            <span className="absolute -top-1.5 -right-2 bg-amber-500 text-stone-950 text-[9px] font-black w-4 h-4 rounded-full flex items-center justify-center border border-amber-950 shadow-md">
+            <span className="absolute -top-1.5 -right-2 bg-amber-500 text-slate-950 text-[9px] font-black w-4 h-4 rounded-full flex items-center justify-center border border-white shadow-sm">
               {totalItemCount > 9 ? "9+" : totalItemCount}
             </span>
           )}
@@ -86,10 +86,10 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({
       {/* Wishlist */}
       <button
         onClick={() => onNavigate("account", { tab: "wishlist" })}
-        className={`relative flex flex-col items-center justify-center py-1 px-2.5 rounded-xl transition-all duration-200 min-w-[56px] min-h-[48px] active:scale-95 ${
+        className={`relative flex flex-col items-center justify-center py-1 px-2.5 rounded-xl transition-all duration-200 min-w-[56px] min-h-[48px] active:scale-95 cursor-pointer ${
           activePage === "account"
-            ? "text-amber-400 font-extrabold"
-            : "text-stone-400 hover:text-stone-200"
+            ? "text-amber-700 font-extrabold"
+            : "text-slate-500 hover:text-slate-800"
         }`}
       >
         <div className="relative">
@@ -116,16 +116,16 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({
             onNavigate("auth");
           }
         }}
-        className={`flex flex-col items-center justify-center py-1 px-2.5 rounded-xl transition-all duration-200 min-w-[56px] min-h-[48px] active:scale-95 ${
+        className={`flex flex-col items-center justify-center py-1 px-2.5 rounded-xl transition-all duration-200 min-w-[56px] min-h-[48px] active:scale-95 cursor-pointer ${
           activePage === "account" || activePage === "admin" || activePage === "employee"
-            ? "text-amber-400 font-extrabold"
-            : "text-stone-400 hover:text-stone-200"
+            ? "text-amber-700 font-extrabold"
+            : "text-slate-500 hover:text-slate-800"
         }`}
       >
         {isAdmin ? (
-          <LayoutDashboard className="w-5 h-5 text-amber-400" />
+          <LayoutDashboard className="w-5 h-5 text-amber-600" />
         ) : isEmployee ? (
-          <ShieldCheck className="w-5 h-5 text-emerald-400" />
+          <ShieldCheck className="w-5 h-5 text-emerald-600" />
         ) : (
           <UserIcon className="w-5 h-5 stroke-[1.8]" />
         )}

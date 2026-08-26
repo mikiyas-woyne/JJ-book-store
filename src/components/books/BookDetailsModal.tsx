@@ -68,16 +68,16 @@ export const BookDetailsModal: React.FC<BookDetailsModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 overflow-y-auto bg-black/60 backdrop-blur-sm flex items-center justify-center p-3 sm:p-6 animate-in fade-in">
-      <div className="relative bg-white rounded-3xl shadow-2xl border border-slate-100 w-full max-w-4xl overflow-hidden max-h-[92vh] flex flex-col my-auto">
+    <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-3 sm:p-6 animate-fadeIn">
+      <div className="relative bg-white rounded-3xl shadow-2xl border border-slate-200 w-full max-w-4xl overflow-hidden max-h-[92vh] flex flex-col my-auto">
         {/* Sticky Header with Close */}
         <div className="p-4 sm:p-6 border-b border-slate-100 flex items-center justify-between bg-white sticky top-0 z-20">
           <div className="flex items-center gap-2">
-            <span className="text-xs font-bold text-amber-800 bg-amber-50 px-3 py-1 rounded-full uppercase tracking-wider">
+            <span className="text-xs font-bold text-amber-800 bg-amber-50 border border-amber-200/80 px-3 py-1 rounded-full uppercase tracking-wider">
               {book.categoryName}
             </span>
             {book.featured && (
-              <span className="text-xs font-bold text-amber-950 bg-amber-400 px-3 py-1 rounded-full uppercase tracking-wider flex items-center gap-1">
+              <span className="text-xs font-black text-slate-950 bg-amber-400 px-3 py-1 rounded-full uppercase tracking-wider flex items-center gap-1 border border-amber-300 shadow-sm">
                 <Sparkles className="w-3 h-3" /> Bestseller
               </span>
             )}
@@ -86,14 +86,14 @@ export const BookDetailsModal: React.FC<BookDetailsModalProps> = ({
           <div className="flex items-center gap-2">
             <button
               onClick={handleShare}
-              className="p-2 rounded-full hover:bg-slate-100 text-slate-500 transition-colors"
+              className="p-2 rounded-full hover:bg-slate-100 text-slate-600 transition-colors cursor-pointer"
               title="Share Book"
             >
               <Share2 className="w-5 h-5" />
             </button>
             <button
               onClick={onClose}
-              className="p-2 rounded-full hover:bg-slate-100 text-slate-500 transition-colors"
+              className="p-2 rounded-full hover:bg-slate-100 text-slate-600 transition-colors cursor-pointer"
             >
               <X className="w-6 h-6" />
             </button>
@@ -124,7 +124,7 @@ export const BookDetailsModal: React.FC<BookDetailsModalProps> = ({
                 )}
               </div>
 
-              {/* Publisher & ISBN pill under cover */}
+              {/* Publisher & ISBN pill */}
               <div className="mt-4 text-center text-xs text-slate-500 space-y-1">
                 <p><strong className="text-slate-700">ISBN:</strong> {book.ISBN}</p>
                 <p><strong className="text-slate-700">Language:</strong> {book.language}</p>
@@ -143,7 +143,7 @@ export const BookDetailsModal: React.FC<BookDetailsModalProps> = ({
 
                 {/* Rating & Review Summary */}
                 <div className="flex items-center gap-2 mt-2 text-sm">
-                  <div className="flex items-center text-amber-400">
+                  <div className="flex items-center text-amber-500">
                     {[1, 2, 3, 4, 5].map((star) => (
                       <Star
                         key={star}
@@ -162,12 +162,12 @@ export const BookDetailsModal: React.FC<BookDetailsModalProps> = ({
               </div>
 
               {/* Price Box */}
-              <div className="p-4 rounded-2xl bg-amber-50/80 border border-amber-900/10 flex items-center justify-between">
+              <div className="p-4 rounded-2xl bg-amber-50/80 border border-amber-200/80 flex items-center justify-between shadow-sm">
                 <div>
                   <div className="flex items-baseline gap-2">
-                    <span className="text-2xl sm:text-3xl font-extrabold text-slate-900">
+                    <span className="text-2xl sm:text-3xl font-serif font-extrabold text-slate-900">
                       {book.discountPrice || book.price}{" "}
-                      <span className="text-sm font-bold text-amber-800">ETB</span>
+                      <span className="text-sm font-bold text-amber-700 font-sans">ETB</span>
                     </span>
                     {hasDiscount && (
                       <span className="text-sm text-slate-400 line-through">
@@ -183,12 +183,12 @@ export const BookDetailsModal: React.FC<BookDetailsModalProps> = ({
                 {/* Stock Tag */}
                 <div>
                   {book.stock > 0 ? (
-                    <span className="px-3 py-1 rounded-full bg-emerald-100 text-emerald-800 text-xs font-bold flex items-center gap-1">
+                    <span className="px-3 py-1 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 text-xs font-bold flex items-center gap-1">
                       <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
                       In Stock ({book.stock})
                     </span>
                   ) : (
-                    <span className="px-3 py-1 rounded-full bg-rose-100 text-rose-800 text-xs font-bold">
+                    <span className="px-3 py-1 rounded-full bg-rose-50 text-rose-700 border border-rose-200 text-xs font-bold">
                       Out of Stock
                     </span>
                   )}
@@ -201,7 +201,7 @@ export const BookDetailsModal: React.FC<BookDetailsModalProps> = ({
                 <div className="flex items-center border border-slate-200 rounded-xl bg-slate-50 overflow-hidden">
                   <button
                     onClick={() => setQuantity(Math.max(1, quantity - 1))}
-                    className="w-10 h-10 hover:bg-slate-200 active:bg-slate-300 font-bold text-slate-700 text-base flex items-center justify-center transition-colors"
+                    className="w-10 h-10 hover:bg-slate-200 active:bg-slate-300 font-bold text-slate-700 text-base flex items-center justify-center transition-colors cursor-pointer"
                     aria-label="Decrease quantity"
                   >
                     -
@@ -211,7 +211,7 @@ export const BookDetailsModal: React.FC<BookDetailsModalProps> = ({
                   </span>
                   <button
                     onClick={() => setQuantity(Math.min(book.stock, quantity + 1))}
-                    className="w-10 h-10 hover:bg-slate-200 active:bg-slate-300 font-bold text-slate-700 text-base flex items-center justify-center transition-colors"
+                    className="w-10 h-10 hover:bg-slate-200 active:bg-slate-300 font-bold text-slate-700 text-base flex items-center justify-center transition-colors cursor-pointer"
                     aria-label="Increase quantity"
                   >
                     +
@@ -224,10 +224,10 @@ export const BookDetailsModal: React.FC<BookDetailsModalProps> = ({
                 <button
                   onClick={handleAddToCart}
                   disabled={book.stock <= 0}
-                  className="w-full py-3.5 px-4 rounded-xl bg-amber-500 hover:bg-amber-400 text-amber-950 font-bold text-sm transition-all shadow-md flex items-center justify-center gap-2 active:scale-95 disabled:opacity-50"
+                  className="w-full py-3.5 px-4 rounded-xl bg-gradient-to-r from-amber-500 via-amber-400 to-orange-500 hover:from-amber-400 hover:to-orange-400 text-slate-950 font-black text-sm transition-all shadow-md shadow-amber-200 flex items-center justify-center gap-2 active:scale-95 disabled:opacity-50 cursor-pointer"
                 >
-                  <ShoppingBag className="w-5 h-5" />
-                  <span>Add to Shopping Cart</span>
+                  <ShoppingBag className="w-5 h-5 text-slate-950" />
+                  <span>Add to Cart</span>
                 </button>
 
                 <button
@@ -236,10 +236,10 @@ export const BookDetailsModal: React.FC<BookDetailsModalProps> = ({
                     onClose();
                   }}
                   disabled={book.stock <= 0}
-                  className="w-full py-3.5 px-4 rounded-xl bg-amber-950 hover:bg-amber-900 text-amber-100 font-bold text-sm transition-all shadow-md flex items-center justify-center gap-2 active:scale-95 disabled:opacity-50 cursor-pointer"
+                  className="w-full py-3.5 px-4 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-bold text-sm transition-all shadow-md flex items-center justify-center gap-2 active:scale-95 disabled:opacity-50 cursor-pointer"
                 >
                   <ShoppingBag className="w-4 h-4 text-amber-400" />
-                  <span>Order Now (Direct Checkout)</span>
+                  <span>Order Now (Direct)</span>
                 </button>
               </div>
 
@@ -253,7 +253,7 @@ export const BookDetailsModal: React.FC<BookDetailsModalProps> = ({
                     "info"
                   );
                 }}
-                className={`w-full py-2.5 rounded-xl border text-xs font-bold transition-colors flex items-center justify-center gap-2 ${
+                className={`w-full py-2.5 rounded-xl border text-xs font-bold transition-colors flex items-center justify-center gap-2 cursor-pointer ${
                   isFavorited
                     ? "bg-rose-50 text-rose-700 border-rose-200"
                     : "bg-white text-slate-700 border-slate-200 hover:bg-slate-50"
@@ -265,12 +265,12 @@ export const BookDetailsModal: React.FC<BookDetailsModalProps> = ({
             </div>
           </div>
 
-          {/* Navigation Tabs (Description, Specifications, Reviews) */}
+          {/* Navigation Tabs */}
           <div className="border-t border-slate-200 pt-6">
             <div className="flex border-b border-slate-200 gap-6 text-sm font-bold">
               <button
                 onClick={() => setActiveTab("description")}
-                className={`pb-3 transition-colors border-b-2 ${
+                className={`pb-3 transition-colors border-b-2 cursor-pointer ${
                   activeTab === "description"
                     ? "border-amber-600 text-amber-800"
                     : "border-transparent text-slate-500 hover:text-slate-800"
@@ -280,17 +280,17 @@ export const BookDetailsModal: React.FC<BookDetailsModalProps> = ({
               </button>
               <button
                 onClick={() => setActiveTab("details")}
-                className={`pb-3 transition-colors border-b-2 ${
+                className={`pb-3 transition-colors border-b-2 cursor-pointer ${
                   activeTab === "details"
                     ? "border-amber-600 text-amber-800"
                     : "border-transparent text-slate-500 hover:text-slate-800"
                 }`}
               >
-                Publishing Specifications
+                Specifications
               </button>
               <button
                 onClick={() => setActiveTab("reviews")}
-                className={`pb-3 transition-colors border-b-2 ${
+                className={`pb-3 transition-colors border-b-2 cursor-pointer ${
                   activeTab === "reviews"
                     ? "border-amber-600 text-amber-800"
                     : "border-transparent text-slate-500 hover:text-slate-800"
@@ -303,14 +303,14 @@ export const BookDetailsModal: React.FC<BookDetailsModalProps> = ({
             {/* Tab Contents */}
             <div className="py-6">
               {activeTab === "description" && (
-                <div className="prose prose-amber max-w-none text-slate-700 text-sm leading-relaxed space-y-4">
+                <div className="prose prose-slate max-w-none text-slate-700 text-sm leading-relaxed space-y-4">
                   <p>{book.description}</p>
                 </div>
               )}
 
               {activeTab === "details" && (
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 text-xs">
-                  <div className="p-3.5 bg-slate-50 rounded-xl border border-slate-100 flex items-center gap-3">
+                  <div className="p-3.5 bg-slate-50 rounded-xl border border-slate-200 flex items-center gap-3">
                     <Building className="w-5 h-5 text-amber-600" />
                     <div>
                       <span className="text-slate-400 font-semibold block">Publisher</span>
@@ -318,7 +318,7 @@ export const BookDetailsModal: React.FC<BookDetailsModalProps> = ({
                     </div>
                   </div>
 
-                  <div className="p-3.5 bg-slate-50 rounded-xl border border-slate-100 flex items-center gap-3">
+                  <div className="p-3.5 bg-slate-50 rounded-xl border border-slate-200 flex items-center gap-3">
                     <Calendar className="w-5 h-5 text-amber-600" />
                     <div>
                       <span className="text-slate-400 font-semibold block">Publication Date</span>
@@ -326,7 +326,7 @@ export const BookDetailsModal: React.FC<BookDetailsModalProps> = ({
                     </div>
                   </div>
 
-                  <div className="p-3.5 bg-slate-50 rounded-xl border border-slate-100 flex items-center gap-3">
+                  <div className="p-3.5 bg-slate-50 rounded-xl border border-slate-200 flex items-center gap-3">
                     <FileText className="w-5 h-5 text-amber-600" />
                     <div>
                       <span className="text-slate-400 font-semibold block">Page Count</span>
@@ -334,7 +334,7 @@ export const BookDetailsModal: React.FC<BookDetailsModalProps> = ({
                     </div>
                   </div>
 
-                  <div className="p-3.5 bg-slate-50 rounded-xl border border-slate-100 flex items-center gap-3">
+                  <div className="p-3.5 bg-slate-50 rounded-xl border border-slate-200 flex items-center gap-3">
                     <Globe className="w-5 h-5 text-amber-600" />
                     <div>
                       <span className="text-slate-400 font-semibold block">Language</span>
@@ -342,7 +342,7 @@ export const BookDetailsModal: React.FC<BookDetailsModalProps> = ({
                     </div>
                   </div>
 
-                  <div className="p-3.5 bg-slate-50 rounded-xl border border-slate-100 flex items-center gap-3">
+                  <div className="p-3.5 bg-slate-50 rounded-xl border border-slate-200 flex items-center gap-3">
                     <BookOpen className="w-5 h-5 text-amber-600" />
                     <div>
                       <span className="text-slate-400 font-semibold block">ISBN Identifier</span>
@@ -367,7 +367,7 @@ export const BookDetailsModal: React.FC<BookDetailsModalProps> = ({
                   <div
                     key={rel.id}
                     onClick={() => onSelectBook(rel)}
-                    className="p-3 rounded-2xl bg-slate-50 border border-slate-100 hover:border-amber-400 cursor-pointer transition-all group"
+                    className="p-3 rounded-2xl bg-white border border-slate-200 hover:border-amber-400 hover:shadow-md cursor-pointer transition-all group"
                   >
                     <img
                       src={rel.coverImage}
@@ -377,7 +377,7 @@ export const BookDetailsModal: React.FC<BookDetailsModalProps> = ({
                     <h5 className="font-serif font-bold text-slate-900 text-xs line-clamp-1 group-hover:text-amber-800">
                       {rel.title}
                     </h5>
-                    <p className="text-[11px] text-slate-500">{rel.discountPrice || rel.price} ETB</p>
+                    <p className="text-[11px] text-slate-500 font-semibold">{rel.discountPrice || rel.price} ETB</p>
                   </div>
                 ))}
               </div>

@@ -93,7 +93,6 @@ export const UserAccountView: React.FC<UserAccountViewProps> = ({
           list.push({ id: d.id, ...d.data() } as Order);
         });
 
-        // Merge local orders from localStorage for instant offline access
         try {
           const localOrdersRaw = localStorage.getItem("jj_local_orders");
           if (localOrdersRaw) {
@@ -108,10 +107,9 @@ export const UserAccountView: React.FC<UserAccountViewProps> = ({
           console.warn("Local orders merge notice:", lErr);
         }
 
-        // Sort by newest
         list.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
         setOrders(list);
-        // Fetch email notification logs
+
         try {
           const emailSnap = await getDocs(collection(db, "emailNotifications"));
           const eList: EmailNotificationLog[] = [];
@@ -132,7 +130,6 @@ export const UserAccountView: React.FC<UserAccountViewProps> = ({
 
     fetchUserOrders();
   }, [currentUser]);
-
 
   const handleSaveProfile = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -170,26 +167,26 @@ export const UserAccountView: React.FC<UserAccountViewProps> = ({
   const getStatusBadge = (status: OrderStatus) => {
     switch (status) {
       case "pending":
-        return <span className="px-2.5 py-1 rounded-full bg-amber-100 text-amber-800 font-bold text-xs">Pending</span>;
+        return <span className="px-2.5 py-1 rounded-full bg-amber-50 text-amber-800 border border-amber-200 font-bold text-xs">Pending</span>;
       case "confirmed":
-        return <span className="px-2.5 py-1 rounded-full bg-sky-100 text-sky-800 font-bold text-xs">Confirmed</span>;
+        return <span className="px-2.5 py-1 rounded-full bg-sky-50 text-sky-800 border border-sky-200 font-bold text-xs">Confirmed</span>;
       case "processing":
-        return <span className="px-2.5 py-1 rounded-full bg-purple-100 text-purple-800 font-bold text-xs">Processing</span>;
+        return <span className="px-2.5 py-1 rounded-full bg-purple-50 text-purple-800 border border-purple-200 font-bold text-xs">Processing</span>;
       case "packed":
       case "ready_for_delivery":
-        return <span className="px-2.5 py-1 rounded-full bg-indigo-100 text-indigo-800 font-bold text-xs">Ready for Dispatch</span>;
+        return <span className="px-2.5 py-1 rounded-full bg-indigo-50 text-indigo-800 border border-indigo-200 font-bold text-xs">Ready for Dispatch</span>;
       case "assigned":
       case "handed_to_delivery":
       case "out_for_delivery":
-        return <span className="px-2.5 py-1 rounded-full bg-amber-200 text-amber-950 font-bold text-xs animate-pulse">Out for Delivery</span>;
+        return <span className="px-2.5 py-1 rounded-full bg-amber-100 text-amber-900 border border-amber-300 font-bold text-xs animate-pulse">Out for Delivery</span>;
       case "delivered":
-        return <span className="px-2.5 py-1 rounded-full bg-emerald-100 text-emerald-800 font-bold text-xs">Delivered</span>;
+        return <span className="px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-800 border border-emerald-200 font-bold text-xs">Delivered</span>;
       case "delivery_failed":
-        return <span className="px-2.5 py-1 rounded-full bg-rose-100 text-rose-800 font-bold text-xs">Delivery Issue</span>;
+        return <span className="px-2.5 py-1 rounded-full bg-rose-50 text-rose-800 border border-rose-200 font-bold text-xs">Delivery Issue</span>;
       case "returned_to_store":
-        return <span className="px-2.5 py-1 rounded-full bg-slate-200 text-slate-800 font-bold text-xs">Returned</span>;
+        return <span className="px-2.5 py-1 rounded-full bg-slate-100 text-slate-800 border border-slate-200 font-bold text-xs">Returned</span>;
       case "cancelled":
-        return <span className="px-2.5 py-1 rounded-full bg-rose-100 text-rose-800 font-bold text-xs">Cancelled</span>;
+        return <span className="px-2.5 py-1 rounded-full bg-rose-50 text-rose-800 border border-rose-200 font-bold text-xs">Cancelled</span>;
       default:
         return <span className="px-2.5 py-1 rounded-full bg-slate-100 text-slate-700 font-bold text-xs">{status}</span>;
     }
@@ -198,28 +195,28 @@ export const UserAccountView: React.FC<UserAccountViewProps> = ({
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 space-y-8">
       {/* User Dashboard Header */}
-      <div className="p-6 sm:p-8 rounded-3xl bg-amber-950 text-amber-50 shadow-xl border border-amber-900/40 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-6">
+      <div className="p-6 sm:p-8 rounded-3xl bg-white text-slate-800 shadow-sm border border-slate-200 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-6">
         <div className="flex items-center gap-4">
-          <div className="w-16 h-16 rounded-2xl bg-amber-500 text-amber-950 font-bold text-xl flex items-center justify-center shadow-lg">
+          <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-amber-400 to-orange-500 text-slate-950 font-bold text-2xl flex items-center justify-center shadow-md shadow-amber-200">
             {userProfile?.fullName?.charAt(0) || "U"}
           </div>
           <div>
-            <h2 className="font-serif font-extrabold text-2xl text-white">
+            <h2 className="font-serif font-extrabold text-2xl text-slate-900">
               {userProfile?.fullName || "JJ Bookstore Customer"}
             </h2>
-            <p className="text-xs text-amber-300/80">{currentUser?.email || "Guest Customer"}</p>
+            <p className="text-xs text-slate-500">{currentUser?.email || "Guest Customer"}</p>
             <div className="mt-1 flex items-center gap-2">
-              <span className="px-2.5 py-0.5 rounded-full bg-amber-900 text-amber-300 text-[10px] font-bold uppercase">
+              <span className="px-2.5 py-0.5 rounded-full bg-amber-50 text-amber-800 border border-amber-200 text-[10px] font-bold uppercase">
                 {userProfile?.role || "Customer"} Account
               </span>
-              <span className="text-xs text-amber-200/60">• Member since 2026</span>
+              <span className="text-xs text-slate-400">• Verified Member</span>
             </div>
           </div>
         </div>
 
         <button
           onClick={() => onNavigate("shop")}
-          className="px-5 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-amber-950 font-bold text-xs shadow-md"
+          className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 text-slate-950 font-extrabold text-xs shadow-md shadow-amber-200 cursor-pointer"
         >
           Browse Book Catalog
         </button>
@@ -229,36 +226,36 @@ export const UserAccountView: React.FC<UserAccountViewProps> = ({
       <div className="flex border-b border-slate-200 gap-8 text-sm font-bold">
         <button
           onClick={() => setActiveTab("orders")}
-          className={`pb-3 transition-colors border-b-2 flex items-center gap-2 ${
+          className={`pb-3 transition-colors border-b-2 flex items-center gap-2 cursor-pointer ${
             activeTab === "orders" ? "border-amber-600 text-amber-800" : "border-transparent text-slate-500 hover:text-slate-800"
           }`}
         >
-          <Package className="w-4 h-4" />
-          <span>My Orders & Order Tracker</span>
+          <Package className="w-4 h-4 text-amber-600" />
+          <span>My Orders & Tracker</span>
         </button>
 
         <button
           onClick={() => setActiveTab("wishlist")}
-          className={`pb-3 transition-colors border-b-2 flex items-center gap-2 ${
+          className={`pb-3 transition-colors border-b-2 flex items-center gap-2 cursor-pointer ${
             activeTab === "wishlist" ? "border-amber-600 text-amber-800" : "border-transparent text-slate-500 hover:text-slate-800"
           }`}
         >
-          <Heart className="w-4 h-4" />
+          <Heart className="w-4 h-4 text-rose-500" />
           <span>Saved Wishlist ({wishlistIds.length})</span>
         </button>
 
         <button
           onClick={() => setActiveTab("profile")}
-          className={`pb-3 transition-colors border-b-2 flex items-center gap-2 ${
+          className={`pb-3 transition-colors border-b-2 flex items-center gap-2 cursor-pointer ${
             activeTab === "profile" ? "border-amber-600 text-amber-800" : "border-transparent text-slate-500 hover:text-slate-800"
           }`}
         >
-          <UserIcon className="w-4 h-4" />
+          <UserIcon className="w-4 h-4 text-amber-600" />
           <span>Account Settings</span>
         </button>
       </div>
 
-      {/* Tab 1: Orders History & Timeline */}
+      {/* Tab 1: Orders History */}
       {activeTab === "orders" && (
         <div className="space-y-6">
           <h3 className="font-serif font-bold text-slate-900 text-lg">Order History & Real-Time Tracking</h3>
@@ -266,7 +263,7 @@ export const UserAccountView: React.FC<UserAccountViewProps> = ({
           {loadingOrders ? (
             <div className="text-center py-12 text-slate-400 text-xs">Loading order records...</div>
           ) : orders.length === 0 ? (
-            <div className="p-12 text-center bg-white rounded-3xl border border-dashed border-slate-200 space-y-3">
+            <div className="p-12 text-center bg-white rounded-3xl border border-dashed border-slate-200 space-y-3 shadow-sm">
               <ShoppingBag className="w-12 h-12 text-amber-600 mx-auto" />
               <h4 className="font-serif font-bold text-slate-800 text-base">No Orders Placed Yet</h4>
               <p className="text-xs text-slate-500 max-w-sm mx-auto">
@@ -274,7 +271,7 @@ export const UserAccountView: React.FC<UserAccountViewProps> = ({
               </p>
               <button
                 onClick={() => onNavigate("shop")}
-                className="px-5 py-2.5 rounded-xl bg-amber-950 text-amber-100 font-bold text-xs hover:bg-amber-900 inline-block"
+                className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 text-slate-950 font-bold text-xs shadow-md shadow-amber-200 inline-block cursor-pointer"
               >
                 Start Shopping Now
               </button>
@@ -308,7 +305,7 @@ export const UserAccountView: React.FC<UserAccountViewProps> = ({
                         </span>
                         <button
                           onClick={() => setExpandedOrderId(isExpanded ? null : ord.id)}
-                          className="p-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold flex items-center gap-1"
+                          className="p-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold flex items-center gap-1 cursor-pointer"
                         >
                           <span>{isExpanded ? "Hide Details" : "Track & Details"}</span>
                           {isExpanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
@@ -318,32 +315,32 @@ export const UserAccountView: React.FC<UserAccountViewProps> = ({
 
                     {/* Expandable Tracking Timeline & Items */}
                     {isExpanded && (
-                      <div className="space-y-6 pt-2 animate-in fade-in">
+                      <div className="space-y-6 pt-2 animate-fadeIn">
                         {/* Status Timeline */}
-                        <div className="p-4 rounded-2xl bg-amber-50/50 border border-amber-900/10 space-y-3">
+                        <div className="p-4 rounded-2xl bg-amber-50/60 border border-amber-200 space-y-3">
                           <h5 className="font-bold text-slate-900 text-xs flex items-center gap-1.5">
                             <Clock className="w-4 h-4 text-amber-700" /> Real-time Delivery Status Tracker
                           </h5>
                           <div className="grid grid-cols-2 sm:grid-cols-5 gap-2 text-center text-[11px] font-semibold">
-                            <div className={`p-2 rounded-xl border ${ord.orderStatus !== "cancelled" ? "bg-amber-500 text-amber-950 font-bold border-amber-600" : "bg-slate-100 text-slate-400"}`}>
+                            <div className={`p-2 rounded-xl border ${ord.orderStatus !== "cancelled" ? "bg-amber-500 text-slate-950 font-bold border-amber-600 shadow-sm" : "bg-slate-100 text-slate-400"}`}>
                               1. Order Placed
                             </div>
-                            <div className={`p-2 rounded-xl border ${["confirmed", "processing", "shipped", "out_for_delivery", "delivered"].includes(ord.orderStatus) ? "bg-amber-500 text-amber-950 font-bold border-amber-600" : "bg-slate-100 text-slate-400"}`}>
+                            <div className={`p-2 rounded-xl border ${["confirmed", "processing", "shipped", "out_for_delivery", "delivered"].includes(ord.orderStatus) ? "bg-amber-500 text-slate-950 font-bold border-amber-600 shadow-sm" : "bg-slate-100 text-slate-400"}`}>
                               2. Confirmed
                             </div>
-                            <div className={`p-2 rounded-xl border ${["processing", "shipped", "out_for_delivery", "delivered"].includes(ord.orderStatus) ? "bg-amber-500 text-amber-950 font-bold border-amber-600" : "bg-slate-100 text-slate-400"}`}>
+                            <div className={`p-2 rounded-xl border ${["processing", "shipped", "out_for_delivery", "delivered"].includes(ord.orderStatus) ? "bg-amber-500 text-slate-950 font-bold border-amber-600 shadow-sm" : "bg-slate-100 text-slate-400"}`}>
                               3. Processing
                             </div>
-                            <div className={`p-2 rounded-xl border ${["shipped", "out_for_delivery", "delivered"].includes(ord.orderStatus) ? "bg-amber-500 text-amber-950 font-bold border-amber-600" : "bg-slate-100 text-slate-400"}`}>
+                            <div className={`p-2 rounded-xl border ${["shipped", "out_for_delivery", "delivered"].includes(ord.orderStatus) ? "bg-amber-500 text-slate-950 font-bold border-amber-600 shadow-sm" : "bg-slate-100 text-slate-400"}`}>
                               4. Out for Delivery
                             </div>
-                            <div className={`p-2 rounded-xl border ${ord.orderStatus === "delivered" ? "bg-emerald-600 text-white font-bold border-emerald-700" : "bg-slate-100 text-slate-400"}`}>
+                            <div className={`p-2 rounded-xl border ${ord.orderStatus === "delivered" ? "bg-emerald-600 text-white font-bold border-emerald-700 shadow-sm" : "bg-slate-100 text-slate-400"}`}>
                               5. Delivered
                             </div>
                           </div>
                         </div>
 
-                        {/* Official Receipt Card for Screenshot */}
+                        {/* Official Receipt Card */}
                         <div
                           id={`order-receipt-${ord.id}`}
                           className="p-5 rounded-2xl bg-white border border-slate-200 shadow-sm space-y-3 text-xs"
@@ -391,64 +388,6 @@ export const UserAccountView: React.FC<UserAccountViewProps> = ({
                           </div>
                         </div>
 
-                        {/* Customer Email Notifications Section */}
-                        {(() => {
-                          const matchingEmails = emailLogs.filter(
-                            (e) => e.orderId === ord.orderId || e.recipientEmail === ord.customerEmail
-                          );
-
-                          if (matchingEmails.length === 0) return null;
-
-                          return (
-                            <div className="p-4 rounded-2xl bg-amber-50/70 border border-amber-900/15 space-y-3 text-xs">
-                              <h5 className="font-bold text-amber-950 text-xs flex items-center justify-between">
-                                <span className="flex items-center gap-1.5">
-                                  <Mail className="w-4 h-4 text-amber-700" /> Dispatched Staff Verification Email ({matchingEmails.length})
-                                </span>
-                                <span className="text-[10px] font-bold text-amber-800 bg-amber-200/60 px-2.5 py-0.5 rounded-full">
-                                  Customer Mail Logged
-                                </span>
-                              </h5>
-
-                              <div className="space-y-2">
-                                {matchingEmails.map((log) => (
-                                  <div
-                                    key={log.id}
-                                    className="p-3.5 bg-white rounded-xl border border-amber-900/10 space-y-2"
-                                  >
-                                    <div className="flex items-center justify-between">
-                                      <span className="font-bold text-slate-900 flex items-center gap-1.5 text-xs">
-                                        <span
-                                          className={`w-2 h-2 rounded-full ${
-                                            log.emailType === "approved" ? "bg-emerald-500" : "bg-rose-500"
-                                          }`}
-                                        />
-                                        {log.subject}
-                                      </span>
-                                      <span className="text-[10px] text-slate-400">
-                                        {new Date(log.sentAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
-                                      </span>
-                                    </div>
-                                    <p className="text-slate-600 text-[11px]">
-                                      Sent to: <strong>{log.recipientEmail}</strong> • Staff Verifier:{" "}
-                                      <strong>{log.verifiedByEmployeeName || "Store Staff"}</strong>
-                                    </p>
-                                    <details className="mt-1">
-                                      <summary className="text-[11px] text-amber-800 font-bold cursor-pointer hover:underline">
-                                        View Formatted HTML Email Body
-                                      </summary>
-                                      <div
-                                        className="mt-2 p-3 bg-slate-50 rounded-xl border border-slate-200 max-h-52 overflow-y-auto text-[11px]"
-                                        dangerouslySetInnerHTML={{ __html: log.htmlBody }}
-                                      />
-                                    </details>
-                                  </div>
-                                ))}
-                              </div>
-                            </div>
-                          );
-                        })()}
-
                         {/* Order Footer Actions */}
                         <div className="flex flex-col sm:flex-row items-center justify-between gap-3 pt-2 border-t border-slate-100 text-xs">
                           <p className="text-slate-500">
@@ -459,7 +398,7 @@ export const UserAccountView: React.FC<UserAccountViewProps> = ({
                             {ord.orderStatus === "pending" && (
                               <button
                                 onClick={() => handleCancelOrder(ord.id)}
-                                className="px-3.5 py-2 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-700 font-bold text-xs"
+                                className="px-3.5 py-2 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-700 font-bold text-xs cursor-pointer"
                               >
                                 Cancel Order
                               </button>
@@ -467,7 +406,7 @@ export const UserAccountView: React.FC<UserAccountViewProps> = ({
                             <button
                               onClick={() => handleDownloadOrderScreenshot(ord)}
                               disabled={downloadingOrderId === ord.id}
-                              className="px-4 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs flex items-center gap-1.5 transition-all shadow-sm disabled:opacity-50"
+                              className="px-4 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs flex items-center gap-1.5 transition-all shadow-sm disabled:opacity-50 cursor-pointer"
                             >
                               {downloadingOrderId === ord.id ? (
                                 <>
@@ -499,7 +438,7 @@ export const UserAccountView: React.FC<UserAccountViewProps> = ({
           <h3 className="font-serif font-bold text-slate-900 text-lg">My Saved Wishlist Books</h3>
 
           {wishlistBooks.length === 0 ? (
-            <div className="p-12 text-center bg-white rounded-3xl border border-dashed border-slate-200 space-y-3">
+            <div className="p-12 text-center bg-white rounded-3xl border border-dashed border-slate-200 space-y-3 shadow-sm">
               <Heart className="w-12 h-12 text-rose-500 mx-auto" />
               <h4 className="font-serif font-bold text-slate-800 text-base">Wishlist is Empty</h4>
               <p className="text-xs text-slate-500 max-w-sm mx-auto">
@@ -507,7 +446,7 @@ export const UserAccountView: React.FC<UserAccountViewProps> = ({
               </p>
               <button
                 onClick={() => onNavigate("shop")}
-                className="px-5 py-2.5 rounded-xl bg-amber-950 text-amber-100 font-bold text-xs hover:bg-amber-900 inline-block"
+                className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 text-slate-950 font-bold text-xs shadow-md shadow-amber-200 inline-block cursor-pointer"
               >
                 Browse Books
               </button>
@@ -516,7 +455,7 @@ export const UserAccountView: React.FC<UserAccountViewProps> = ({
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
               {wishlistBooks.map((bk) => (
                 <div key={bk.id} className="p-4 rounded-2xl bg-white border border-slate-200 shadow-sm flex items-center gap-4">
-                  <img src={bk.coverImage} alt={bk.title} className="w-16 h-20 object-cover rounded-xl shrink-0" />
+                  <img src={bk.coverImage} alt={bk.title} className="w-16 h-20 object-cover rounded-xl shrink-0 border border-slate-100" />
                   <div className="flex-1 min-w-0 space-y-1">
                     <h4 className="font-serif font-bold text-slate-900 text-xs truncate">{bk.title}</h4>
                     <p className="text-[11px] text-slate-500">{bk.authorName}</p>
@@ -528,13 +467,13 @@ export const UserAccountView: React.FC<UserAccountViewProps> = ({
                           addToCart(bk, 1);
                           showToast("Moved to Cart", `Added "${bk.title}" to cart.`, "success");
                         }}
-                        className="px-3 py-1 rounded-lg bg-amber-500 hover:bg-amber-400 text-amber-950 font-bold text-[11px]"
+                        className="px-3 py-1 rounded-lg bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-[11px] cursor-pointer"
                       >
                         Add to Cart
                       </button>
                       <button
                         onClick={() => toggleWishlist(bk.id)}
-                        className="text-slate-400 hover:text-rose-600 text-[11px] font-semibold"
+                        className="text-slate-400 hover:text-rose-600 text-[11px] font-semibold cursor-pointer"
                       >
                         Remove
                       </button>
@@ -560,7 +499,7 @@ export const UserAccountView: React.FC<UserAccountViewProps> = ({
                 value={fullName}
                 onChange={(e) => setFullName(e.target.value)}
                 required
-                className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:border-amber-500 text-sm"
+                className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:border-amber-500 text-sm bg-white"
               />
             </div>
 
@@ -581,14 +520,14 @@ export const UserAccountView: React.FC<UserAccountViewProps> = ({
                 value={phone}
                 onChange={(e) => setPhone(e.target.value)}
                 placeholder="+251 938 014 055"
-                className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:border-amber-500 text-sm"
+                className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:border-amber-500 text-sm bg-white"
               />
             </div>
 
             <button
               type="submit"
               disabled={savingProfile}
-              className="px-6 py-3 rounded-xl bg-amber-500 hover:bg-amber-400 text-amber-950 font-bold text-xs shadow-md"
+              className="px-6 py-3 rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 text-slate-950 font-bold text-xs shadow-md shadow-amber-200 cursor-pointer"
             >
               {savingProfile ? "Saving..." : "Save Profile Details"}
             </button>

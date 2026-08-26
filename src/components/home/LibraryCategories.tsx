@@ -11,7 +11,6 @@ export const LibraryCategories: React.FC<LibraryCategoriesProps> = ({
   categories,
   onSelectCategory,
 }) => {
-  // Ensure all 10 required category names are represented
   const requiredCategories = [
     { id: "cat-fiction", name: "Fiction", desc: "Engaging novels, poetry, and storytelling classics." },
     { id: "cat-nonfiction", name: "Non-Fiction", desc: "Biographies, essays, memoirs, and real-world accounts." },
@@ -25,7 +24,6 @@ export const LibraryCategories: React.FC<LibraryCategoriesProps> = ({
     { id: "cat-amharic", name: "Ethiopian Books", desc: "Amharic literature, Ge'ez texts, and Ethiopian classics." },
   ];
 
-  // Merge loaded categories or fallback to required list
   const displayCategories = requiredCategories.map((req) => {
     const existing = categories.find(
       (c) => c.name.toLowerCase() === req.name.toLowerCase() || c.id === req.id
@@ -41,20 +39,20 @@ export const LibraryCategories: React.FC<LibraryCategoriesProps> = ({
   });
 
   return (
-    <section className="relative py-16 bg-[#1a120c] text-stone-100 border-b border-amber-950/60 overflow-hidden">
+    <section className="relative py-16 bg-slate-50 text-slate-800 border-b border-slate-200 overflow-hidden">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-10">
         <div className="text-center max-w-2xl mx-auto space-y-3">
-          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-amber-950 text-amber-400 border border-amber-800/60 text-xs font-bold uppercase tracking-wider">
-            <Layers className="w-3.5 h-3.5" />
+          <div className="inline-flex items-center gap-2 px-3.5 py-1 rounded-full bg-amber-50 text-amber-800 border border-amber-200 text-xs font-bold uppercase tracking-wider shadow-sm">
+            <Layers className="w-3.5 h-3.5 text-amber-600" />
             <span>Digital Library Aisles</span>
           </div>
 
-          <h2 className="font-serif font-extrabold text-2xl sm:text-4xl text-white tracking-tight">
-            Explore Library Categories
+          <h2 className="font-serif font-extrabold text-2xl sm:text-4xl text-slate-900 tracking-tight">
+            Explore Bookstore Categories
           </h2>
 
-          <p className="text-stone-400 text-xs sm:text-sm leading-relaxed">
-            Step into dedicated reading wings curated across literature, science, history, and Ethiopian heritage.
+          <p className="text-slate-600 text-xs sm:text-sm leading-relaxed">
+            Step into dedicated aisles curated across literature, sciences, history, technology, and authentic Ethiopian heritage.
           </p>
         </div>
 
@@ -64,26 +62,26 @@ export const LibraryCategories: React.FC<LibraryCategoriesProps> = ({
             <div
               key={cat.id}
               onClick={() => onSelectCategory(cat.id)}
-              className="group relative rounded-3xl bg-gradient-to-b from-[#251b13] to-[#1a110a] border border-amber-900/40 hover:border-amber-500/60 p-5 cursor-pointer transition-all duration-300 shadow-md hover:shadow-2xl hover:-translate-y-1.5 flex flex-col justify-between"
+              className="group relative rounded-3xl bg-white border border-slate-200 hover:border-amber-400 p-5 cursor-pointer transition-all duration-300 shadow-sm hover:shadow-xl hover:-translate-y-1 flex flex-col justify-between"
             >
               <div className="space-y-3">
-                <div className="w-10 h-10 rounded-2xl bg-amber-900/40 border border-amber-700/40 flex items-center justify-center text-amber-400 group-hover:bg-amber-500 group-hover:text-stone-950 transition-colors">
+                <div className="w-10 h-10 rounded-2xl bg-amber-50 border border-amber-200/80 flex items-center justify-center text-amber-700 group-hover:bg-amber-500 group-hover:text-slate-950 transition-colors shadow-sm">
                   <BookOpen className="w-5 h-5" />
                 </div>
 
                 <div>
-                  <h3 className="font-serif font-bold text-white text-base group-hover:text-amber-300 transition-colors">
+                  <h3 className="font-serif font-bold text-slate-900 text-base group-hover:text-amber-800 transition-colors">
                     {cat.name}
                   </h3>
-                  <p className="text-[11px] text-stone-400 leading-relaxed mt-1 line-clamp-2">
+                  <p className="text-xs text-slate-500 leading-relaxed mt-1 line-clamp-2">
                     {cat.description}
                   </p>
                 </div>
               </div>
 
-              <div className="pt-4 mt-4 border-t border-amber-900/30 flex items-center justify-between text-[11px] font-bold text-amber-400">
-                <span>Enter Wing</span>
-                <ArrowRight className="w-3.5 h-3.5 group-hover:translate-x-1 transition-transform" />
+              <div className="pt-4 mt-4 border-t border-slate-100 flex items-center justify-between text-xs font-bold text-amber-700">
+                <span>Browse Category</span>
+                <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
               </div>
             </div>
           ))}

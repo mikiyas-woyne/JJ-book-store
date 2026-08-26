@@ -40,7 +40,8 @@ import {
   Star,
   Users,
   Layers,
-  Award
+  Award,
+  Sparkles
 } from "lucide-react";
 
 function MainAppContent() {
@@ -292,15 +293,13 @@ function MainAppContent() {
     if (selectedSort === "price-high") return priceB - priceA;
     if (selectedSort === "rating") return b.ratingAverage - a.ratingAverage;
     if (selectedSort === "bestselling") return b.soldCount - a.soldCount;
-    // Sort alphabetically by title, ignoring case (A→Z)
     if (selectedSort === "title-az") return a.title.localeCompare(b.title);
-    // Sort alphabetically by title, ignoring case, reversed (Z→A)
     if (selectedSort === "title-za") return b.title.localeCompare(a.title);
     return new Date(b.createdAt || "").getTime() - new Date(a.createdAt || "").getTime();
   });
 
   return (
-    <div className="min-h-screen bg-[#ffe6cc] flex flex-col text-slate-800 font-sans antialiased">
+    <div className="min-h-screen bg-[#f8fafc] flex flex-col text-slate-800 font-sans antialiased">
       {/* Header Navigation */}
       <Header
         onOpenSearch={() => setIsSearchOpen(true)}
@@ -336,11 +335,11 @@ function MainAppContent() {
         {activePage === "shop" && (
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 space-y-6">
             {/* Header & Controls Bar */}
-            <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 border-b border-orange-200 pb-6">
+            <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 border-b border-slate-200 pb-6">
               <div>
                 <h1 className="font-serif font-extrabold text-2xl sm:text-3xl text-slate-900 flex items-center gap-3">
-                  <span>Digital Library Catalog</span>
-                  <span className="text-xs font-sans font-bold bg-rose-50 text-rose-800 border border-rose-100 px-2.5 py-1 rounded-full">
+                  <span>Digital Book Catalog</span>
+                  <span className="text-xs font-sans font-bold bg-amber-50 text-amber-800 border border-amber-200 px-2.5 py-1 rounded-full shadow-sm">
                     {sortedBooks.length} Available
                   </span>
                 </h1>
@@ -354,7 +353,7 @@ function MainAppContent() {
                 <select
                   value={selectedCategoryId}
                   onChange={(e) => setSelectedCategoryId(e.target.value)}
-                  className="px-3.5 py-2 rounded-xl border border-orange-200 bg-orange-50 text-xs font-bold text-slate-700 focus:outline-none focus:border-fuchsia-600"
+                  className="px-3.5 py-2 rounded-xl border border-slate-200 bg-white text-xs font-bold text-slate-700 focus:outline-none focus:border-amber-500 shadow-sm cursor-pointer"
                 >
                   <option value="all">All Categories ({categories.length})</option>
                   {categories.map((c) => (
@@ -367,7 +366,7 @@ function MainAppContent() {
                 <select
                   value={selectedAuthorId}
                   onChange={(e) => setSelectedAuthorId(e.target.value)}
-                  className="px-3.5 py-2 rounded-xl border border-orange-200 bg-orange-50 text-xs font-bold text-slate-700 focus:outline-none focus:border-fuchsia-600"
+                  className="px-3.5 py-2 rounded-xl border border-slate-200 bg-white text-xs font-bold text-slate-700 focus:outline-none focus:border-amber-500 shadow-sm cursor-pointer"
                 >
                   <option value="all">All Authors ({authors.length})</option>
                   {authors.map((a) => (
@@ -380,7 +379,7 @@ function MainAppContent() {
                 <select
                   value={selectedSort}
                   onChange={(e) => setSelectedSort(e.target.value)}
-                  className="px-3.5 py-2 rounded-xl border border-orange-200 bg-orange-50 text-xs font-bold text-slate-700 focus:outline-none focus:border-fuchsia-600"
+                  className="px-3.5 py-2 rounded-xl border border-slate-200 bg-white text-xs font-bold text-slate-700 focus:outline-none focus:border-amber-500 shadow-sm cursor-pointer"
                 >
                   <option value="newest">Newest Titles</option>
                   <option value="bestselling">Most Popular</option>
@@ -397,10 +396,10 @@ function MainAppContent() {
             <div className="flex items-center gap-2 overflow-x-auto pb-2 scrollbar-none">
               <button
                 onClick={() => setSelectedCategoryId("all")}
-                className={`px-3.5 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap transition-all shrink-0 ${
+                className={`px-3.5 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap transition-all shrink-0 cursor-pointer ${
                   selectedCategoryId === "all"
-                    ? "bg-amber-500 text-stone-950 shadow-md"
-                    : "bg-orange-50 text-slate-600 hover:text-fuchsia-800 hover:bg-fuchsia-50 border border-orange-200"
+                    ? "bg-amber-500 text-slate-950 shadow-md"
+                    : "bg-white text-slate-600 hover:text-amber-800 hover:bg-amber-50 border border-slate-200 shadow-sm"
                 }`}
               >
                 All Genres ({books.length})
@@ -412,15 +411,15 @@ function MainAppContent() {
                   <button
                     key={cat.id}
                     onClick={() => setSelectedCategoryId(cat.id)}
-                    className={`px-3.5 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap transition-all shrink-0 flex items-center gap-1.5 ${
+                    className={`px-3.5 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap transition-all shrink-0 flex items-center gap-1.5 cursor-pointer ${
                       isSelected
-                        ? "bg-amber-500 text-stone-950 shadow-md"
-                        : "bg-orange-50 text-slate-600 hover:text-fuchsia-800 hover:bg-fuchsia-50 border border-orange-200"
+                        ? "bg-amber-500 text-slate-950 shadow-md"
+                        : "bg-white text-slate-600 hover:text-amber-800 hover:bg-amber-50 border border-slate-200 shadow-sm"
                     }`}
                   >
                     <span>{cat.name}</span>
                     {count > 0 && (
-                      <span className={`text-[10px] px-1.5 py-0.2 rounded-full ${isSelected ? "bg-fuchsia-950/10 text-fuchsia-950" : "bg-orange-100 text-slate-500"}`}>
+                      <span className={`text-[10px] px-1.5 py-0.2 rounded-full ${isSelected ? "bg-slate-950/15 text-slate-950" : "bg-slate-100 text-slate-500"}`}>
                         {count}
                       </span>
                     )}
@@ -429,17 +428,17 @@ function MainAppContent() {
               })}
             </div>
 
-            {/* Active Filter Tags Row (if filtered) */}
+            {/* Active Filter Tags Row */}
             {(selectedCategoryId !== "all" || selectedAuthorId !== "all" || searchQuery.trim() !== "") && (
               <div className="flex flex-wrap items-center gap-2 pt-1 pb-1">
-                  <span className="text-xs text-slate-500 font-medium">Active Filters:</span>
+                <span className="text-xs text-slate-500 font-medium">Active Filters:</span>
 
                 {selectedCategoryId !== "all" && (
-                  <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-amber-950/80 border border-amber-800/60 text-amber-300 text-xs font-semibold">
+                  <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-amber-50 border border-amber-200 text-amber-800 text-xs font-semibold">
                     Category: {categories.find((c) => c.id === selectedCategoryId)?.name || selectedCategoryId}
                     <button
                       onClick={() => setSelectedCategoryId("all")}
-                      className="text-amber-400 hover:text-white font-bold ml-1"
+                      className="text-amber-700 hover:text-rose-600 font-bold ml-1 cursor-pointer"
                     >
                       ×
                     </button>
@@ -447,11 +446,11 @@ function MainAppContent() {
                 )}
 
                 {selectedAuthorId !== "all" && (
-                  <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-amber-950/80 border border-amber-800/60 text-amber-300 text-xs font-semibold">
+                  <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-amber-50 border border-amber-200 text-amber-800 text-xs font-semibold">
                     Author: {authors.find((a) => a.id === selectedAuthorId)?.name || selectedAuthorId}
                     <button
                       onClick={() => setSelectedAuthorId("all")}
-                      className="text-amber-400 hover:text-white font-bold ml-1"
+                      className="text-amber-700 hover:text-rose-600 font-bold ml-1 cursor-pointer"
                     >
                       ×
                     </button>
@@ -459,11 +458,11 @@ function MainAppContent() {
                 )}
 
                 {searchQuery.trim() !== "" && (
-                  <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-amber-950/80 border border-amber-800/60 text-amber-300 text-xs font-semibold">
+                  <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-amber-50 border border-amber-200 text-amber-800 text-xs font-semibold">
                     Search: &ldquo;{searchQuery}&rdquo;
                     <button
                       onClick={() => setSearchQuery("")}
-                      className="text-amber-400 hover:text-white font-bold ml-1"
+                      className="text-amber-700 hover:text-rose-600 font-bold ml-1 cursor-pointer"
                     >
                       ×
                     </button>
@@ -476,7 +475,7 @@ function MainAppContent() {
                     setSelectedAuthorId("all");
                     setSearchQuery("");
                   }}
-                  className="text-xs font-bold text-amber-400 hover:text-amber-300 underline ml-2"
+                  className="text-xs font-bold text-amber-700 hover:text-amber-800 underline ml-2 cursor-pointer"
                 >
                   Clear All
                 </button>
@@ -526,7 +525,7 @@ function MainAppContent() {
                     setSelectedAuthorId(auth.id);
                     handleNavigate("shop");
                   }}
-                  className="p-6 rounded-3xl bookshop-card hover:border-fuchsia-300 cursor-pointer transition-all space-y-4 group"
+                  className="p-6 rounded-3xl bg-white border border-slate-200 hover:border-amber-400 hover:shadow-xl cursor-pointer transition-all space-y-4 group shadow-sm"
                 >
                   <div className="flex items-center gap-4">
                     <img
@@ -535,10 +534,10 @@ function MainAppContent() {
                       className="w-16 h-16 rounded-full object-cover border-2 border-amber-400 group-hover:scale-105 transition-transform"
                     />
                     <div>
-                      <h3 className="font-serif font-bold text-slate-900 text-base group-hover:text-fuchsia-800">
+                      <h3 className="font-serif font-bold text-slate-900 text-base group-hover:text-amber-800 transition-colors">
                         {auth.name}
                       </h3>
-                      <span className="text-xs font-semibold text-fuchsia-800 bg-fuchsia-50 px-2.5 py-0.5 rounded-full border border-fuchsia-100">
+                      <span className="text-xs font-bold text-amber-800 bg-amber-50 px-2.5 py-0.5 rounded-full border border-amber-200/60">
                         Author
                       </span>
                     </div>
@@ -548,9 +547,9 @@ function MainAppContent() {
                     {auth.bio}
                   </p>
 
-                  <div className="pt-2 border-t border-orange-200 flex items-center justify-between text-xs font-bold text-fuchsia-700">
+                  <div className="pt-2 border-t border-slate-100 flex items-center justify-between text-xs font-bold text-amber-700">
                     <span>View Books by {auth.name.split(" ")[0]}</span>
-                    <ArrowRight className="w-4 h-4" />
+                    <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
                   </div>
                 </div>
               ))}

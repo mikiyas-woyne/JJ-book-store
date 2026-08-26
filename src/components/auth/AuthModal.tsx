@@ -71,32 +71,25 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, reasonNot
   const handleGoogleSignIn = async (directEmailOverride?: string) => {
     setLoading(true);
 
-    // Some preview/embedded windows block BOTH the Google sign-in popup
-    // AND the full-page redirect we fall back to (see AuthContext). In
-    // that case the underlying Firebase call never resolves or rejects,
-    // which used to leave this button spinning forever with the user
-    // never actually getting signed in. This timeout guarantees we always
-    // stop loading and tell the user what's going on, even if Firebase
-    // itself never gets back to us.
     let timedOut = false;
     const timeoutId = setTimeout(() => {
       timedOut = true;
       setLoading(false);
       showToast(
         "Google Sign-In Unavailable Here",
-        "This preview window is blocking Google's sign-in popup and redirect. Open this site in its own browser tab (not embedded/preview) and try again, or sign in with email instead.",
+        "This preview window is blocking Google's sign-in popup. You can sign in with email/password instead.",
         "error"
       );
     }, 10000);
 
     try {
       await loginWithGoogle(directEmailOverride);
-      if (timedOut) return; // the timeout already reported this attempt as failed
+      if (timedOut) return;
       clearTimeout(timeoutId);
       showToast("Google Sign-In Successful", "Welcome to JJ Book Shopping!", "success");
       onClose();
     } catch (err: any) {
-      if (timedOut) return; // the timeout already reported this attempt as failed
+      if (timedOut) return;
       clearTimeout(timeoutId);
       console.error("Google auth error:", err);
       if (
@@ -108,7 +101,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, reasonNot
         setShowDomainNotice(true);
         showToast("Domain Authorization Needed", "Preview domain not yet authorized in Firebase Console.", "error");
       } else if (err?.code === "auth/operation-not-allowed") {
-        showToast("Google Auth Disabled", "Please enable Google Sign-In under Firebase Console > Auth > Sign-in method.", "error");
+        showToast("Google Auth Disabled", "Please enable Google Sign-In in Firebase Console.", "error");
       } else {
         showToast("Google Sign-In Failed", err?.message || "Unable to complete Google Sign-In.", "error");
       }
@@ -118,19 +111,19 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, reasonNot
   };
 
   return (
-    <div className="fixed inset-0 z-50 overflow-y-auto bg-black/60 backdrop-blur-sm flex items-center justify-center p-3 sm:p-6 animate-in fade-in">
-      <div className="relative bg-white rounded-3xl shadow-2xl border border-slate-100 w-full max-w-md overflow-hidden max-h-[92vh] flex flex-col my-auto">
+    <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-3 sm:p-6 animate-fadeIn">
+      <div className="relative bg-white rounded-3xl shadow-2xl border border-slate-200 w-full max-w-md overflow-hidden max-h-[92vh] flex flex-col my-auto">
         {/* Header */}
-        <div className="p-4 sm:p-6 border-b border-slate-100 bg-amber-950 text-amber-50 flex items-center justify-between">
+        <div className="p-4 sm:p-6 border-b border-slate-100 bg-slate-50 flex items-center justify-between">
           <div>
-            <h3 className="font-serif font-bold text-lg sm:text-xl text-white">
+            <h3 className="font-serif font-extrabold text-lg sm:text-xl text-slate-900">
               {mode === "login" && "Sign In to JJ Bookstore"}
               {mode === "register" && "Create Customer Account"}
               {mode === "forgot" && "Reset Password"}
             </h3>
-            <p className="text-xs text-amber-300">Unlock order tracking, wishlists & reviews</p>
+            <p className="text-xs text-slate-500 mt-0.5">Unlock order tracking, wishlists & reviews</p>
           </div>
-          <button onClick={onClose} className="p-1.5 rounded-full hover:bg-amber-900 text-amber-300">
+          <button onClick={onClose} className="p-1.5 rounded-full hover:bg-slate-200 text-slate-500 cursor-pointer">
             <X className="w-6 h-6" />
           </button>
         </div>
@@ -138,7 +131,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, reasonNot
         {/* Form Body */}
         <div className="p-4 sm:p-6 space-y-4 sm:space-y-5 overflow-y-auto">
           {reasonNotice && (
-            <div className="p-3.5 rounded-2xl bg-amber-500/10 border border-amber-500/30 text-amber-950 text-xs font-semibold flex items-center gap-2.5 animate-in fade-in">
+            <div className="p-3.5 rounded-2xl bg-amber-50 border border-amber-200 text-amber-900 text-xs font-semibold flex items-center gap-2.5 animate-fadeIn">
               <Sparkles className="w-4 h-4 text-amber-600 shrink-0" />
               <span className="leading-relaxed">{reasonNotice}</span>
             </div>
@@ -156,7 +149,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, reasonNot
                     onChange={(e) => setFullName(e.target.value)}
                     placeholder="ሙሉ ስም ያስገቡ (Enter Full Name)"
                     required
-                    className="w-full pl-9 pr-3.5 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:border-amber-500"
+                    className="w-full pl-9 pr-3.5 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:border-amber-500 bg-white"
                   />
                 </div>
               </div>
@@ -172,7 +165,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, reasonNot
                   onChange={(e) => setEmail(e.target.value)}
                   placeholder="name@domain.com"
                   required
-                  className="w-full pl-9 pr-3.5 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:border-amber-500"
+                  className="w-full pl-9 pr-3.5 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:border-amber-500 bg-white"
                 />
               </div>
             </div>
@@ -185,7 +178,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, reasonNot
                     <button
                       type="button"
                       onClick={() => setMode("forgot")}
-                      className="text-amber-800 hover:underline font-semibold"
+                      className="text-amber-700 hover:underline font-semibold cursor-pointer"
                     >
                       Forgot?
                     </button>
@@ -200,12 +193,12 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, reasonNot
                     placeholder="••••••••"
                     required
                     minLength={6}
-                    className="w-full pl-9 pr-10 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:border-amber-500 font-medium"
+                    className="w-full pl-9 pr-10 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:border-amber-500 font-medium bg-white"
                   />
                   <button
                     type="button"
                     onClick={() => setShowPassword(!showPassword)}
-                    className="absolute right-3 top-2.5 p-0.5 text-slate-400 hover:text-slate-600 focus:outline-none transition-colors"
+                    className="absolute right-3 top-2.5 p-0.5 text-slate-400 hover:text-slate-600 focus:outline-none transition-colors cursor-pointer"
                     title={showPassword ? "Hide password" : "Show password"}
                   >
                     {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
@@ -217,9 +210,9 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, reasonNot
             <button
               type="submit"
               disabled={loading}
-              className="w-full py-3 px-4 rounded-xl bg-amber-500 hover:bg-amber-400 text-amber-950 font-bold text-sm shadow-md transition-all flex items-center justify-center gap-2 active:scale-95 disabled:opacity-50"
+              className="w-full py-3 px-4 rounded-xl bg-gradient-to-r from-amber-500 via-amber-400 to-orange-500 hover:from-amber-400 hover:to-orange-400 text-slate-950 font-black text-sm shadow-md shadow-amber-200 transition-all flex items-center justify-center gap-2 active:scale-95 disabled:opacity-50 cursor-pointer"
             >
-              <LogIn className="w-4 h-4" />
+              <LogIn className="w-4 h-4 text-slate-950" />
               <span>
                 {loading
                   ? "Authenticating..."
@@ -245,7 +238,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, reasonNot
                 type="button"
                 onClick={() => handleGoogleSignIn()}
                 disabled={loading}
-                className="w-full py-2.5 px-4 rounded-xl border border-slate-200 hover:bg-slate-50 text-slate-700 font-bold text-xs transition-all flex items-center justify-center gap-2.5 shadow-sm bg-white active:scale-98 disabled:opacity-50"
+                className="w-full py-2.5 px-4 rounded-xl border border-slate-200 hover:bg-slate-50 text-slate-700 font-bold text-xs transition-all flex items-center justify-center gap-2.5 shadow-sm bg-white active:scale-98 disabled:opacity-50 cursor-pointer"
               >
                 <svg className="w-4 h-4 shrink-0" viewBox="0 0 24 24">
                   <path
@@ -268,9 +261,8 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, reasonNot
                 <span>Continue with Google</span>
               </button>
 
-              {/* Domain Authorization Notice & Quick Google Login Box */}
               {showDomainNotice && (
-                <div className="p-3.5 rounded-2xl bg-amber-50 border border-amber-200 text-amber-900 text-xs space-y-2.5 animate-in fade-in">
+                <div className="p-3.5 rounded-2xl bg-amber-50 border border-amber-200 text-amber-900 text-xs space-y-2.5 animate-fadeIn">
                   <div className="flex items-start gap-2">
                     <ShieldAlert className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
                     <div>
@@ -286,7 +278,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, reasonNot
                     <button
                       type="button"
                       onClick={copyDomainToClipboard}
-                      className="px-2 py-1 bg-amber-800 hover:bg-amber-900 text-white rounded-lg text-[10px] font-bold flex items-center gap-1 transition-colors shrink-0"
+                      className="px-2 py-1 bg-amber-800 hover:bg-amber-900 text-white rounded-lg text-[10px] font-bold flex items-center gap-1 transition-colors shrink-0 cursor-pointer"
                     >
                       {copied ? <Check className="w-3 h-3 text-green-300" /> : <Copy className="w-3 h-3" />}
                       <span>{copied ? "Copied!" : "Copy Domain"}</span>
@@ -306,7 +298,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, reasonNot
                       <button
                         type="button"
                         onClick={() => handleGoogleSignIn(googleEmailInput.trim() || "mikiyaswoyne@gmail.com")}
-                        className="px-3 py-1.5 bg-amber-900 hover:bg-amber-950 text-white font-bold text-xs rounded-xl transition-all shrink-0"
+                        className="px-3 py-1.5 bg-amber-800 hover:bg-amber-900 text-white font-bold text-xs rounded-xl transition-all shrink-0 cursor-pointer"
                       >
                         Sign In
                       </button>
@@ -324,7 +316,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, reasonNot
                 Don't have an account?{" "}
                 <button
                   onClick={() => setMode("register")}
-                  className="font-bold text-amber-800 hover:underline"
+                  className="font-bold text-amber-700 hover:underline cursor-pointer"
                 >
                   Register now
                 </button>
@@ -334,7 +326,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, reasonNot
                 Already registered?{" "}
                 <button
                   onClick={() => setMode("login")}
-                  className="font-bold text-amber-800 hover:underline"
+                  className="font-bold text-amber-700 hover:underline cursor-pointer"
                 >
                   Sign in here
                 </button>
