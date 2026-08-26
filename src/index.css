@@ -1,7 +1,7 @@
 @import "tailwindcss";
 
 /* Bright, welcoming bookstore palette: apricot #FFE6CC, ink #1E293B,
-   teal #0F766E, coral #E85D3F, and marigold #F59E0B. */
+   berry #A21CAF, coral #E85D3F, and marigold #F59E0B. */
 @layer base {
   body {
     background: #ffe6cc;

@@ -144,7 +144,7 @@ export const LibraryEnvironmentHero: React.FC<LibraryEnvironmentHeroProps> = ({
                       className={`px-2.5 py-1 rounded-full text-[11px] font-bold transition-all whitespace-nowrap cursor-pointer ${
                         safeIndex === i
                           ? "bg-amber-400 text-stone-950 shadow-md font-black scale-105"
-                          : "bg-orange-50 text-slate-600 hover:text-teal-800 border border-orange-200"
+                          : "bg-orange-50 text-slate-600 hover:text-fuchsia-800 border border-orange-200"
                       }`}
                     >
                       {bk.title.split("(")[0].trim()}
@@ -160,7 +160,7 @@ export const LibraryEnvironmentHero: React.FC<LibraryEnvironmentHeroProps> = ({
 
               {/* Author & Attributes */}
               <div className="flex flex-wrap items-center gap-3 text-xs sm:text-sm text-slate-600 font-medium">
-                <span>By <strong className="text-teal-800 font-serif font-bold text-base">{activeBook.authorName}</strong></span>
+                <span>By <strong className="text-fuchsia-800 font-serif font-bold text-base">{activeBook.authorName}</strong></span>
                 <span className="text-slate-300">•</span>
                 <span className="text-amber-600 font-semibold">{activeBook.categoryName}</span>
                 <span className="text-slate-300">•</span>
@@ -200,7 +200,7 @@ export const LibraryEnvironmentHero: React.FC<LibraryEnvironmentHeroProps> = ({
             <div className="pt-4 border-t border-orange-200 space-y-4">
               {/* Ethiopian Birr Pricing */}
               <div className="flex items-baseline gap-3">
-                <span className="font-serif font-extrabold text-2xl sm:text-3xl text-teal-800 tracking-tight">
+                <span className="font-serif font-extrabold text-2xl sm:text-3xl text-fuchsia-800 tracking-tight">
                   {activeBook.discountPrice || activeBook.price} <span className="text-xs font-sans font-bold text-amber-600">ETB</span>
                 </span>
                 {activeBook.discountPrice && (
@@ -222,7 +222,7 @@ export const LibraryEnvironmentHero: React.FC<LibraryEnvironmentHeroProps> = ({
               <div className="flex flex-wrap items-center gap-3">
                 <button
                   onClick={() => onSelectBook(activeBook)}
-                  className="flex-1 min-w-[130px] px-5 py-3 rounded-2xl bg-teal-700 hover:bg-teal-600 text-white font-extrabold text-xs uppercase tracking-wider transition-all shadow-lg shadow-teal-200 flex items-center justify-center gap-2 active:scale-95 cursor-pointer"
+                  className="flex-1 min-w-[130px] px-5 py-3 rounded-2xl bg-fuchsia-700 hover:bg-fuchsia-600 text-white font-extrabold text-xs uppercase tracking-wider transition-all shadow-lg shadow-fuchsia-200 flex items-center justify-center gap-2 active:scale-95 cursor-pointer"
                 >
                   <Eye className="w-4 h-4" />
                   <span>VIEW BOOK</span>
@@ -241,7 +241,7 @@ export const LibraryEnvironmentHero: React.FC<LibraryEnvironmentHeroProps> = ({
                   className={`p-3 rounded-2xl border transition-colors cursor-pointer ${
                     isFavorited
                       ? "bg-rose-600 border-rose-500 text-white shadow-lg shadow-rose-950/50"
-                      : "bg-orange-50 border-orange-200 text-slate-600 hover:text-teal-800"
+                      : "bg-orange-50 border-orange-200 text-slate-600 hover:text-fuchsia-800"
                   }`}
                   title="Wishlist"
                 >

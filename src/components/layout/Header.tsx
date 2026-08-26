@@ -41,14 +41,14 @@ export const Header: React.FC<HeaderProps> = ({
   return (
     <header className="sticky top-0 z-40 bg-orange-50/95 text-slate-800 shadow-sm border-b border-orange-200 backdrop-blur-md">
       {/* Top Banner Ticker */}
-      <div className="bg-gradient-to-r from-teal-800 via-teal-700 to-cyan-700 text-teal-50 text-xs py-2 px-4 border-b border-teal-600/30">
+      <div className="bg-gradient-to-r from-fuchsia-800 via-fuchsia-700 to-rose-700 text-fuchsia-50 text-xs py-2 px-4 border-b border-fuchsia-600/30">
         <div className="max-w-7xl mx-auto w-full flex items-center justify-between gap-4">
           <p className="flex items-center gap-2 mx-auto sm:mx-0 font-medium tracking-wide">
             <span>Fast Express Delivery in Addis Ababa & Regions • Use promo code <strong className="text-amber-200 underline font-semibold tracking-wider">WELCOME15</strong> for 15% Off!</span>
           </p>
-          <div className="hidden sm:flex items-center gap-5 text-teal-100 text-[11px] font-semibold tracking-wider uppercase">
+          <div className="hidden sm:flex items-center gap-5 text-fuchsia-100 text-[11px] font-semibold tracking-wider uppercase">
             <span className="flex items-center gap-1.5"><span className="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>ETB (የኢትዮጵያ ብር)</span>
-            <span className="text-teal-200/50">|</span>
+            <span className="text-fuchsia-200/50">|</span>
             <span>Support: +251 938 014 055</span>
           </div>
         </div>
@@ -83,8 +83,8 @@ export const Header: React.FC<HeaderProps> = ({
             onClick={() => onNavigate("home")}
             className={`px-4 py-2 rounded-xl transition-all duration-200 ${
               activePage === "home"
-                ? "bg-teal-50 text-teal-800 font-semibold border border-teal-100 shadow-inner"
-                : "hover:bg-teal-50 hover:text-teal-800"
+                ? "bg-fuchsia-50 text-fuchsia-800 font-semibold border border-fuchsia-100 shadow-inner"
+                : "hover:bg-fuchsia-50 hover:text-fuchsia-800"
             }`}
           >
             Home
@@ -93,8 +93,8 @@ export const Header: React.FC<HeaderProps> = ({
             onClick={() => onNavigate("shop")}
             className={`px-4 py-2 rounded-xl transition-all duration-200 ${
               activePage === "shop"
-                ? "bg-teal-50 text-teal-800 font-semibold border border-teal-100 shadow-inner"
-                : "hover:bg-teal-50 hover:text-teal-800"
+                ? "bg-fuchsia-50 text-fuchsia-800 font-semibold border border-fuchsia-100 shadow-inner"
+                : "hover:bg-fuchsia-50 hover:text-fuchsia-800"
             }`}
           >
             Shop Books
@@ -103,8 +103,8 @@ export const Header: React.FC<HeaderProps> = ({
             onClick={() => onNavigate("categories")}
             className={`px-4 py-2 rounded-xl transition-all duration-200 ${
               activePage === "categories"
-                ? "bg-teal-50 text-teal-800 font-semibold border border-teal-100 shadow-inner"
-                : "hover:bg-teal-50 hover:text-teal-800"
+                ? "bg-fuchsia-50 text-fuchsia-800 font-semibold border border-fuchsia-100 shadow-inner"
+                : "hover:bg-fuchsia-50 hover:text-fuchsia-800"
             }`}
           >
             Categories
@@ -113,8 +113,8 @@ export const Header: React.FC<HeaderProps> = ({
             onClick={() => onNavigate("authors")}
             className={`px-4 py-2 rounded-xl transition-all duration-200 ${
               activePage === "authors"
-                ? "bg-teal-50 text-teal-800 font-semibold border border-teal-100 shadow-inner"
-                : "hover:bg-teal-50 hover:text-teal-800"
+                ? "bg-fuchsia-50 text-fuchsia-800 font-semibold border border-fuchsia-100 shadow-inner"
+                : "hover:bg-fuchsia-50 hover:text-fuchsia-800"
             }`}
           >
             Authors
@@ -122,7 +122,7 @@ export const Header: React.FC<HeaderProps> = ({
           {onOpenAbout && (
             <button
               onClick={onOpenAbout}
-              className="px-3.5 py-2 rounded-xl hover:bg-teal-50 hover:text-teal-800 text-slate-600 transition-all duration-200"
+              className="px-3.5 py-2 rounded-xl hover:bg-fuchsia-50 hover:text-fuchsia-800 text-slate-600 transition-all duration-200"
             >
               About
             </button>
@@ -130,7 +130,7 @@ export const Header: React.FC<HeaderProps> = ({
           {onOpenContact && (
             <button
               onClick={onOpenContact}
-              className="px-3.5 py-2 rounded-xl hover:bg-teal-50 hover:text-teal-800 text-slate-600 transition-all duration-200"
+              className="px-3.5 py-2 rounded-xl hover:bg-fuchsia-50 hover:text-fuchsia-800 text-slate-600 transition-all duration-200"
             >
               Contact
             </button>
@@ -142,10 +142,10 @@ export const Header: React.FC<HeaderProps> = ({
           {/* Quick Search trigger */}
           <button
             onClick={onOpenSearch}
-            className="p-2.5 rounded-xl bg-orange-50 hover:bg-teal-50 text-slate-700 transition-all flex items-center gap-2 border border-orange-200 hover:border-teal-200 shadow-sm"
+            className="p-2.5 rounded-xl bg-orange-50 hover:bg-fuchsia-50 text-slate-700 transition-all flex items-center gap-2 border border-orange-200 hover:border-fuchsia-200 shadow-sm"
             title="Search catalog..."
           >
-            <Search className="w-4 h-4 text-teal-700" />
+            <Search className="w-4 h-4 text-fuchsia-700" />
             <span className="hidden lg:inline text-xs font-medium text-slate-600">Search books...</span>
           </button>
 
@@ -172,7 +172,7 @@ export const Header: React.FC<HeaderProps> = ({
             <ShoppingBag className="w-4 h-4 stroke-[2.5]" />
             <span className="hidden sm:inline text-xs font-extrabold uppercase tracking-wider">Cart</span>
             {totalItemCount > 0 && (
-              <span className="bg-orange-50 text-teal-800 text-[11px] font-extrabold px-2 py-0.5 rounded-full border border-teal-100">
+              <span className="bg-orange-50 text-fuchsia-800 text-[11px] font-extrabold px-2 py-0.5 rounded-full border border-fuchsia-100">
                 {totalItemCount}
               </span>
             )}
@@ -182,7 +182,7 @@ export const Header: React.FC<HeaderProps> = ({
           <div className="relative">
             <button
               onClick={() => setUserDropdownOpen(!userDropdownOpen)}
-              className="p-2 sm:px-3 sm:py-2 rounded-xl bg-teal-50 hover:bg-teal-100 text-teal-800 transition-colors flex items-center gap-2 border border-teal-100"
+              className="p-2 sm:px-3 sm:py-2 rounded-xl bg-fuchsia-50 hover:bg-fuchsia-100 text-fuchsia-800 transition-colors flex items-center gap-2 border border-fuchsia-100"
             >
               {userProfile?.photoURL || currentUser?.photoURL ? (
                 <img
@@ -192,7 +192,7 @@ export const Header: React.FC<HeaderProps> = ({
                   referrerPolicy="no-referrer"
                 />
               ) : (
-                <UserIcon className="w-5 h-5 text-teal-700" />
+                <UserIcon className="w-5 h-5 text-fuchsia-700" />
               )}
               {currentUser && (
                 <span className="hidden sm:inline text-xs font-semibold max-w-[100px] truncate">

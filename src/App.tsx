@@ -354,7 +354,7 @@ function MainAppContent() {
                 <select
                   value={selectedCategoryId}
                   onChange={(e) => setSelectedCategoryId(e.target.value)}
-                  className="px-3.5 py-2 rounded-xl border border-orange-200 bg-orange-50 text-xs font-bold text-slate-700 focus:outline-none focus:border-teal-600"
+                  className="px-3.5 py-2 rounded-xl border border-orange-200 bg-orange-50 text-xs font-bold text-slate-700 focus:outline-none focus:border-fuchsia-600"
                 >
                   <option value="all">All Categories ({categories.length})</option>
                   {categories.map((c) => (
@@ -367,7 +367,7 @@ function MainAppContent() {
                 <select
                   value={selectedAuthorId}
                   onChange={(e) => setSelectedAuthorId(e.target.value)}
-                  className="px-3.5 py-2 rounded-xl border border-orange-200 bg-orange-50 text-xs font-bold text-slate-700 focus:outline-none focus:border-teal-600"
+                  className="px-3.5 py-2 rounded-xl border border-orange-200 bg-orange-50 text-xs font-bold text-slate-700 focus:outline-none focus:border-fuchsia-600"
                 >
                   <option value="all">All Authors ({authors.length})</option>
                   {authors.map((a) => (
@@ -380,7 +380,7 @@ function MainAppContent() {
                 <select
                   value={selectedSort}
                   onChange={(e) => setSelectedSort(e.target.value)}
-                  className="px-3.5 py-2 rounded-xl border border-orange-200 bg-orange-50 text-xs font-bold text-slate-700 focus:outline-none focus:border-teal-600"
+                  className="px-3.5 py-2 rounded-xl border border-orange-200 bg-orange-50 text-xs font-bold text-slate-700 focus:outline-none focus:border-fuchsia-600"
                 >
                   <option value="newest">Newest Titles</option>
                   <option value="bestselling">Most Popular</option>
@@ -400,7 +400,7 @@ function MainAppContent() {
                 className={`px-3.5 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap transition-all shrink-0 ${
                   selectedCategoryId === "all"
                     ? "bg-amber-500 text-stone-950 shadow-md"
-                    : "bg-orange-50 text-slate-600 hover:text-teal-800 hover:bg-teal-50 border border-orange-200"
+                    : "bg-orange-50 text-slate-600 hover:text-fuchsia-800 hover:bg-fuchsia-50 border border-orange-200"
                 }`}
               >
                 All Genres ({books.length})
@@ -415,12 +415,12 @@ function MainAppContent() {
                     className={`px-3.5 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap transition-all shrink-0 flex items-center gap-1.5 ${
                       isSelected
                         ? "bg-amber-500 text-stone-950 shadow-md"
-                        : "bg-orange-50 text-slate-600 hover:text-teal-800 hover:bg-teal-50 border border-orange-200"
+                        : "bg-orange-50 text-slate-600 hover:text-fuchsia-800 hover:bg-fuchsia-50 border border-orange-200"
                     }`}
                   >
                     <span>{cat.name}</span>
                     {count > 0 && (
-                      <span className={`text-[10px] px-1.5 py-0.2 rounded-full ${isSelected ? "bg-teal-950/10 text-teal-950" : "bg-orange-100 text-slate-500"}`}>
+                      <span className={`text-[10px] px-1.5 py-0.2 rounded-full ${isSelected ? "bg-fuchsia-950/10 text-fuchsia-950" : "bg-orange-100 text-slate-500"}`}>
                         {count}
                       </span>
                     )}
@@ -526,7 +526,7 @@ function MainAppContent() {
                     setSelectedAuthorId(auth.id);
                     handleNavigate("shop");
                   }}
-                  className="p-6 rounded-3xl bookshop-card hover:border-teal-300 cursor-pointer transition-all space-y-4 group"
+                  className="p-6 rounded-3xl bookshop-card hover:border-fuchsia-300 cursor-pointer transition-all space-y-4 group"
                 >
                   <div className="flex items-center gap-4">
                     <img
@@ -535,10 +535,10 @@ function MainAppContent() {
                       className="w-16 h-16 rounded-full object-cover border-2 border-amber-400 group-hover:scale-105 transition-transform"
                     />
                     <div>
-                      <h3 className="font-serif font-bold text-slate-900 text-base group-hover:text-teal-800">
+                      <h3 className="font-serif font-bold text-slate-900 text-base group-hover:text-fuchsia-800">
                         {auth.name}
                       </h3>
-                      <span className="text-xs font-semibold text-teal-800 bg-teal-50 px-2.5 py-0.5 rounded-full border border-teal-100">
+                      <span className="text-xs font-semibold text-fuchsia-800 bg-fuchsia-50 px-2.5 py-0.5 rounded-full border border-fuchsia-100">
                         Author
                       </span>
                     </div>
@@ -548,7 +548,7 @@ function MainAppContent() {
                     {auth.bio}
                   </p>
 
-                  <div className="pt-2 border-t border-orange-200 flex items-center justify-between text-xs font-bold text-teal-700">
+                  <div className="pt-2 border-t border-orange-200 flex items-center justify-between text-xs font-bold text-fuchsia-700">
                     <span>View Books by {auth.name.split(" ")[0]}</span>
                     <ArrowRight className="w-4 h-4" />
                   </div>
