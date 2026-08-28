@@ -113,7 +113,7 @@ Assert-Test "TEST 12" "CheckoutModal requires authenticated currentUser before p
 # ------------------------------------------------------------------------------
 function Simulate-OrderCancellation {
     param ($requestUser, $order)
-    $isStaff = ($requestUser.role -in @('admin', 'superAdmin', 'staff', 'employee')) -or ($requestUser.email -eq "mikiyaswoyne@gmail.com")
+    $isStaff = ($requestUser.role -in @('admin', 'superAdmin', 'staff', 'employee')) -or ($requestUser.email -eq "admin@jjbookstore.com")
     if ($order.customerId -ne $requestUser.uid -and -not $isStaff) {
         return @{ status = 403; code = "UNAUTHORIZED"; message = "Unauthorized: You cannot cancel an order belonging to another customer." }
     }
@@ -155,10 +155,10 @@ $suspendedAdmin = @{ uid = "adm-02"; email = "badadmin@jjbookstore.com"; role = 
 $customerUser = @{ uid = "cust-01"; email = "user@example.com"; role = "customer"; status = "active" }
 $staffUser = @{ uid = "stf-01"; email = "staff@jjbookstore.com"; role = "staff"; status = "active" }
 
-$resAdminSmtp = Simulate-RequireRole $adminUser @('admin', 'superAdmin') @('mikiyaswoyne@gmail.com')
-$resCustSmtp = Simulate-RequireRole $customerUser @('admin', 'superAdmin') @('mikiyaswoyne@gmail.com')
-$resStaffSmtp = Simulate-RequireRole $staffUser @('admin', 'superAdmin') @('mikiyaswoyne@gmail.com')
-$resSuspAdmin = Simulate-RequireRole $suspendedAdmin @('admin', 'superAdmin') @('mikiyaswoyne@gmail.com')
+$resAdminSmtp = Simulate-RequireRole $adminUser @('admin', 'superAdmin') @('admin@jjbookstore.com')
+$resCustSmtp = Simulate-RequireRole $customerUser @('admin', 'superAdmin') @('admin@jjbookstore.com')
+$resStaffSmtp = Simulate-RequireRole $staffUser @('admin', 'superAdmin') @('admin@jjbookstore.com')
+$resSuspAdmin = Simulate-RequireRole $suspendedAdmin @('admin', 'superAdmin') @('admin@jjbookstore.com')
 
 $t14_pass = ($resAdminSmtp -eq 200) -and ($resCustSmtp -eq 403) -and ($resStaffSmtp -eq 403) -and ($resSuspAdmin -eq 403)
 Assert-Test "TEST 14" "Role guard matrix for Admin endpoints: Admin (200), Customer (403), Staff (403), Suspended (403)" $t14_pass "Admin: $resAdminSmtp, Customer: $resCustSmtp, Staff: $resStaffSmtp, Suspended: $resSuspAdmin"

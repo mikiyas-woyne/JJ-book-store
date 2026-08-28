@@ -82,7 +82,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   >("overview");
 
   // Test Email & SMTP Configuration State
-  const [testTargetEmail, setTestTargetEmail] = useState("mikiyaswoyne@gmail.com");
+  const [testTargetEmail, setTestTargetEmail] = useState("");
   const [testingEmail, setTestingEmail] = useState(false);
   const [testResult, setTestResult] = useState<{
     success: boolean;
@@ -98,7 +98,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   const [smtpUser, setSmtpUser] = useState("");
   const [smtpPass, setSmtpPass] = useState("");
   const [smtpSecure, setSmtpSecure] = useState(false);
-  const [adminReceiverEmail, setAdminReceiverEmail] = useState("mikiyaswoyne@gmail.com");
+  const [adminReceiverEmail, setAdminReceiverEmail] = useState("");
   const [isSmtpConfigured, setIsSmtpConfigured] = useState(false);
   const [hasPassSaved, setHasPassSaved] = useState(false);
   const [savingSmtp, setSavingSmtp] = useState(false);
@@ -2316,7 +2316,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
               </div>
               <div className="bg-slate-950 p-3 rounded-xl border border-slate-800">
                 <span className="text-[10px] uppercase text-slate-400 font-bold block">Admin Recipient</span>
-                <span className="font-bold text-slate-200 truncate block">{adminReceiverEmail || "mikiyaswoyne@gmail.com"}</span>
+                <span className="font-bold text-slate-200 truncate block">{adminReceiverEmail || "Configured via Server (.env)"}</span>
               </div>
             </div>
           </div>
@@ -2397,7 +2397,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                   type="text"
                   value={smtpUser}
                   onChange={(e) => setSmtpUser(e.target.value)}
-                  placeholder="e.g. mikiyaswoyne@gmail.com or apikey"
+                  placeholder="e.g. orders@jjbookstore.com or apikey"
                   className="w-full px-4 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:border-amber-500 text-xs font-bold text-slate-900 bg-white"
                   required
                 />
@@ -2422,7 +2422,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                   type="email"
                   value={adminReceiverEmail}
                   onChange={(e) => setAdminReceiverEmail(e.target.value)}
-                  placeholder="e.g. mikiyaswoyne@gmail.com"
+                  placeholder="e.g. admin@jjbookstore.com"
                   className="w-full px-4 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:border-amber-500 text-xs font-bold text-slate-900 bg-white"
                 />
               </div>
@@ -2483,7 +2483,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                   type="email"
                   value={testTargetEmail}
                   onChange={(e) => setTestTargetEmail(e.target.value)}
-                  placeholder="e.g. mikiyaswoyne@gmail.com"
+                  placeholder="e.g. admin@jjbookstore.com"
                   className="w-full px-4 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:border-amber-500 text-xs font-bold text-slate-900 bg-white"
                 />
               </div>

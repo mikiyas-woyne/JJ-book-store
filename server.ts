@@ -42,14 +42,14 @@ async function startServer() {
   // AUTHENTICATION & AUTHORIZATION MIDDLEWARE (FIREBASE ADMIN TOKEN VERIFICATION)
   // ==============================================================================
   const KNOWN_ADMIN_EMAILS = [
-    "mikiyaswoyne@gmail.com",
-    "admin@jjbookstore.com",
-    "admin@jjbookshopping.com"
-  ];
+    (process.env.ADMIN_EMAIL || "").trim().toLowerCase(),
+    ...(process.env.ADMIN_EMAILS ? process.env.ADMIN_EMAILS.split(",").map((e) => e.trim().toLowerCase()) : [])
+  ].filter(Boolean);
 
   function isAuthorizedAdminEmail(email?: string | null): boolean {
     if (!email) return false;
-    return KNOWN_ADMIN_EMAILS.includes(email.trim().toLowerCase());
+    const normalized = email.trim().toLowerCase();
+    return KNOWN_ADMIN_EMAILS.includes(normalized);
   }
 
   interface AuthenticatedUser {
@@ -204,22 +204,63 @@ async function startServer() {
     res.json({ status: "ok", service: "JJ Book Shopping API", timestamp: new Date().toISOString() });
   });
 
-  // Server runtime SMTP configuration memory
+  // ==============================================================================
+  // EMAIL SANITIZATION, VALIDATION & STRUCTURED LOGGING UTILITIES
+  // ==============================================================================
+  function escapeHtml(str: any): string {
+    if (str === null || str === undefined) return "";
+    return String(str)
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;")
+      .replace(/'/g, "&#39;");
+  }
+
+  function sanitizeSubject(str: any): string {
+    if (str === null || str === undefined) return "";
+    return String(str).replace(/[\r\n\x00-\x1F\x7F]+/g, " ").trim();
+  }
+
+  function isValidEmail(email: any): boolean {
+    if (!email || typeof email !== "string") return false;
+    const clean = email.trim();
+    if (clean.length > 254 || clean.length < 5) return false;
+    const emailRegex = /^[a-zA-Z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)+$/;
+    return emailRegex.test(clean);
+  }
+
+  function logEmailEvent(event: string, details: Record<string, any>) {
+    const safeDetails: Record<string, any> = { ...details };
+    delete safeDetails.pass;
+    delete safeDetails.password;
+    delete safeDetails.SMTP_PASS;
+    delete safeDetails.token;
+    delete safeDetails.authorization;
+    console.log(JSON.stringify({ event, timestamp: new Date().toISOString(), ...safeDetails }));
+  }
+
+  // Server runtime SMTP configuration state (strictly server-side)
   let runtimeSmtpConfig = {
-    host: process.env.SMTP_HOST || "",
+    host: (process.env.SMTP_HOST || "").trim(),
     port: Number(process.env.SMTP_PORT) || 587,
-    user: process.env.SMTP_USER || "",
-    pass: process.env.SMTP_PASS || "",
+    user: (process.env.SMTP_USER || "").trim(),
+    pass: (process.env.SMTP_PASS || "").trim(),
     secure: process.env.SMTP_SECURE === "true",
-    adminEmail: process.env.ADMIN_EMAIL || "mikiyaswoyne@gmail.com"
+    adminEmail: (process.env.ADMIN_EMAIL || "").trim(),
+    fromEmail: (process.env.SMTP_FROM_EMAIL || "").trim(),
+    fromName: (process.env.SMTP_FROM_NAME || "JJ Book Store").trim()
   };
 
   function getSmtpTransporter() {
-    const smtpHost = (runtimeSmtpConfig.host || process.env.SMTP_HOST || "").trim().replace(/^smpt\./i, "smtp.");
+    const smtpHost = (runtimeSmtpConfig.host || process.env.SMTP_HOST || "").trim();
     const smtpUser = (runtimeSmtpConfig.user || process.env.SMTP_USER || "").trim();
     const smtpPass = (runtimeSmtpConfig.pass || process.env.SMTP_PASS || "").trim();
     const smtpPort = Number(runtimeSmtpConfig.port || process.env.SMTP_PORT) || 587;
     const smtpSecure = runtimeSmtpConfig.secure || process.env.SMTP_SECURE === "true" || smtpPort === 465;
+    const adminEmail = (runtimeSmtpConfig.adminEmail || process.env.ADMIN_EMAIL || "").trim();
+    const fromEmail = (runtimeSmtpConfig.fromEmail || process.env.SMTP_FROM_EMAIL || smtpUser || "noreply@jjbookstore.com").trim();
+    const fromName = runtimeSmtpConfig.fromName || process.env.SMTP_FROM_NAME || "JJ Book Store";
 
     if (smtpHost && smtpUser && smtpPass) {
       return {
@@ -228,13 +269,15 @@ async function startServer() {
         user: smtpUser,
         port: smtpPort,
         secure: smtpSecure,
-        adminEmail: runtimeSmtpConfig.adminEmail || process.env.ADMIN_EMAIL || "mikiyaswoyne@gmail.com",
+        adminEmail,
+        fromEmail,
+        fromName,
         transporter: nodemailer.createTransport({
           host: smtpHost,
           port: smtpPort,
           secure: smtpSecure,
-          auth: { user: smtpUser, pass: smtpPass },
-          tls: { rejectUnauthorized: false }
+          auth: { user: smtpUser, pass: smtpPass }
+          // Standard TLS certificate verification enforced without insecure overrides
         })
       };
     }
@@ -245,47 +288,81 @@ async function startServer() {
       user: smtpUser || "Unconfigured",
       port: smtpPort,
       secure: smtpSecure,
-      adminEmail: runtimeSmtpConfig.adminEmail || process.env.ADMIN_EMAIL || "mikiyaswoyne@gmail.com",
+      adminEmail,
+      fromEmail,
+      fromName,
       transporter: null
     };
   }
 
   // Reusable server-side function to send order notification emails via configured SMTP
+  // Resilient: failures never block or rollback the order; idempotent: prevents duplicate emails
   async function sendOrderEmailNotifications(order: any) {
     if (!order) return;
 
-    const adminEmail = process.env.ADMIN_EMAIL || "mikiyaswoyne@gmail.com";
-    const customerEmail = (order.customerEmail || "").trim();
+    const orderId = order.orderId || order.id || "N/A";
     const smtpConfig = getSmtpTransporter();
-    let transporter: any = smtpConfig.transporter;
+    const adminEmail = smtpConfig.adminEmail;
+    const customerEmail = (order.customerEmail || "").trim();
 
-    if (!transporter) {
-      const testAccount = await nodemailer.createTestAccount();
-      transporter = nodemailer.createTransport({
-        host: "smtp.ethereal.email",
-        port: 587,
-        secure: false,
-        auth: { user: testAccount.user, pass: testAccount.pass }
+    // IDEMPOTENCY GUARD: Check if order creation email was already sent
+    const existingDelivery = order.emailDelivery?.orderCreated;
+    if (order.emailNotificationSent || existingDelivery?.status === "sent" || existingDelivery?.status === "sending") {
+      logEmailEvent("email.duplicate.prevented", {
+        type: "order_created",
+        orderId,
+        existingStatus: existingDelivery?.status || "sent"
       });
+      return;
     }
+
+    if (!smtpConfig.configured || !smtpConfig.transporter) {
+      logEmailEvent("email.send.unavailable", {
+        type: "order_created",
+        orderId,
+        reason: "SMTP not configured on server"
+      });
+      return;
+    }
+
+    const transporter = smtpConfig.transporter;
+    const fromAddress = `"${smtpConfig.fromName}" <${smtpConfig.fromEmail}>`;
+    const now = new Date().toISOString();
+
+    // Mark status as sending in memory to claim atomic lock
+    if (!order.emailDelivery) order.emailDelivery = {};
+    order.emailDelivery.orderCreated = { status: "sending", startedAt: now };
+
+    logEmailEvent("email.send.started", { type: "order_created", orderId });
+
+    // Escaped dynamic values
+    const safeCustomerName = escapeHtml(order.customerName);
+    const safePhone = escapeHtml(order.customerPhone);
+    const safePaymentMethod = escapeHtml(order.paymentMethod);
+    const safePaymentRef = escapeHtml(order.paymentReference);
+    const safeGrandTotal = escapeHtml(order.grandTotal);
+    const safeSubtotal = escapeHtml(order.subtotal);
+    const safeTax = escapeHtml(order.tax);
+    const safeShipping = order.shippingFee === 0 ? "FREE" : `${escapeHtml(order.shippingFee)} ETB`;
+    const safeDiscount = order.discount ? `${escapeHtml(order.discount)} ETB` : null;
 
     const itemsHtml = (order.items || [])
       .map(
         (item: any) => `
         <tr>
           <td style="padding: 10px; border-bottom: 1px solid #e2e8f0; font-size: 13px;">
-            <strong>${item.title}</strong><br>
-            <span style="color: #64748b; font-size: 11px;">Author: ${item.authorName || "Ethiopian Literature"}</span>
+            <strong>${escapeHtml(item.title)}</strong><br>
+            <span style="color: #64748b; font-size: 11px;">Author: ${escapeHtml(item.authorName || "Ethiopian Literature")}</span>
           </td>
-          <td style="padding: 10px; border-bottom: 1px solid #e2e8f0; text-align: center; font-size: 13px;">${item.quantity}</td>
-          <td style="padding: 10px; border-bottom: 1px solid #e2e8f0; text-align: right; font-size: 13px;">${item.price} ETB</td>
-          <td style="padding: 10px; border-bottom: 1px solid #e2e8f0; text-align: right; font-weight: bold; font-size: 13px;">${item.total || item.price * item.quantity} ETB</td>
+          <td style="padding: 10px; border-bottom: 1px solid #e2e8f0; text-align: center; font-size: 13px;">${escapeHtml(item.quantity)}</td>
+          <td style="padding: 10px; border-bottom: 1px solid #e2e8f0; text-align: right; font-size: 13px;">${escapeHtml(item.price)} ETB</td>
+          <td style="padding: 10px; border-bottom: 1px solid #e2e8f0; text-align: right; font-weight: bold; font-size: 13px;">${escapeHtml(item.total || (Number(item.price) || 0) * (Number(item.quantity) || 1))} ETB</td>
         </tr>
       `
       )
       .join("");
 
-    const adminSubject = `🚨 [NEW ORDER RECEIVED] Order #${order.orderId} - ${order.customerName} (${order.grandTotal} ETB)`;
+    const adminSubject = sanitizeSubject(`🚨 [NEW ORDER RECEIVED] Order #${orderId} - ${order.customerName} (${order.grandTotal} ETB)`);
     const adminBody = `
       <div style="font-family: Arial, sans-serif; max-width: 620px; margin: 0 auto; color: #1e293b; line-height: 1.5; border: 1px solid #cbd5e1; border-radius: 16px; overflow: hidden; background-color: #ffffff;">
         <div style="background-color: #0f172a; color: #f8fafc; padding: 22px; text-align: center;">
@@ -294,13 +371,13 @@ async function startServer() {
         </div>
         <div style="padding: 24px;">
           <div style="background-color: #fffbeb; border: 1px solid #fde68a; border-radius: 12px; padding: 16px; margin-bottom: 20px;">
-            <h2 style="margin: 0 0 8px; color: #78350f; font-size: 16px;">Order #${order.orderId} Summary</h2>
-            <p style="margin: 3px 0; font-size: 13px;"><strong>Customer:</strong> ${order.customerName}</p>
-            <p style="margin: 3px 0; font-size: 13px;"><strong>Email:</strong> ${order.customerEmail || "N/A"}</p>
-            <p style="margin: 3px 0; font-size: 13px;"><strong>Phone:</strong> ${order.customerPhone}</p>
-            <p style="margin: 3px 0; font-size: 13px;"><strong>Delivery Address:</strong> ${order.shippingAddress?.streetAddress || ""}, ${order.shippingAddress?.subcity || ""}, ${order.shippingAddress?.region || "Addis Ababa"}</p>
-            <p style="margin: 3px 0; font-size: 13px;"><strong>Payment Method:</strong> <span style="text-transform: uppercase; font-weight: bold;">${order.paymentMethod}</span> (${order.paymentStatus})</p>
-            ${order.paymentReference ? `<p style="margin: 3px 0; font-size: 13px; color: #b45309;"><strong>Payment Reference #:</strong> ${order.paymentReference}</p>` : ""}
+            <h2 style="margin: 0 0 8px; color: #78350f; font-size: 16px;">Order #${escapeHtml(orderId)} Summary</h2>
+            <p style="margin: 3px 0; font-size: 13px;"><strong>Customer:</strong> ${safeCustomerName}</p>
+            <p style="margin: 3px 0; font-size: 13px;"><strong>Email:</strong> ${escapeHtml(customerEmail || "N/A")}</p>
+            <p style="margin: 3px 0; font-size: 13px;"><strong>Phone:</strong> ${safePhone}</p>
+            <p style="margin: 3px 0; font-size: 13px;"><strong>Delivery Address:</strong> ${escapeHtml(order.shippingAddress?.streetAddress || "")}, ${escapeHtml(order.shippingAddress?.subcity || "")}, ${escapeHtml(order.shippingAddress?.region || "Addis Ababa")}</p>
+            <p style="margin: 3px 0; font-size: 13px;"><strong>Payment Method:</strong> <span style="text-transform: uppercase; font-weight: bold;">${safePaymentMethod}</span> (${escapeHtml(order.paymentStatus)})</p>
+            ${safePaymentRef ? `<p style="margin: 3px 0; font-size: 13px; color: #b45309;"><strong>Payment Reference #:</strong> ${safePaymentRef}</p>` : ""}
           </div>
           <table style="width: 100%; border-collapse: collapse; margin-bottom: 20px;">
             <thead>
@@ -314,17 +391,17 @@ async function startServer() {
             <tbody>${itemsHtml}</tbody>
           </table>
           <div style="border-top: 2px solid #e2e8f0; padding-top: 12px; text-align: right; font-size: 13px;">
-            <p style="margin: 3px 0; color: #64748b;">Subtotal: ${order.subtotal} ETB</p>
-            ${order.discount ? `<p style="margin: 3px 0; color: #16a34a;">Discount: -${order.discount} ETB</p>` : ""}
-            <p style="margin: 3px 0; color: #64748b;">Shipping Fee: ${order.shippingFee === 0 ? "FREE" : `${order.shippingFee} ETB`}</p>
-            <p style="margin: 3px 0; color: #64748b;">15% VAT: ${order.tax} ETB</p>
-            <h3 style="margin: 8px 0 0; color: #78350f; font-size: 18px;">Grand Total: ${order.grandTotal} ETB</h3>
+            <p style="margin: 3px 0; color: #64748b;">Subtotal: ${safeSubtotal} ETB</p>
+            ${safeDiscount ? `<p style="margin: 3px 0; color: #16a34a;">Discount: -${safeDiscount}</p>` : ""}
+            <p style="margin: 3px 0; color: #64748b;">Shipping Fee: ${safeShipping}</p>
+            <p style="margin: 3px 0; color: #64748b;">15% VAT: ${safeTax} ETB</p>
+            <h3 style="margin: 8px 0 0; color: #78350f; font-size: 18px;">Grand Total: ${safeGrandTotal} ETB</h3>
           </div>
         </div>
       </div>
     `;
 
-    const customerSubject = `📚 [JJ Bookstore] Order #${order.orderId} Confirmed - Thank You!`;
+    const customerSubject = sanitizeSubject(`📚 [JJ Bookstore] Order #${orderId} Confirmed - Thank You!`);
     const customerBody = `
       <div style="font-family: Arial, sans-serif; max-width: 620px; margin: 0 auto; color: #1e293b; line-height: 1.5; border: 1px solid #cbd5e1; border-radius: 16px; overflow: hidden; background-color: #ffffff;">
         <div style="background-color: #0f172a; color: #f8fafc; padding: 22px; text-align: center;">
@@ -333,9 +410,9 @@ async function startServer() {
         </div>
         <div style="padding: 24px;">
           <div style="background-color: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 12px; padding: 16px; margin-bottom: 20px;">
-            <h2 style="margin: 0 0 6px; font-size: 16px; color: #166534;">🎉 Thank You for Your Order, ${order.customerName}!</h2>
+            <h2 style="margin: 0 0 6px; font-size: 16px; color: #166534;">🎉 Thank You for Your Order, ${safeCustomerName}!</h2>
             <p style="margin: 0; font-size: 13px; color: #15803d;">
-              We have received your order <strong>${order.orderId}</strong>. Our warehouse staff is currently reviewing your order for dispatch.
+              We have received your order <strong>${escapeHtml(orderId)}</strong>. Our warehouse staff is currently reviewing your order for dispatch.
             </p>
           </div>
           <table style="width: 100%; border-collapse: collapse; margin-bottom: 20px;">
@@ -349,32 +426,69 @@ async function startServer() {
             <tbody>${itemsHtml}</tbody>
           </table>
           <div style="border-top: 2px solid #e2e8f0; padding-top: 12px; text-align: right; font-size: 13px;">
-            <h3 style="margin: 8px 0 0; color: #b45309; font-size: 18px;">Total: ${order.grandTotal} ETB</h3>
+            <h3 style="margin: 8px 0 0; color: #b45309; font-size: 18px;">Total: ${safeGrandTotal} ETB</h3>
           </div>
         </div>
       </div>
     `;
 
-    if (transporter) {
-      try {
+    let adminSent = false;
+    let customerSent = false;
+
+    try {
+      if (isValidEmail(adminEmail)) {
         await transporter.sendMail({
-          from: `"JJ Book Shopping" <noreply@jjbookshopping.com>`,
+          from: fromAddress,
           to: adminEmail,
           subject: adminSubject,
           html: adminBody
         });
-      } catch (err) {}
-
-      if (customerEmail) {
-        try {
-          await transporter.sendMail({
-            from: `"JJ Book Shopping" <noreply@jjbookshopping.com>`,
-            to: customerEmail,
-            subject: customerSubject,
-            html: customerBody
-          });
-        } catch (err) {}
+        adminSent = true;
       }
+
+      if (isValidEmail(customerEmail) && customerEmail.toLowerCase() !== adminEmail.toLowerCase()) {
+        await transporter.sendMail({
+          from: fromAddress,
+          to: customerEmail,
+          subject: customerSubject,
+          html: customerBody
+        });
+        customerSent = true;
+      }
+
+      const sentTime = new Date().toISOString();
+      order.emailNotificationSent = true;
+      order.emailNotifiedAt = sentTime;
+      order.emailDelivery.orderCreated = {
+        status: "sent",
+        adminSent,
+        customerSent,
+        sentAt: sentTime
+      };
+
+      if (firestoreAdmin && order.id) {
+        try {
+          await firestoreAdmin.collection("orders").doc(order.id).update({
+            emailNotificationSent: true,
+            emailNotifiedAt: sentTime,
+            "emailDelivery.orderCreated": {
+              status: "sent",
+              adminSent,
+              customerSent,
+              sentAt: sentTime
+            }
+          });
+        } catch (fsErr) {}
+      }
+
+      logEmailEvent("email.send.success", { type: "order_created", orderId, adminSent, customerSent });
+    } catch (err: any) {
+      logEmailEvent("email.send.failed", { type: "order_created", orderId, error: err?.message });
+      order.emailDelivery.orderCreated = {
+        status: "failed",
+        failedAt: new Date().toISOString(),
+        error: err?.message || "Send failed"
+      };
     }
   }
 
@@ -1472,6 +1586,199 @@ async function startServer() {
       });
     } catch (err: any) {
       res.status(500).json({ success: false, message: err?.message || "Failed to update SMTP configuration" });
+    }
+  });
+
+  // ==============================================================================
+  // 9. ADMIN TEST EMAIL ENDPOINT (STRICT ADMIN ONLY)
+  // ==============================================================================
+  app.post("/api/admin/test-email", requireAdmin, async (req, res) => {
+    try {
+      const { toEmail, subject, textMessage } = req.body;
+      const cleanTo = String(toEmail || "").trim();
+
+      if (!isValidEmail(cleanTo)) {
+        res.status(400).json({
+          success: false,
+          code: "INVALID_RECIPIENT",
+          message: "Please specify a valid recipient email address."
+        });
+        return;
+      }
+
+      const smtpConfig = getSmtpTransporter();
+      if (!smtpConfig.configured || !smtpConfig.transporter) {
+        logEmailEvent("email.configuration.invalid", {
+          endpoint: "/api/admin/test-email",
+          reason: "SMTP is not configured on the server."
+        });
+        res.status(400).json({
+          success: false,
+          configured: false,
+          code: "SMTP_UNCONFIGURED",
+          message: "SMTP is not fully configured. Please configure host, user, and password.",
+          hint: "Set SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS, and ADMIN_EMAIL in environment variables."
+        });
+        return;
+      }
+
+      const safeSubject = sanitizeSubject(subject || "✅ [JJ Bookstore] SMTP Test Email");
+      const safeText = escapeHtml(textMessage || "This is a verified test email sent from JJ Book Store SMTP Server.");
+      const fromAddress = `"${smtpConfig.fromName}" <${smtpConfig.fromEmail}>`;
+
+      logEmailEvent("email.send.started", { type: "admin_test", recipient: cleanTo });
+
+      await smtpConfig.transporter.sendMail({
+        from: fromAddress,
+        to: cleanTo,
+        subject: safeSubject,
+        html: `
+          <div style="font-family: Arial, sans-serif; max-width: 540px; margin: 0 auto; border: 1px solid #e2e8f0; border-radius: 12px; overflow: hidden;">
+            <div style="background-color: #064e3b; color: #ecfdf5; padding: 18px; text-align: center;">
+              <h2 style="margin: 0; font-size: 18px; color: #34d399;">JJ BOOKSTORE SMTP TEST</h2>
+            </div>
+            <div style="padding: 20px; color: #334155; font-size: 14px; line-height: 1.5;">
+              <p>Hello,</p>
+              <p>${safeText}</p>
+              <p style="margin-top: 20px; font-size: 12px; color: #64748b;">
+                SMTP Server: <strong>${escapeHtml(smtpConfig.host)}:${smtpConfig.port}</strong> (TLS: ${smtpConfig.secure ? "SMTPS/465" : "STARTTLS/587"})<br/>
+                Sender Address: <strong>${escapeHtml(smtpConfig.fromEmail)}</strong>
+              </p>
+            </div>
+          </div>
+        `
+      });
+
+      logEmailEvent("email.send.success", { type: "admin_test", recipient: cleanTo });
+
+      res.json({
+        success: true,
+        configured: true,
+        message: `Test email successfully dispatched to ${cleanTo}!`
+      });
+    } catch (err: any) {
+      logEmailEvent("email.send.failed", { type: "admin_test", error: err?.message });
+      res.status(500).json({
+        success: false,
+        code: "EMAIL_SEND_FAILED",
+        message: "Failed to dispatch test email. Please check your SMTP host credentials and connection.",
+        hint: "Verify host server, port (587/465), user, password, and SSL/TLS configuration."
+      });
+    }
+  });
+
+  // ==============================================================================
+  // 10. ORDER STATUS EMAIL DISPATCH (EMPLOYEE/ADMIN ONLY)
+  // ==============================================================================
+  app.post("/api/orders/send-status-email", requireEmployee, async (req, res) => {
+    try {
+      const { orderId, type, verifiedByEmployeeName, receiptNumber, note } = req.body;
+      if (!orderId || !type) {
+        res.status(400).json({ success: false, code: "MISSING_PARAM", message: "Order ID and email type are required." });
+        return;
+      }
+
+      let order: any = null;
+      if (firestoreAdmin) {
+        try {
+          const snap = await firestoreAdmin.collection("orders").doc(orderId).get();
+          if (snap.exists) order = { id: snap.id, ...snap.data() };
+        } catch (e) {}
+      }
+      if (!order) {
+        order = localMemoryStore.orders.get(orderId);
+      }
+
+      if (!order) {
+        res.status(404).json({ success: false, code: "ORDER_NOT_FOUND", message: "Order not found." });
+        return;
+      }
+
+      const eventKey = type === "approved" ? "payment_verified" : type === "rejected" ? "payment_rejected" : `status_${type}`;
+      if (order.emailDelivery?.[eventKey]?.status === "sent") {
+        logEmailEvent("email.duplicate.prevented", { type: eventKey, orderId: order.orderId });
+        res.json({ success: true, alreadySent: true, message: "Status email was already dispatched." });
+        return;
+      }
+
+      const smtpConfig = getSmtpTransporter();
+      if (!smtpConfig.configured || !smtpConfig.transporter) {
+        logEmailEvent("email.send.unavailable", { type: eventKey, orderId: order.orderId, reason: "SMTP not configured" });
+        res.json({ success: true, sent: false, message: "Email delivery unavailable; status recorded in system." });
+        return;
+      }
+
+      const customerEmail = (order.customerEmail || "").trim();
+      if (!isValidEmail(customerEmail)) {
+        res.status(400).json({ success: false, code: "INVALID_CUSTOMER_EMAIL", message: "Customer email is invalid." });
+        return;
+      }
+
+      const safeOrderId = escapeHtml(order.orderId || orderId);
+      const safeCustomerName = escapeHtml(order.customerName || "Customer");
+      const safeVerifier = escapeHtml(verifiedByEmployeeName || "Store Staff");
+      const safeReceipt = escapeHtml(receiptNumber || order.paymentReference || "N/A");
+      const safeNote = note ? escapeHtml(note) : "";
+      const fromAddress = `"${smtpConfig.fromName}" <${smtpConfig.fromEmail}>`;
+
+      const subject = type === "approved"
+        ? sanitizeSubject(`✅ [JJ Bookstore] Order #${order.orderId || orderId} Payment Verified & Order Confirmed!`)
+        : sanitizeSubject(`⚠️ [JJ Bookstore] Payment Verification Alert for Order #${order.orderId || orderId}`);
+
+      const htmlBody = type === "approved"
+        ? `
+          <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; border: 1px solid #e2e8f0; border-radius: 16px; overflow: hidden; background-color: #ffffff;">
+            <div style="background-color: #064e3b; color: #ecfdf5; padding: 22px; text-align: center;">
+              <h1 style="margin: 0; font-size: 22px; color: #34d399;">JJ BOOKSTORE</h1>
+              <p style="margin: 4px 0 0; font-size: 13px; color: #a7f3d0;">Payment Verified & Order Confirmed</p>
+            </div>
+            <div style="padding: 24px;">
+              <p>Dear <strong>${safeCustomerName}</strong>,</p>
+              <p>Your payment for order <strong>#${safeOrderId}</strong> has been successfully verified by our staff (<strong>${safeVerifier}</strong>). Receipt #: <strong>${safeReceipt}</strong>.</p>
+              ${safeNote ? `<p style="font-style: italic; color: #475569;">Note: "${safeNote}"</p>` : ""}
+              <p style="margin-top: 16px;">Total Amount: <strong>${escapeHtml(order.grandTotal)} ETB</strong></p>
+            </div>
+          </div>
+        `
+        : `
+          <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; border: 1px solid #e2e8f0; border-radius: 16px; overflow: hidden; background-color: #ffffff;">
+            <div style="background-color: #7f1d1d; color: #fef2f2; padding: 22px; text-align: center;">
+              <h1 style="margin: 0; font-size: 22px; color: #fca5a5;">JJ BOOKSTORE</h1>
+              <p style="margin: 4px 0 0; font-size: 13px; color: #fecaca;">Payment Verification Issue</p>
+            </div>
+            <div style="padding: 24px;">
+              <p>Dear <strong>${safeCustomerName}</strong>,</p>
+              <p>Our staff (<strong>${safeVerifier}</strong>) checked your order <strong>#${safeOrderId}</strong> and found an issue with the transaction reference.</p>
+              ${safeNote ? `<p style="font-style: italic; color: #991b1b;">Reason: "${safeNote}"</p>` : ""}
+              <p>Please contact customer support with your payment transfer confirmation to dispatch your books.</p>
+            </div>
+          </div>
+        `;
+
+      await smtpConfig.transporter.sendMail({
+        from: fromAddress,
+        to: customerEmail,
+        subject,
+        html: htmlBody
+      });
+
+      const sentTime = new Date().toISOString();
+      if (!order.emailDelivery) order.emailDelivery = {};
+      order.emailDelivery[eventKey] = { status: "sent", sentAt: sentTime };
+
+      if (firestoreAdmin && order.id) {
+        try {
+          await firestoreAdmin.collection("orders").doc(order.id).update({
+            [`emailDelivery.${eventKey}`]: { status: "sent", sentAt: sentTime }
+          });
+        } catch (e) {}
+      }
+
+      logEmailEvent("email.send.success", { type: eventKey, orderId: order.orderId });
+      res.json({ success: true, sent: true, message: `Status notification email dispatched to ${customerEmail}` });
+    } catch (err: any) {
+      logEmailEvent("email.send.failed", { error: err?.message });
+      res.status(500).json({ success: false, message: "Failed to dispatch status email." });
     }
   });
 

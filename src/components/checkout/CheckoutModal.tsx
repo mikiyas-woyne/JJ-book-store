@@ -777,9 +777,9 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
                   ✉️
                 </div>
                 <div>
-                  <strong className="font-bold text-amber-900 block">Order Notification Emails Dispatched</strong>
+                  <strong className="font-bold text-amber-900 block">Order Notification Dispatched</strong>
                   <p className="text-[11px] text-amber-800 leading-relaxed mt-0.5">
-                    A confirmation email has been sent to <strong>{createdOrder.customerEmail || customerEmail}</strong> and an order alert has been delivered to the bookstore administrator (<strong>mikiyaswoyne@gmail.com</strong>).
+                    A confirmation email has been dispatched to <strong>{createdOrder.customerEmail || customerEmail}</strong> and your order has been received by the bookstore fulfillment team.
                   </p>
                 </div>
               </div>

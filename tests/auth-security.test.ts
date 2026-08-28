@@ -43,7 +43,6 @@ export function runAuthSecurityTests() {
   }
 
   const KNOWN_ADMIN_EMAILS = [
-    "mikiyaswoyne@gmail.com",
     "admin@jjbookstore.com",
     "admin@jjbookshopping.com"
   ];
@@ -102,7 +101,7 @@ export function runAuthSecurityTests() {
   assertTest(4, "Verified admin token granted access with 200 OK", t4, "Administrative role validated successfully");
 
   // 5. Authorized Admin Email bypass
-  const emailAdmin: MockUser = { uid: "adm-owner", email: "mikiyaswoyne@gmail.com", role: "customer", status: "active" };
+  const emailAdmin: MockUser = { uid: "adm-owner", email: "admin@jjbookstore.com", role: "customer", status: "active" };
   const t5 = checkAdminAccess(emailAdmin).status === 200;
   assertTest(5, "Authorized super-admin email recognized and granted access", t5, "SuperAdmin email whitelist verified");
 

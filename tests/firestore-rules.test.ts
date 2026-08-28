@@ -109,7 +109,7 @@ class FirestoreSecurityRulesEngine {
     if (auth?.token?.role === "admin") return true;
     const role = this.getUserRole(auth);
     if (role === "admin" || role === "superAdmin") return true;
-    const adminEmails = ["mikiyaswoyne@gmail.com", "admin@jjbookstore.com", "admin@jjbookshopping.com"];
+    const adminEmails = ["admin@jjbookstore.com", "admin@jjbookshopping.com"];
     return !!(auth?.token?.email && adminEmails.includes(auth.token.email));
   }
 

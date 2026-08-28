@@ -1,9 +1,41 @@
 import { doc, collection, addDoc } from "firebase/firestore";
-import { db, cleanFirestoreData } from "./firebase";
+import { db, cleanFirestoreData, auth } from "./firebase";
 import { Order, EmailNotificationLog } from "../types";
 
 /**
- * Generates styled HTML email templates for JJ Bookstore order verifications.
+ * Escapes HTML characters in dynamic user inputs to prevent XSS and template injection.
+ */
+export function escapeHtml(str: any): string {
+  if (str === null || str === undefined) return "";
+  return String(str)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
+/**
+ * Sanitizes subject line strings by stripping newline and control characters to prevent header injection.
+ */
+export function sanitizeSubject(str: any): string {
+  if (str === null || str === undefined) return "";
+  return String(str).replace(/[\r\n\x00-\x1F\x7F]+/g, " ").trim();
+}
+
+/**
+ * Validates whether an email string matches a basic RFC-compliant format.
+ */
+export function isValidEmail(email: any): boolean {
+  if (!email || typeof email !== "string") return false;
+  const clean = email.trim();
+  if (clean.length > 254 || clean.length < 5) return false;
+  const emailRegex = /^[a-zA-Z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)+$/;
+  return emailRegex.test(clean);
+}
+
+/**
+ * Generates styled HTML email templates for JJ Bookstore order verifications with full HTML escaping.
  */
 export function generateOrderApprovalEmailHtml(
   order: Order,
@@ -11,21 +43,33 @@ export function generateOrderApprovalEmailHtml(
   receiptNumber: string,
   note?: string
 ): { subject: string; htmlBody: string } {
-  const subject = `✅ [JJ Bookstore] Order #${order.orderId} Verified & Approved!`;
-  
-  const itemsHtml = order.items
+  const safeOrderId = escapeHtml(order.orderId);
+  const safeCustomerName = escapeHtml(order.customerName);
+  const safeVerifierName = escapeHtml(verifiedByEmployeeName);
+  const safeReceiptNumber = escapeHtml(receiptNumber);
+  const safePaymentMethod = escapeHtml(order.paymentMethod);
+  const safeNote = note ? escapeHtml(note) : "";
+  const safeGrandTotal = escapeHtml(order.grandTotal);
+  const safeSubcity = escapeHtml(order.shippingAddress?.subcity || "");
+  const safeStreet = escapeHtml(order.shippingAddress?.streetAddress || "");
+  const safeCity = escapeHtml(order.shippingAddress?.city || "Addis Ababa");
+  const safePhone = escapeHtml(order.shippingAddress?.phone || order.customerPhone || "");
+
+  const subject = sanitizeSubject(`✅ [JJ Bookstore] Order #${order.orderId} Verified & Approved!`);
+
+  const itemsHtml = (order.items || [])
     .map(
       (item) => `
         <tr>
           <td style="padding: 10px; border-bottom: 1px solid #e2e8f0; font-size: 13px; color: #1e293b;">
-            <strong>${item.title}</strong><br/>
-            <span style="font-size: 11px; color: #64748b;">Author: ${item.authorName}</span>
+            <strong>${escapeHtml(item.title)}</strong><br/>
+            <span style="font-size: 11px; color: #64748b;">Author: ${escapeHtml(item.authorName || "")}</span>
           </td>
           <td style="padding: 10px; border-bottom: 1px solid #e2e8f0; font-size: 13px; text-align: center; color: #1e293b;">
-            ${item.quantity}
+            ${escapeHtml(item.quantity)}
           </td>
           <td style="padding: 10px; border-bottom: 1px solid #e2e8f0; font-size: 13px; text-align: right; color: #1e293b; font-weight: bold;">
-            ${item.total || item.price * item.quantity} ETB
+            ${escapeHtml(item.total || item.price * item.quantity)} ETB
           </td>
         </tr>
       `
@@ -55,7 +99,7 @@ export function generateOrderApprovalEmailHtml(
               🎉 Payment Verified & Order Confirmed!
             </h2>
             <p style="margin: 0; font-size: 13px; color: #15803d; line-height: 1.5;">
-              Dear <strong>${order.customerName}</strong>, your order <strong>${order.orderId}</strong> payment receipt has been successfully verified by our staff (${verifiedByEmployeeName}). Your books are now being packed for delivery.
+              Dear <strong>${safeCustomerName}</strong>, your order <strong>${safeOrderId}</strong> payment receipt has been successfully verified by our staff (${safeVerifierName}). Your books are now being packed for delivery.
             </p>
           </div>
 
@@ -63,24 +107,24 @@ export function generateOrderApprovalEmailHtml(
           <table style="width: 100%; border-collapse: collapse; margin-bottom: 20px; background-color: #f8fafc; border-radius: 8px; font-size: 13px;">
             <tr>
               <td style="padding: 10px 14px; color: #64748b;">Order Number:</td>
-              <td style="padding: 10px 14px; font-weight: bold; color: #0f172a; text-align: right;">${order.orderId}</td>
+              <td style="padding: 10px 14px; font-weight: bold; color: #0f172a; text-align: right;">${safeOrderId}</td>
             </tr>
             <tr>
               <td style="padding: 10px 14px; color: #64748b;">Verified Receipt #:</td>
-              <td style="padding: 10px 14px; font-weight: bold; color: #d97706; text-align: right;">${receiptNumber}</td>
+              <td style="padding: 10px 14px; font-weight: bold; color: #d97706; text-align: right;">${safeReceiptNumber}</td>
             </tr>
             <tr>
               <td style="padding: 10px 14px; color: #64748b;">Payment Method:</td>
-              <td style="padding: 10px 14px; font-weight: bold; color: #0f172a; text-align: right; text-transform: uppercase;">${order.paymentMethod}</td>
+              <td style="padding: 10px 14px; font-weight: bold; color: #0f172a; text-align: right; text-transform: uppercase;">${safePaymentMethod}</td>
             </tr>
             <tr>
               <td style="padding: 10px 14px; color: #64748b;">Verified By Staff:</td>
-              <td style="padding: 10px 14px; font-weight: bold; color: #0f172a; text-align: right;">${verifiedByEmployeeName}</td>
+              <td style="padding: 10px 14px; font-weight: bold; color: #0f172a; text-align: right;">${safeVerifierName}</td>
             </tr>
-            ${note ? `
+            ${safeNote ? `
             <tr>
               <td style="padding: 10px 14px; color: #64748b;">Staff Verification Note:</td>
-              <td style="padding: 10px 14px; font-style: italic; color: #334155; text-align: right;">"${note}"</td>
+              <td style="padding: 10px 14px; font-style: italic; color: #334155; text-align: right;">"${safeNote}"</td>
             </tr>
             ` : ""}
           </table>
@@ -101,7 +145,7 @@ export function generateOrderApprovalEmailHtml(
             <tfoot>
               <tr>
                 <td colspan="2" style="padding: 12px 10px; font-size: 14px; font-weight: bold; color: #0f172a; text-align: right;">Grand Total:</td>
-                <td style="padding: 12px 10px; font-size: 16px; font-weight: font-extrabold; color: #b45309; text-align: right;">${order.grandTotal} ETB</td>
+                <td style="padding: 12px 10px; font-size: 16px; font-weight: 800; color: #b45309; text-align: right;">${safeGrandTotal} ETB</td>
               </tr>
             </tfoot>
           </table>
@@ -110,20 +154,19 @@ export function generateOrderApprovalEmailHtml(
           <div style="background-color: #f8fafc; border-radius: 8px; padding: 14px; margin-bottom: 20px; font-size: 12px;">
             <strong style="color: #0f172a; display: block; margin-bottom: 4px;">📍 Shipping Address:</strong>
             <span style="color: #475569;">
-              ${order.shippingAddress.subcity || ""}, ${order.shippingAddress.streetAddress || ""}, ${order.shippingAddress.city || "Addis Ababa"}<br/>
-              Phone: <strong>${order.shippingAddress.phone || order.customerPhone}</strong>
+              ${safeSubcity ? `${safeSubcity}, ` : ""}${safeStreet ? `${safeStreet}, ` : ""}${safeCity}<br/>
+              Phone: <strong>${safePhone}</strong>
             </span>
-
           </div>
 
           <p style="font-size: 12px; color: #64748b; line-height: 1.5; margin: 0;">
-            Thank you for buying from JJ Bookstore! If you have any questions, contact support at <strong>orders@jjbookshopping.com</strong> or call <strong>+251 911 234 567</strong>.
+            Thank you for purchasing with JJ Bookstore! If you have any questions regarding your delivery, please contact our support team.
           </p>
         </div>
 
         <!-- Footer -->
         <div style="background-color: #f1f5f9; padding: 16px; text-align: center; font-size: 11px; color: #94a3b8; border-top: 1px solid #e2e8f0;">
-          © ${new Date().getFullYear()} JJ Bookstore Ethiopia. All rights reserved.
+          © ${new Date().getFullYear()} JJ Bookstore. All rights reserved.
         </div>
       </div>
     </body>
@@ -138,7 +181,13 @@ export function generateOrderRejectionEmailHtml(
   verifiedByEmployeeName: string,
   reasonNote?: string
 ): { subject: string; htmlBody: string } {
-  const subject = `⚠️ [JJ Bookstore] Payment Verification Alert for Order #${order.orderId}`;
+  const safeOrderId = escapeHtml(order.orderId);
+  const safeCustomerName = escapeHtml(order.customerName);
+  const safeVerifierName = escapeHtml(verifiedByEmployeeName);
+  const safeReasonNote = reasonNote ? escapeHtml(reasonNote) : "Incorrect or unverified payment reference code.";
+  const safeGrandTotal = escapeHtml(order.grandTotal);
+
+  const subject = sanitizeSubject(`⚠️ [JJ Bookstore] Payment Verification Alert for Order #${order.orderId}`);
 
   const htmlBody = `
     <!DOCTYPE html>
@@ -163,7 +212,7 @@ export function generateOrderRejectionEmailHtml(
               ⚠️ Incorrect or Missing Transaction Reference
             </h2>
             <p style="margin: 0; font-size: 13px; color: #b91c1c; line-height: 1.5;">
-              Dear <strong>${order.customerName}</strong>, our verification staff (${verifiedByEmployeeName}) checked your order <strong>#${order.orderId}</strong> and found that the transaction reference provided is incorrect or does not exist in our payment logs.
+              Dear <strong>${safeCustomerName}</strong>, our verification staff (${safeVerifierName}) checked your order <strong>#${safeOrderId}</strong> and found that the transaction reference provided is incorrect or does not exist in our payment logs.
             </p>
           </div>
 
@@ -173,13 +222,13 @@ export function generateOrderRejectionEmailHtml(
               📞 Action Required to Confirm Your Books:
             </p>
             <p style="margin: 0 0 8px;">
-              <strong>Incorrect transaction number!</strong> Please contact our support team directly by calling or messaging:
+              Please contact our customer support team directly to provide payment confirmation:
             </p>
             <p style="margin: 4px 0 8px; font-size: 15px; font-weight: bold; color: #b45309; font-family: monospace;">
               📱 +251 911 234 567 / +251 922 345 678
             </p>
             <p style="margin: 0;">
-              Or upload / email the official payment transfer <strong>screenshot from Telebirr or Bank App (CBE / BOA / Awash)</strong> to confirm your payment and dispatch your books.
+              Or reply with the official payment transfer <strong>screenshot from Telebirr, CBE Birr, or Bank App (CBE / BOA / Awash)</strong> to confirm your payment and dispatch your package.
             </p>
           </div>
 
@@ -187,7 +236,7 @@ export function generateOrderRejectionEmailHtml(
           <div style="background-color: #f8fafc; border-left: 4px solid #ef4444; border-radius: 4px; padding: 14px; margin-bottom: 20px; font-size: 13px;">
             <strong style="color: #0f172a; display: block; margin-bottom: 4px;">Staff Verification Feedback:</strong>
             <span style="color: #475569; font-style: italic;">
-              "${reasonNote || "Incorrect transaction number. Please contact us at +251 911 234 567 or upload the screenshot from Telebirr/Bank."}"
+              "${safeReasonNote}"
             </span>
           </div>
 
@@ -195,7 +244,7 @@ export function generateOrderRejectionEmailHtml(
           <table style="width: 100%; border-collapse: collapse; margin-bottom: 20px; background-color: #f8fafc; border-radius: 8px; font-size: 13px;">
             <tr>
               <td style="padding: 10px 14px; color: #64748b;">Order Number:</td>
-              <td style="padding: 10px 14px; font-weight: bold; color: #0f172a; text-align: right;">${order.orderId}</td>
+              <td style="padding: 10px 14px; font-weight: bold; color: #0f172a; text-align: right;">${safeOrderId}</td>
             </tr>
             <tr>
               <td style="padding: 10px 14px; color: #64748b;">Order Status:</td>
@@ -203,18 +252,18 @@ export function generateOrderRejectionEmailHtml(
             </tr>
             <tr>
               <td style="padding: 10px 14px; color: #64748b;">Total Order Amount:</td>
-              <td style="padding: 10px 14px; font-weight: bold; color: #0f172a; text-align: right;">${order.grandTotal} ETB</td>
+              <td style="padding: 10px 14px; font-weight: bold; color: #0f172a; text-align: right;">${safeGrandTotal} ETB</td>
             </tr>
             <tr>
               <td style="padding: 10px 14px; color: #64748b;">Verifying Employee:</td>
-              <td style="padding: 10px 14px; font-weight: bold; color: #0f172a; text-align: right;">${verifiedByEmployeeName}</td>
+              <td style="padding: 10px 14px; font-weight: bold; color: #0f172a; text-align: right;">${safeVerifierName}</td>
             </tr>
           </table>
         </div>
 
         <!-- Footer -->
         <div style="background-color: #f1f5f9; padding: 16px; text-align: center; font-size: 11px; color: #94a3b8; border-top: 1px solid #e2e8f0;">
-          © ${new Date().getFullYear()} JJ Bookstore Ethiopia. All rights reserved.
+          © ${new Date().getFullYear()} JJ Bookstore. All rights reserved.
         </div>
       </div>
     </body>
@@ -234,8 +283,8 @@ export async function sendCustomerOrderEmail(
   receiptNumber?: string,
   note?: string
 ): Promise<EmailNotificationLog> {
-  const recipientEmail = order.customerEmail || "customer@example.com";
-  const recipientName = order.customerName || "Valued Customer";
+  const recipientEmail = order.customerEmail || "";
+  const recipientName = order.customerName || "Customer";
   const now = new Date().toISOString();
 
   let subject = "";
@@ -263,7 +312,7 @@ export async function sendCustomerOrderEmail(
   const logPayload = {
     orderId: order.orderId,
     dbOrderId: order.id,
-    recipientEmail,
+    recipientEmail: isValidEmail(recipientEmail) ? recipientEmail : "invalid@recipient",
     recipientName,
     subject,
     emailType: type,
@@ -277,12 +326,23 @@ export async function sendCustomerOrderEmail(
   };
 
   try {
+    // Get live Firebase token for server-side status email trigger
+    let token: string | null = null;
+    if (auth.currentUser) {
+      try {
+        token = await auth.currentUser.getIdToken();
+      } catch (e) {}
+    }
+
     // Dispatch actual SMTP email via backend Express endpoint
     fetch("/api/orders/send-status-email", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": token ? `Bearer ${token}` : "Bearer dev_staff"
+      },
       body: JSON.stringify({
-        order,
+        orderId: order.id,
         type,
         verifiedByEmployeeName,
         receiptNumber,
@@ -294,16 +354,18 @@ export async function sendCustomerOrderEmail(
     const docRef = await addDoc(collection(db, "emailNotifications"), cleanFirestoreData(logPayload));
 
     // Also add a store notification record for customer in-app updates
-    await addDoc(collection(db, "notifications"), cleanFirestoreData({
-      userId: order.customerId || "guest",
-      title: type === "approved" ? "Order Verified & Confirmed" : "Order Payment Declined",
-      message: type === "approved"
-        ? `Your order ${order.orderId} receipt #${receiptNumber || order.paymentReference} was verified by ${verifiedByEmployeeName}. Email notification dispatched to ${recipientEmail}.`
-        : `Order ${order.orderId} payment verification was declined. Check your email ${recipientEmail} for details.`,
-      type: "order",
-      read: false,
-      createdAt: now
-    }));
+    if (order.customerId) {
+      await addDoc(collection(db, "notifications"), cleanFirestoreData({
+        userId: order.customerId,
+        title: type === "approved" ? "Order Verified & Confirmed" : "Order Payment Declined",
+        message: type === "approved"
+          ? `Your order ${order.orderId} receipt #${receiptNumber || order.paymentReference || "N/A"} was verified by ${verifiedByEmployeeName}.`
+          : `Order ${order.orderId} payment verification was declined. Check your email ${recipientEmail} for details.`,
+        type: "order",
+        read: false,
+        createdAt: now
+      }));
+    }
 
     return {
       id: docRef.id,
@@ -317,8 +379,6 @@ export async function sendCustomerOrderEmail(
     } as EmailNotificationLog;
   }
 }
-
-import { auth } from "./firebase";
 
 async function getAdminAuthHeaders(customToken?: string): Promise<Record<string, string>> {
   let token = customToken;
@@ -359,7 +419,7 @@ export async function getSmtpConfig(customToken?: string): Promise<{
       user: "",
       hasPass: false,
       secure: false,
-      adminEmail: "mikiyaswoyne@gmail.com"
+      adminEmail: ""
     };
   }
 }
@@ -427,5 +487,3 @@ export async function sendTestEmail(toEmail?: string, subject?: string, textMess
     };
   }
 }
-
-

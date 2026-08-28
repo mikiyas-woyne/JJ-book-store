@@ -15,15 +15,18 @@ import { collection, doc, getDoc, getDocs, query, setDoc, updateDoc, where } fro
 import { auth, db, googleProvider, cleanFirestoreData } from "../lib/firebase";
 import { UserProfile, UserRole } from "../types";
 
-const KNOWN_ADMIN_EMAILS = [
-  "mikiyaswoyne@gmail.com",
-  "admin@jjbookstore.com",
-  "admin@jjbookshopping.com"
-];
+const CONFIGURED_ADMIN_EMAIL = (import.meta.env.VITE_ADMIN_EMAIL || "").trim().toLowerCase();
+const CONFIGURED_ADMIN_EMAILS = (import.meta.env.VITE_ADMIN_EMAILS || "")
+  .split(",")
+  .map((e: string) => e.trim().toLowerCase())
+  .filter(Boolean);
 
 function isAuthorizedAdminEmail(email?: string | null): boolean {
   if (!email) return false;
-  return KNOWN_ADMIN_EMAILS.includes(email.trim().toLowerCase());
+  const normalized = email.trim().toLowerCase();
+  if (CONFIGURED_ADMIN_EMAIL && normalized === CONFIGURED_ADMIN_EMAIL) return true;
+  if (CONFIGURED_ADMIN_EMAILS.includes(normalized)) return true;
+  return false;
 }
 
 interface AuthContextType {
