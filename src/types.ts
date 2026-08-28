@@ -292,6 +292,7 @@ export interface Order {
   orderStatus: OrderStatus;
   shippingAddress: EthiopianAddress;
   notes?: string;
+  deliveryNotes?: string;
   couponCode?: string;
   createdAt: string;
   updatedAt: string;

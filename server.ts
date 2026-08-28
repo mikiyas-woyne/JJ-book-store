@@ -3,22 +3,23 @@ import path from "path";
 import { fileURLToPath } from "url";
 import { createServer as createViteServer } from "vite";
 import nodemailer from "nodemailer";
-import * as admin from "firebase-admin";
+import { getApps, initializeApp } from "firebase-admin/app";
+import { getFirestore } from "firebase-admin/firestore";
 import { INITIAL_BOOKS, INITIAL_COUPONS } from "./src/lib/sampleData";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 // Initialize Firebase Admin SDK safely
-if (!admin.getApps().length) {
+if (!getApps().length) {
   try {
-    admin.initializeApp();
+    initializeApp();
   } catch (e: any) {
     console.warn("Firebase Admin initialized in local mode:", e?.message);
   }
 }
 
-const firestoreAdmin = admin.getApps().length ? admin.firestore() : null;
+const firestoreAdmin = getApps().length ? getFirestore() : null;
 
 // In-memory fallback database for local preview/development when Admin credentials are not attached
 const localMemoryStore = {

@@ -2,7 +2,7 @@
 # JJ BOOK STORE - FIRESTORE AUTHORIZATION & SECURITY TEST SUITE (POWERSHELL)
 # ==============================================================================
 
-$rulesPath = "C:\Users\mickey\.gemini\antigravity-ide\scratch\JJ-book-store-main\firestore.rules"
+$rulesPath = if (Test-Path "$PSScriptRoot\..\firestore.rules") { "$PSScriptRoot\..\firestore.rules" } else { "C:\Users\mickey\.gemini\antigravity-ide\scratch\JJ-book-store\firestore.rules" }
 $rulesContent = Get-Content -Path $rulesPath -Raw
 
 Write-Host "=================================================" -ForegroundColor Cyan

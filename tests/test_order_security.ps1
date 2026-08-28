@@ -27,10 +27,10 @@ function Assert-Test {
     }
 }
 
-$rulesPath = "C:\Users\mickey\.gemini\antigravity-ide\scratch\JJ-book-store-main\firestore.rules"
+$rulesPath = if (Test-Path "$PSScriptRoot\..\firestore.rules") { "$PSScriptRoot\..\firestore.rules" } else { "C:\Users\mickey\.gemini\antigravity-ide\scratch\JJ-book-store\firestore.rules" }
 $rulesContent = Get-Content -Path $rulesPath -Raw
 
-$serverPath = "C:\Users\mickey\.gemini\antigravity-ide\scratch\JJ-book-store-main\server.ts"
+$serverPath = if (Test-Path "$PSScriptRoot\..\server.ts") { "$PSScriptRoot\..\server.ts" } else { "C:\Users\mickey\.gemini\antigravity-ide\scratch\JJ-book-store\server.ts" }
 $serverContent = Get-Content -Path $serverPath -Raw
 
 # ------------------------------------------------------------------------------
