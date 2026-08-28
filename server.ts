@@ -381,7 +381,7 @@ async function startServer() {
   });
 
   // ==============================================================================
-  // 2. SECURE SERVER-SIDE ORDER CREATION WITH ATOMIC INVENTORY DEDUCTION
+  // 2. SECURE SERVER-SIDE ORDER CREATION WITH MULTI-BOOK ATOMIC TRANSACTION
   // ==============================================================================
   app.post("/api/orders/create", async (req, res) => {
     try {
@@ -400,12 +400,32 @@ async function startServer() {
       } = req.body;
 
       if (!customerId) {
-        res.status(401).json({ success: false, message: "Authenticated customer ID is required." });
+        res.status(401).json({ success: false, code: "UNAUTHORIZED", message: "Authenticated customer ID is required." });
         return;
       }
 
       // Check Idempotency: Prevent duplicate orders on double click or retry
       if (idempotencyKey) {
+        if (firestoreAdmin) {
+          try {
+            const existingQ = await firestoreAdmin
+              .collection("orders")
+              .where("idempotencyKey", "==", String(idempotencyKey))
+              .limit(1)
+              .get();
+            if (!existingQ.empty) {
+              const existingDoc = existingQ.docs[0];
+              res.json({
+                success: true,
+                order: { id: existingDoc.id, ...existingDoc.data() },
+                idempotent: true,
+                message: "Order previously created."
+              });
+              return;
+            }
+          } catch (e) {}
+        }
+
         const existingOrder = Array.from(localMemoryStore.orders.values()).find(
           (o) => o.idempotencyKey === idempotencyKey
         );
@@ -448,7 +468,6 @@ async function startServer() {
         grandTotal: calculation.grandTotal,
         currency: "ETB",
         paymentMethod: paymentMethod || "cod",
-        // SECURITY: Initial payment status is ALWAYS pending (never 'paid' from client!)
         paymentStatus: "pending",
         paymentReference: paymentReference ? String(paymentReference).trim() : (paymentMethod === "cod" ? "Cash on Delivery" : "Pending Verification"),
         orderStatus: "pending",
@@ -476,88 +495,152 @@ async function startServer() {
 
       // ATOMIC INVENTORY DEDUCTION TRANSACTION
       if (firestoreAdmin) {
-        try {
-          await firestoreAdmin.runTransaction(async (transaction) => {
-            // 1. Check & Decrement Stock for all books
-            for (const item of calculation.items) {
-              const bookRef = firestoreAdmin.collection("books").doc(item.bookId);
-              const bookDoc = await transaction.get(bookRef);
+        await firestoreAdmin.runTransaction(async (transaction) => {
+          // Phase 1: Read all book documents within the transaction
+          const bookReadResults: { ref: FirebaseFirestore.DocumentReference; snap: FirebaseFirestore.DocumentSnapshot; item: typeof calculation.items[0] }[] = [];
+          for (const item of calculation.items) {
+            const bookRef = firestoreAdmin.collection("books").doc(item.bookId);
+            const bookDoc = await transaction.get(bookRef);
 
-              if (!bookDoc.exists) {
-                throw new Error(`Book "${item.title}" no longer exists in catalog.`);
-              }
-
-              const currentStock = bookDoc.data()?.stock ?? 0;
-              if (currentStock < item.quantity) {
-                throw new Error(`Insufficient stock for "${item.title}". Available: ${currentStock}`);
-              }
-
-              transaction.update(bookRef, {
-                stock: currentStock - item.quantity,
-                soldCount: (bookDoc.data()?.soldCount || 0) + item.quantity,
-                updatedAt: now
-              });
-
-              // Log inventory transaction
-              const invTxRef = firestoreAdmin.collection("inventoryTransactions").doc();
-              transaction.set(invTxRef, {
-                bookId: item.bookId,
-                bookTitle: item.title,
-                changeQuantity: -item.quantity,
-                previousStock: currentStock,
-                newStock: currentStock - item.quantity,
-                reason: "order_placed",
-                performedBy: customerId,
-                orderId: orderNumber,
-                createdAt: now
-              });
+            if (!bookDoc.exists) {
+              const err: any = new Error(`Book "${item.title}" (${item.bookId}) no longer exists in catalog.`);
+              err.code = "BOOK_NOT_FOUND";
+              throw err;
             }
 
-            // 2. Increment coupon used count if applicable
-            if (calculation.coupon?.id) {
-              const couponRef = firestoreAdmin.collection("coupons").doc(calculation.coupon.id);
-              const couponDoc = await transaction.get(couponRef);
-              if (couponDoc.exists) {
-                transaction.update(couponRef, {
-                  usedCount: (couponDoc.data()?.usedCount || 0) + 1
-                });
-              }
+            const bData = bookDoc.data() || {};
+            if (bData.active === false) {
+              const err: any = new Error(`"${item.title}" is currently deactivated.`);
+              err.code = "BOOK_UNAVAILABLE";
+              throw err;
             }
 
-            // 3. Save order document
-            const orderDocRef = firestoreAdmin.collection("orders").doc();
-            newOrder.id = orderDocRef.id;
-            transaction.set(orderDocRef, newOrder);
+            const currentStock = typeof bData.stock === "number" ? bData.stock : 0;
+            if (currentStock < item.quantity) {
+              const err: any = new Error(
+                `INSUFFICIENT_STOCK: Insufficient stock for "${item.title}". Requested: ${item.quantity}, Available: ${currentStock}.`
+              );
+              err.code = "INSUFFICIENT_STOCK";
+              err.bookId = item.bookId;
+              err.availableStock = currentStock;
+              throw err;
+            }
 
-            // 4. Log Activity
-            const actLogRef = firestoreAdmin.collection("activity_logs").doc();
-            transaction.set(actLogRef, {
-              title: `New Order #${orderNumber}`,
-              description: `${newOrder.customerName} placed order for ${newOrder.items.length} book(s) totaling ${newOrder.grandTotal} ETB`,
-              category: "orders",
-              type: "order_created",
-              orderId: orderNumber,
-              amount: newOrder.grandTotal,
-              timestamp: now
+            bookReadResults.push({ ref: bookRef, snap: bookDoc, item });
+          }
+
+          // Read coupon if applicable
+          let couponRef: FirebaseFirestore.DocumentReference | null = null;
+          let couponDoc: FirebaseFirestore.DocumentSnapshot | null = null;
+          if (calculation.coupon?.id) {
+            couponRef = firestoreAdmin.collection("coupons").doc(calculation.coupon.id);
+            couponDoc = await transaction.get(couponRef);
+          }
+
+          // Phase 2: Atomic writes
+          for (const { ref: bookRef, snap: bookDoc, item } of bookReadResults) {
+            const bData = bookDoc.data() || {};
+            const currentStock = typeof bData.stock === "number" ? bData.stock : 0;
+            const currentSoldCount = typeof bData.soldCount === "number" ? bData.soldCount : 0;
+            const newStock = currentStock - item.quantity;
+            const newSoldCount = currentSoldCount + item.quantity;
+
+            transaction.update(bookRef, {
+              stock: newStock,
+              soldCount: newSoldCount,
+              updatedAt: now
             });
+
+            // Deterministic transaction record ID to prevent duplicates on transaction retry
+            const txDocId = `tx_order_${orderNumber}_${item.bookId}_sale`;
+            const invTxRef = firestoreAdmin.collection("inventoryTransactions").doc(txDocId);
+            transaction.set(invTxRef, {
+              id: txDocId,
+              transactionId: txDocId,
+              bookId: item.bookId,
+              bookTitle: item.title,
+              orderId: orderNumber,
+              type: "SALE",
+              reason: "order_placed",
+              quantity: item.quantity,
+              changeQuantity: -item.quantity,
+              previousStock: currentStock,
+              newStock: newStock,
+              previousSoldCount: currentSoldCount,
+              newSoldCount: newSoldCount,
+              performedBy: customerId,
+              createdAt: now
+            });
+          }
+
+          if (couponRef && couponDoc && couponDoc.exists) {
+            transaction.update(couponRef, {
+              usedCount: (couponDoc.data()?.usedCount || 0) + 1
+            });
+          }
+
+          const orderDocRef = firestoreAdmin.collection("orders").doc();
+          newOrder.id = orderDocRef.id;
+          transaction.set(orderDocRef, newOrder);
+
+          const actLogRef = firestoreAdmin.collection("activity_logs").doc();
+          transaction.set(actLogRef, {
+            title: `New Order #${orderNumber}`,
+            description: `${newOrder.customerName} placed order for ${newOrder.items.length} book(s) totaling ${newOrder.grandTotal} ETB`,
+            category: "orders",
+            type: "order_created",
+            orderId: orderNumber,
+            amount: newOrder.grandTotal,
+            timestamp: now
           });
-        } catch (fsTxErr: any) {
-          console.warn("Firestore transaction notice (falling back to memory):", fsTxErr?.message);
+        });
+      } else {
+        // In-memory fallback (when Firestore Admin credentials are not provided in local dev)
+        for (const item of calculation.items) {
+          const memBook = localMemoryStore.books.get(item.bookId);
+          if (!memBook) {
+            const err: any = new Error(`Book "${item.title}" not found.`);
+            err.code = "BOOK_NOT_FOUND";
+            throw err;
+          }
+          const curStock = typeof memBook.stock === "number" ? memBook.stock : 0;
+          if (curStock < item.quantity) {
+            const err: any = new Error(`INSUFFICIENT_STOCK: Insufficient stock for "${item.title}".`);
+            err.code = "INSUFFICIENT_STOCK";
+            throw err;
+          }
         }
-      }
 
-      // Memory store fallback
-      if (!newOrder.id) {
-        newOrder.id = `order_${Date.now()}`;
-      }
-      localMemoryStore.orders.set(newOrder.id, newOrder);
+        if (!newOrder.id) {
+          newOrder.id = `order_${Date.now()}`;
+        }
+        localMemoryStore.orders.set(newOrder.id, newOrder);
 
-      // Decrement memory stock
-      for (const item of calculation.items) {
-        const memBook = localMemoryStore.books.get(item.bookId);
-        if (memBook) {
-          memBook.stock = Math.max(0, (memBook.stock || 10) - item.quantity);
-          memBook.soldCount = (memBook.soldCount || 0) + item.quantity;
+        for (const item of calculation.items) {
+          const memBook = localMemoryStore.books.get(item.bookId);
+          if (memBook) {
+            const curStock = typeof memBook.stock === "number" ? memBook.stock : 0;
+            const curSold = typeof memBook.soldCount === "number" ? memBook.soldCount : 0;
+            memBook.stock = Math.max(0, curStock - item.quantity);
+            memBook.soldCount = curSold + item.quantity;
+
+            localMemoryStore.inventoryTransactions.push({
+              id: `tx_order_${orderNumber}_${item.bookId}_sale`,
+              bookId: item.bookId,
+              bookTitle: item.title,
+              orderId: orderNumber,
+              type: "SALE",
+              reason: "order_placed",
+              quantity: item.quantity,
+              changeQuantity: -item.quantity,
+              previousStock: curStock,
+              newStock: memBook.stock,
+              previousSoldCount: curSold,
+              newSoldCount: memBook.soldCount,
+              performedBy: customerId,
+              createdAt: now
+            });
+          }
         }
       }
 
@@ -573,9 +656,11 @@ async function startServer() {
       });
     } catch (err: any) {
       console.error("Order creation error:", err);
+      const isStockError = err?.code === "INSUFFICIENT_STOCK" || err?.message?.includes("INSUFFICIENT_STOCK");
       res.status(400).json({
         success: false,
-        message: err.message || "Failed to create order."
+        code: err?.code || (isStockError ? "INSUFFICIENT_STOCK" : "ORDER_CREATION_FAILED"),
+        message: err?.message || "Failed to create order."
       });
     }
   });
@@ -588,123 +673,500 @@ async function startServer() {
       const { orderId, customerId, reason } = req.body;
 
       if (!orderId) {
-        res.status(400).json({ success: false, message: "Order ID is required." });
+        res.status(400).json({ success: false, code: "MISSING_PARAM", message: "Order ID is required." });
         return;
       }
 
-      let orderData: any = null;
-      let orderDocRef: any = null;
+      let orderNumber = "";
+      const now = new Date().toISOString();
 
       if (firestoreAdmin) {
-        try {
-          const snap = await firestoreAdmin.collection("orders").doc(orderId).get();
-          if (snap.exists) {
-            orderData = snap.data();
-            orderDocRef = snap.ref;
+        const orderDocRef = firestoreAdmin.collection("orders").doc(orderId);
+        await firestoreAdmin.runTransaction(async (transaction) => {
+          const freshOrderSnap = await transaction.get(orderDocRef);
+          if (!freshOrderSnap.exists) {
+            const err: any = new Error("Order not found.");
+            err.code = "ORDER_NOT_FOUND";
+            throw err;
           }
-        } catch (e) {}
-      }
 
-      if (!orderData) {
-        orderData = localMemoryStore.orders.get(orderId);
-      }
+          const oData = freshOrderSnap.data() || {};
+          orderNumber = oData.orderId || orderId;
 
-      if (!orderData) {
-        res.status(404).json({ success: false, message: "Order not found." });
-        return;
-      }
+          // Verify ownership or staff authority
+          if (customerId && oData.customerId !== customerId) {
+            const err: any = new Error("Unauthorized to cancel this order.");
+            err.code = "UNAUTHORIZED";
+            throw err;
+          }
 
-      // Verify ownership or staff authority
-      if (customerId && orderData.customerId !== customerId) {
-        res.status(403).json({ success: false, message: "Unauthorized to cancel this order." });
-        return;
-      }
+          // Idempotency Guard: If already cancelled, do not restock again!
+          if (oData.orderStatus === "cancelled") {
+            return;
+          }
 
-      // State Machine Guard: Only 'pending' orders can be cancelled by customers
-      if (orderData.orderStatus !== "pending") {
-        res.status(400).json({
-          success: false,
-          message: `Cannot cancel order with status "${orderData.orderStatus}". Only pending orders can be cancelled.`
+          // State Machine Guard: Only 'pending' orders can be cancelled by customer
+          if (oData.orderStatus !== "pending") {
+            const err: any = new Error(`Cannot cancel order with status "${oData.orderStatus}". Only pending orders can be cancelled.`);
+            err.code = "ORDER_CANNOT_BE_CANCELLED";
+            throw err;
+          }
+
+          // Read all books and restore stock atomically
+          for (const item of oData.items || []) {
+            if (item.bookId) {
+              const bookRef = firestoreAdmin.collection("books").doc(item.bookId);
+              const bookDoc = await transaction.get(bookRef);
+              if (bookDoc.exists) {
+                const bData = bookDoc.data() || {};
+                const currentStock = typeof bData.stock === "number" ? bData.stock : 0;
+                const currentSoldCount = typeof bData.soldCount === "number" ? bData.soldCount : 0;
+                const itemQty = Math.max(1, Number(item.quantity) || 1);
+                const newStock = currentStock + itemQty;
+                const newSoldCount = Math.max(0, currentSoldCount - itemQty);
+
+                transaction.update(bookRef, {
+                  stock: newStock,
+                  soldCount: newSoldCount,
+                  updatedAt: now
+                });
+
+                const txDocId = `tx_order_${orderNumber}_${item.bookId}_cancel`;
+                const invTxRef = firestoreAdmin.collection("inventoryTransactions").doc(txDocId);
+                transaction.set(invTxRef, {
+                  id: txDocId,
+                  transactionId: txDocId,
+                  bookId: item.bookId,
+                  bookTitle: item.title,
+                  orderId: orderNumber,
+                  type: "RELEASE",
+                  reason: "order_cancelled",
+                  quantity: itemQty,
+                  changeQuantity: itemQty,
+                  previousStock: currentStock,
+                  newStock: newStock,
+                  previousSoldCount: currentSoldCount,
+                  newSoldCount: newSoldCount,
+                  performedBy: customerId || "customer",
+                  createdAt: now
+                });
+              }
+            }
+          }
+
+          const existingHistory = oData.statusHistory || [];
+          transaction.update(orderDocRef, {
+            orderStatus: "cancelled",
+            cancelledReason: reason || "Cancelled by user",
+            updatedAt: now,
+            statusHistory: [
+              ...existingHistory,
+              {
+                status: "cancelled",
+                timestamp: now,
+                note: `Order cancelled. Stock returned to inventory. Reason: ${reason || "Customer request"}`
+              }
+            ]
+          });
         });
+      } else {
+        // Memory fallback
+        const orderData = localMemoryStore.orders.get(orderId);
+        if (!orderData) {
+          res.status(404).json({ success: false, code: "ORDER_NOT_FOUND", message: "Order not found." });
+          return;
+        }
+
+        if (customerId && orderData.customerId !== customerId) {
+          res.status(403).json({ success: false, code: "UNAUTHORIZED", message: "Unauthorized to cancel this order." });
+          return;
+        }
+
+        if (orderData.orderStatus === "cancelled") {
+          res.json({ success: true, alreadyCancelled: true, message: `Order ${orderData.orderId} was already cancelled.` });
+          return;
+        }
+
+        if (orderData.orderStatus !== "pending") {
+          res.status(400).json({
+            success: false,
+            code: "ORDER_CANNOT_BE_CANCELLED",
+            message: `Cannot cancel order with status "${orderData.orderStatus}". Only pending orders can be cancelled.`
+          });
+          return;
+        }
+
+        orderData.orderStatus = "cancelled";
+        orderData.cancelledReason = reason || "Cancelled by user";
+        orderData.updatedAt = now;
+
+        for (const item of orderData.items || []) {
+          const memBook = localMemoryStore.books.get(item.bookId);
+          if (memBook) {
+            const curStock = typeof memBook.stock === "number" ? memBook.stock : 0;
+            const curSold = typeof memBook.soldCount === "number" ? memBook.soldCount : 0;
+            const itemQty = Math.max(1, Number(item.quantity) || 1);
+            memBook.stock = curStock + itemQty;
+            memBook.soldCount = Math.max(0, curSold - itemQty);
+
+            localMemoryStore.inventoryTransactions.push({
+              id: `tx_order_${orderData.orderId}_${item.bookId}_cancel`,
+              bookId: item.bookId,
+              bookTitle: item.title,
+              orderId: orderData.orderId,
+              type: "RELEASE",
+              reason: "order_cancelled",
+              quantity: itemQty,
+              changeQuantity: itemQty,
+              previousStock: curStock,
+              newStock: memBook.stock,
+              previousSoldCount: curSold,
+              newSoldCount: memBook.soldCount,
+              performedBy: customerId || "customer",
+              createdAt: now
+            });
+          }
+        }
+        orderNumber = orderData.orderId;
+      }
+
+      res.json({
+        success: true,
+        orderId: orderNumber || orderId,
+        message: `Order ${orderNumber || orderId} cancelled and stock replenished successfully.`
+      });
+    } catch (err: any) {
+      res.status(err?.code === "UNAUTHORIZED" ? 403 : 400).json({
+        success: false,
+        code: err?.code || "ORDER_CANCELLATION_FAILED",
+        message: err?.message || "Failed to cancel order."
+      });
+    }
+  });
+
+  // ==============================================================================
+  // 4. ATOMIC ORDER RETURN & RESTOCK ENDPOINT (EMPLOYEE/ADMIN)
+  // ==============================================================================
+  app.post("/api/orders/return", async (req, res) => {
+    try {
+      const { orderId, returnCondition, performedBy, performedByName, notes } = req.body;
+
+      if (!orderId) {
+        res.status(400).json({ success: false, code: "MISSING_PARAM", message: "Order ID is required." });
         return;
       }
 
       const now = new Date().toISOString();
+      let orderNumber = "";
 
-      // ATOMIC STOCK RESTORATION TRANSACTION
-      if (firestoreAdmin && orderDocRef) {
-        try {
-          await firestoreAdmin.runTransaction(async (transaction) => {
-            for (const item of orderData.items || []) {
+      if (firestoreAdmin) {
+        const orderDocRef = firestoreAdmin.collection("orders").doc(orderId);
+        await firestoreAdmin.runTransaction(async (transaction) => {
+          const freshOrderSnap = await transaction.get(orderDocRef);
+          if (!freshOrderSnap.exists) {
+            const err: any = new Error("Order not found.");
+            err.code = "ORDER_NOT_FOUND";
+            throw err;
+          }
+
+          const oData = freshOrderSnap.data() || {};
+          orderNumber = oData.orderId || orderId;
+
+          // Idempotency: do not restock twice if already returned
+          if (oData.isRestocked || oData.orderStatus === "returned_to_store") {
+            return;
+          }
+
+          // Restock good condition books
+          const shouldRestock = returnCondition !== "damaged";
+          if (shouldRestock) {
+            for (const item of oData.items || []) {
               if (item.bookId) {
                 const bookRef = firestoreAdmin.collection("books").doc(item.bookId);
                 const bookDoc = await transaction.get(bookRef);
                 if (bookDoc.exists) {
-                  const currentStock = bookDoc.data()?.stock || 0;
+                  const bData = bookDoc.data() || {};
+                  const currentStock = typeof bData.stock === "number" ? bData.stock : 0;
+                  const currentSoldCount = typeof bData.soldCount === "number" ? bData.soldCount : 0;
+                  const itemQty = Math.max(1, Number(item.quantity) || 1);
+                  const newStock = currentStock + itemQty;
+                  const newSoldCount = Math.max(0, currentSoldCount - itemQty);
+
                   transaction.update(bookRef, {
-                    stock: currentStock + (item.quantity || 1),
-                    soldCount: Math.max(0, (bookDoc.data()?.soldCount || 0) - (item.quantity || 1)),
+                    stock: newStock,
+                    soldCount: newSoldCount,
                     updatedAt: now
                   });
 
-                  const invTxRef = firestoreAdmin.collection("inventoryTransactions").doc();
+                  const txDocId = `tx_order_${orderNumber}_${item.bookId}_return`;
+                  const invTxRef = firestoreAdmin.collection("inventoryTransactions").doc(txDocId);
                   transaction.set(invTxRef, {
+                    id: txDocId,
+                    transactionId: txDocId,
                     bookId: item.bookId,
                     bookTitle: item.title,
-                    changeQuantity: item.quantity || 1,
+                    orderId: orderNumber,
+                    type: "RETURN",
+                    reason: "returned_to_store",
+                    quantity: itemQty,
+                    changeQuantity: itemQty,
                     previousStock: currentStock,
-                    newStock: currentStock + (item.quantity || 1),
-                    reason: "order_cancelled",
-                    performedBy: customerId || "system",
-                    orderId: orderData.orderId,
+                    newStock: newStock,
+                    previousSoldCount: currentSoldCount,
+                    newSoldCount: newSoldCount,
+                    performedBy: performedBy || "employee",
+                    performedByName: performedByName || "Staff",
                     createdAt: now
                   });
                 }
               }
             }
+          }
 
-            transaction.update(orderDocRef, {
-              orderStatus: "cancelled",
-              cancelledReason: reason || "Cancelled by user",
-              updatedAt: now
-            });
+          const existingHistory = oData.statusHistory || [];
+          transaction.update(orderDocRef, {
+            orderStatus: "returned_to_store",
+            returnCondition: returnCondition || "good",
+            isRestocked: shouldRestock,
+            updatedAt: now,
+            statusHistory: [
+              ...existingHistory,
+              {
+                status: "returned_to_store",
+                timestamp: now,
+                note: `Package returned to store (${returnCondition || "good"}). ${shouldRestock ? "Restocked to inventory." : "Damaged: not restocked."} Note: ${notes || "No extra note"}`
+              }
+            ]
           });
-        } catch (txErr) {
-          console.warn("Firestore cancellation transaction notice:", txErr);
-        }
-      }
-
-      // Update memory store
-      orderData.orderStatus = "cancelled";
-      localMemoryStore.orders.set(orderId, orderData);
-
-      // Restock memory books
-      for (const item of orderData.items || []) {
-        const memBook = localMemoryStore.books.get(item.bookId);
-        if (memBook) {
-          memBook.stock = (memBook.stock || 0) + (item.quantity || 1);
-          memBook.soldCount = Math.max(0, (memBook.soldCount || 0) - (item.quantity || 1));
+        });
+      } else {
+        const orderData = localMemoryStore.orders.get(orderId);
+        if (orderData) {
+          orderData.orderStatus = "returned_to_store";
+          orderData.isRestocked = returnCondition !== "damaged";
+          orderData.updatedAt = now;
+          orderNumber = orderData.orderId;
         }
       }
 
       res.json({
         success: true,
-        message: `Order ${orderData.orderId} cancelled and stock replenished successfully.`
+        orderId: orderNumber || orderId,
+        message: `Order ${orderNumber || orderId} returned and inventory updated.`
       });
     } catch (err: any) {
-      res.status(500).json({ success: false, message: err.message || "Failed to cancel order." });
+      res.status(400).json({
+        success: false,
+        code: err?.code || "RETURN_FAILED",
+        message: err?.message || "Failed to process return."
+      });
     }
   });
 
   // ==============================================================================
-  // 4. SECURE PAYMENT VERIFICATION & WEBHOOK CALLBACK HANDLER
+  // 5. ATOMIC ADMIN & EMPLOYEE RESTOCK ENDPOINT
+  // ==============================================================================
+  app.post("/api/admin/inventory/restock", async (req, res) => {
+    try {
+      const { bookId, quantity, performedBy, performedByName, reason } = req.body;
+
+      const addQty = Number(quantity);
+      if (!bookId || isNaN(addQty) || addQty <= 0) {
+        res.status(400).json({ success: false, code: "INVALID_PARAM", message: "Valid bookId and positive quantity are required." });
+        return;
+      }
+
+      const now = new Date().toISOString();
+      let updatedBook: any = null;
+
+      if (firestoreAdmin) {
+        const bookRef = firestoreAdmin.collection("books").doc(bookId);
+        await firestoreAdmin.runTransaction(async (transaction) => {
+          const bookDoc = await transaction.get(bookRef);
+          if (!bookDoc.exists) {
+            const err: any = new Error(`Book "${bookId}" not found.`);
+            err.code = "BOOK_NOT_FOUND";
+            throw err;
+          }
+
+          const bData = bookDoc.data() || {};
+          const currentStock = typeof bData.stock === "number" ? bData.stock : 0;
+          const newStock = currentStock + addQty;
+
+          transaction.update(bookRef, {
+            stock: newStock,
+            updatedAt: now
+          });
+
+          const txDocId = `tx_restock_${bookId}_${Date.now()}`;
+          const invTxRef = firestoreAdmin.collection("inventoryTransactions").doc(txDocId);
+          transaction.set(invTxRef, {
+            id: txDocId,
+            transactionId: txDocId,
+            bookId,
+            bookTitle: bData.title || bookId,
+            type: "RESTOCK",
+            reason: reason || "admin_restock",
+            quantity: addQty,
+            changeQuantity: addQty,
+            previousStock: currentStock,
+            newStock: newStock,
+            performedBy: performedBy || "admin",
+            performedByName: performedByName || "Store Admin",
+            createdAt: now
+          });
+
+          updatedBook = { id: bookDoc.id, ...bData, stock: newStock, updatedAt: now };
+        });
+      } else {
+        const memBook = localMemoryStore.books.get(bookId);
+        if (!memBook) {
+          res.status(404).json({ success: false, code: "BOOK_NOT_FOUND", message: `Book "${bookId}" not found.` });
+          return;
+        }
+
+        const currentStock = typeof memBook.stock === "number" ? memBook.stock : 0;
+        memBook.stock = currentStock + addQty;
+        memBook.updatedAt = now;
+        updatedBook = { ...memBook };
+
+        localMemoryStore.inventoryTransactions.push({
+          id: `tx_restock_${bookId}_${Date.now()}`,
+          bookId,
+          bookTitle: memBook.title || bookId,
+          type: "RESTOCK",
+          reason: reason || "admin_restock",
+          quantity: addQty,
+          changeQuantity: addQty,
+          previousStock: currentStock,
+          newStock: memBook.stock,
+          performedBy: performedBy || "admin",
+          performedByName: performedByName || "Store Admin",
+          createdAt: now
+        });
+      }
+
+      res.json({
+        success: true,
+        book: updatedBook,
+        message: `Successfully restocked +${addQty} copies. New stock: ${updatedBook?.stock}`
+      });
+    } catch (err: any) {
+      res.status(400).json({
+        success: false,
+        code: err?.code || "RESTOCK_FAILED",
+        message: err?.message || "Failed to restock book."
+      });
+    }
+  });
+
+  // ==============================================================================
+  // 6. ATOMIC INVENTORY ADJUSTMENT ENDPOINT
+  // ==============================================================================
+  app.post("/api/admin/inventory/adjust", async (req, res) => {
+    try {
+      const { bookId, targetStock, performedBy, performedByName, reason } = req.body;
+
+      const newTarget = Number(targetStock);
+      if (!bookId || isNaN(newTarget) || newTarget < 0) {
+        res.status(400).json({ success: false, code: "INVALID_PARAM", message: "Valid bookId and non-negative target stock required." });
+        return;
+      }
+
+      const now = new Date().toISOString();
+      let updatedBook: any = null;
+
+      if (firestoreAdmin) {
+        const bookRef = firestoreAdmin.collection("books").doc(bookId);
+        await firestoreAdmin.runTransaction(async (transaction) => {
+          const bookDoc = await transaction.get(bookRef);
+          if (!bookDoc.exists) {
+            const err: any = new Error(`Book "${bookId}" not found.`);
+            err.code = "BOOK_NOT_FOUND";
+            throw err;
+          }
+
+          const bData = bookDoc.data() || {};
+          const currentStock = typeof bData.stock === "number" ? bData.stock : 0;
+          const changeQty = newTarget - currentStock;
+
+          transaction.update(bookRef, {
+            stock: newTarget,
+            updatedAt: now
+          });
+
+          const txDocId = `tx_adjust_${bookId}_${Date.now()}`;
+          const invTxRef = firestoreAdmin.collection("inventoryTransactions").doc(txDocId);
+          transaction.set(invTxRef, {
+            id: txDocId,
+            transactionId: txDocId,
+            bookId,
+            bookTitle: bData.title || bookId,
+            type: "ADJUSTMENT",
+            reason: reason || "manual_inventory_adjustment",
+            quantity: Math.abs(changeQty),
+            changeQuantity: changeQty,
+            previousStock: currentStock,
+            newStock: newTarget,
+            performedBy: performedBy || "admin",
+            performedByName: performedByName || "Store Admin",
+            createdAt: now
+          });
+
+          updatedBook = { id: bookDoc.id, ...bData, stock: newTarget, updatedAt: now };
+        });
+      } else {
+        const memBook = localMemoryStore.books.get(bookId);
+        if (!memBook) {
+          res.status(404).json({ success: false, code: "BOOK_NOT_FOUND", message: `Book "${bookId}" not found.` });
+          return;
+        }
+
+        const currentStock = typeof memBook.stock === "number" ? memBook.stock : 0;
+        const changeQty = newTarget - currentStock;
+        memBook.stock = newTarget;
+        memBook.updatedAt = now;
+        updatedBook = { ...memBook };
+
+        localMemoryStore.inventoryTransactions.push({
+          id: `tx_adjust_${bookId}_${Date.now()}`,
+          bookId,
+          bookTitle: memBook.title || bookId,
+          type: "ADJUSTMENT",
+          reason: reason || "manual_inventory_adjustment",
+          quantity: Math.abs(changeQty),
+          changeQuantity: changeQty,
+          previousStock: currentStock,
+          newStock: newTarget,
+          performedBy: performedBy || "admin",
+          performedByName: performedByName || "Store Admin",
+          createdAt: now
+        });
+      }
+
+      res.json({
+        success: true,
+        book: updatedBook,
+        message: `Inventory adjusted to ${newTarget} units.`
+      });
+    } catch (err: any) {
+      res.status(400).json({
+        success: false,
+        code: err?.code || "ADJUSTMENT_FAILED",
+        message: err?.message || "Failed to adjust inventory."
+      });
+    }
+  });
+
+  // ==============================================================================
+  // 7. SECURE & IDEMPOTENT PAYMENT VERIFICATION
   // ==============================================================================
   app.post("/api/payments/verify", async (req, res) => {
     try {
       const { orderId, paymentMethod, transactionRef, amount, providerStatus } = req.body;
 
       if (!orderId) {
-        res.status(400).json({ success: false, message: "Order ID is required for verification." });
+        res.status(400).json({ success: false, code: "MISSING_PARAM", message: "Order ID is required for verification." });
         return;
       }
 
@@ -726,11 +1188,11 @@ async function startServer() {
       }
 
       if (!order) {
-        res.status(404).json({ success: false, message: "Order not found." });
+        res.status(404).json({ success: false, code: "ORDER_NOT_FOUND", message: "Order not found." });
         return;
       }
 
-      // IDEMPOTENCY GUARD: If already paid, return without duplicating side-effects
+      // IDEMPOTENCY GUARD: If already paid, return immediately without duplicate side-effects
       if (order.paymentStatus === "paid") {
         res.json({
           success: true,
@@ -746,7 +1208,6 @@ async function startServer() {
       const verifiedAmount = Number(amount || 0);
 
       if (amount !== undefined && verifiedAmount !== expectedAmount) {
-        // Record payment mismatch security alert
         console.error(
           `[SECURITY ALERT] Payment amount mismatch for order ${order.orderId}! Expected: ${expectedAmount} ETB, Received: ${verifiedAmount} ETB.`
         );
@@ -762,6 +1223,7 @@ async function startServer() {
         res.status(400).json({
           success: false,
           mismatch: true,
+          code: "PAYMENT_AMOUNT_MISMATCH",
           message: `Payment amount (${verifiedAmount} ETB) does not match required order total (${expectedAmount} ETB). Payment not confirmed.`
         });
         return;
@@ -800,7 +1262,7 @@ async function startServer() {
         timestamp: now
       });
     } catch (err: any) {
-      res.status(500).json({ success: false, message: err.message || "Failed to verify payment." });
+      res.status(500).json({ success: false, code: "VERIFICATION_ERROR", message: err.message || "Failed to verify payment." });
     }
   });
 

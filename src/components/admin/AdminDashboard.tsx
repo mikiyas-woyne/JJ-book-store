@@ -38,7 +38,7 @@ import {
   AlertCircle,
   Mail
 } from "lucide-react";
-import { collection, getDocs, doc, setDoc, updateDoc, deleteDoc, addDoc, onSnapshot, writeBatch } from "firebase/firestore";
+import { collection, getDocs, doc, setDoc, updateDoc, deleteDoc, addDoc, onSnapshot, writeBatch, runTransaction } from "firebase/firestore";
 import { db, cleanFirestoreData } from "../../lib/firebase";
 import { Author, Book, Category, Coupon, Order, OrderStatus } from "../../types";
 import { seedBookstoreData } from "../../lib/seed";
@@ -433,20 +433,74 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     }
   };
 
-  // Quick Restock Function with Custom Quantities & Activity Logging
+  // Quick Restock Function with Atomic Transaction & Activity Logging
   const handleQuickRestockCustom = async (bookId: string, currentStock: number, addQty: number, title: string) => {
     try {
-      const newStock = currentStock + addQty;
-      await updateDoc(doc(db, "books", bookId), {
-        stock: newStock,
-        updatedAt: new Date().toISOString()
-      });
-      showToast("Stock Replenished", `Added +${addQty} copies to "${title}". New Total: ${newStock}`, "success");
+      let finalNewStock = currentStock + addQty;
+      let restockSucceeded = false;
+
+      // 1. Try atomic server restock API first
+      try {
+        const res = await fetch("/api/admin/inventory/restock", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            bookId,
+            quantity: addQty,
+            performedBy: userProfile?.uid || "admin",
+            performedByName: userProfile?.fullName || "Store Admin",
+            reason: `Admin quick restock (+${addQty})`
+          })
+        });
+        if (res.ok) {
+          const data = await res.json();
+          if (data.success && data.book) {
+            finalNewStock = data.book.stock;
+            restockSucceeded = true;
+          }
+        }
+      } catch (apiErr) {
+        console.warn("Server restock endpoint notice, using atomic direct Firestore transaction:", apiErr);
+      }
+
+      // 2. Direct Firestore runTransaction fallback
+      if (!restockSucceeded) {
+        await runTransaction(db, async (transaction) => {
+          const bRef = doc(db, "books", bookId);
+          const bSnap = await transaction.get(bRef);
+          const cur = bSnap.exists() ? (bSnap.data()?.stock || 0) : currentStock;
+          finalNewStock = cur + addQty;
+          transaction.update(bRef, {
+            stock: finalNewStock,
+            updatedAt: new Date().toISOString()
+          });
+
+          const txId = `tx_restock_${bookId}_${Date.now()}`;
+          const invTxRef = doc(db, "inventoryTransactions", txId);
+          transaction.set(invTxRef, {
+            id: txId,
+            transactionId: txId,
+            bookId,
+            bookTitle: title,
+            type: "RESTOCK",
+            reason: "admin_restock",
+            quantity: addQty,
+            changeQuantity: addQty,
+            previousStock: cur,
+            newStock: finalNewStock,
+            performedBy: userProfile?.uid || "admin",
+            performedByName: userProfile?.fullName || "Store Admin",
+            createdAt: new Date().toISOString()
+          });
+        });
+      }
+
+      showToast("Stock Replenished", `Added +${addQty} copies to "${title}". New Total: ${finalNewStock}`, "success");
       await logActivityEvent(
         `Inventory Restocked (+${addQty})`,
-        `Restocked ${addQty} unit(s) of "${title}". New stock level: ${newStock}`,
+        `Restocked ${addQty} unit(s) of "${title}". New stock level: ${finalNewStock}`,
         "inventory",
-        { bookId, newStock }
+        { bookId, newStock: finalNewStock }
       );
       onRefreshData();
     } catch (err) {

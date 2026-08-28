@@ -65,6 +65,29 @@ service cloud.firestore {
       );
     }
 
+    function hasPermission(perm) {
+      return isSignedIn() && isUserActive() && (
+        isAdmin() ||
+        (userDocExists() && (
+          ('permissions' in getUserData() && perm in getUserData().permissions) ||
+          ('permissions' in getUserData() && 'manage_inventory' in getUserData().permissions) ||
+          getUserRole() in ['admin', 'superAdmin']
+        ))
+      );
+    }
+
+    function canManageInventory() {
+      return isAdmin() || isEmployee() || hasPermission('manage_inventory') || hasPermission('inventory.view') || hasPermission('inventory.restock') || hasPermission('inventory.adjust');
+    }
+
+    function canRestockInventory() {
+      return isAdmin() || hasPermission('manage_inventory') || hasPermission('inventory.restock');
+    }
+
+    function canAdjustInventory() {
+      return isAdmin() || hasPermission('manage_inventory') || hasPermission('inventory.adjust');
+    }
+
     // ===============================================================
     // 1. USERS & PROFILES
     // ===============================================================
@@ -215,7 +238,8 @@ service cloud.firestore {
     // 10. INVENTORY AUDIT TRANSACTIONS
     // ===============================================================
     match /inventoryTransactions/{txId} {
-      allow read, create: if isEmployee();
+      allow read: if isEmployee();
+      allow create: if isEmployee() && canManageInventory();
       allow update, delete: if isAdmin();
     }
 

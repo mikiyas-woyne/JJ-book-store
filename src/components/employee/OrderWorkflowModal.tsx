@@ -365,8 +365,27 @@ export const OrderWorkflowModal: React.FC<OrderWorkflowModalProps> = ({
     setLoading(true);
     try {
       const retNote = note || `Returned to store inventory. Condition: ${returnCondition}.`;
+
+      // 1. Try atomic server return endpoint
+      try {
+        await fetch("/api/orders/return", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            orderId: order.id,
+            returnCondition,
+            performedBy: currentEmployee?.uid || "staff-01",
+            performedByName: currentEmployee?.fullName || "Store Staff",
+            notes: retNote
+          })
+        });
+      } catch (e) {
+        console.warn("Server return endpoint notice:", e);
+      }
+
       await onUpdateOrderStatus(order.id, "returned_to_store", retNote, {
-        returnCondition
+        returnCondition,
+        isRestocked: returnCondition !== "damaged"
       });
       onClose();
     } finally {

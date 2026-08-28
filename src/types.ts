@@ -17,6 +17,10 @@ export type EmployeePermission =
   | 'view_delivery_addresses'
   | 'update_delivery_status'
   | 'manage_inventory'
+  | 'inventory.view'
+  | 'inventory.restock'
+  | 'inventory.adjust'
+  | 'inventory.approve'
   | 'customer_service'
   | 'view_customers'
   | 'manage_reviews';
@@ -341,15 +345,35 @@ export interface Coupon {
   createdAt: string;
 }
 
+export type InventoryTransactionType =
+  | 'SALE'
+  | 'RESERVATION'
+  | 'RELEASE'
+  | 'RESTOCK'
+  | 'ADJUSTMENT'
+  | 'RETURN'
+  | 'REFUND'
+  | 'restock'
+  | 'order_placed'
+  | 'order_cancelled'
+  | 'manual_adjustment';
+
 export interface InventoryTransaction {
   id: string;
+  transactionId?: string;
   bookId: string;
   bookTitle: string;
+  orderId?: string;
+  type?: InventoryTransactionType;
+  quantity?: number;
   changeQuantity: number;
   previousStock: number;
   newStock: number;
-  reason: 'restock' | 'order_placed' | 'order_cancelled' | 'manual_adjustment';
+  previousSoldCount?: number;
+  newSoldCount?: number;
+  reason: string;
   performedBy: string;
+  performedByName?: string;
   createdAt: string;
 }
 
