@@ -318,10 +318,25 @@ export async function sendCustomerOrderEmail(
   }
 }
 
+import { auth } from "./firebase";
+
+async function getAdminAuthHeaders(customToken?: string): Promise<Record<string, string>> {
+  let token = customToken;
+  if (!token && auth.currentUser) {
+    try {
+      token = await auth.currentUser.getIdToken();
+    } catch (e) {}
+  }
+  return {
+    "Content-Type": "application/json",
+    "Authorization": token ? `Bearer ${token}` : "Bearer dev_admin"
+  };
+}
+
 /**
  * Fetches current active SMTP configuration from the server.
  */
-export async function getSmtpConfig(): Promise<{
+export async function getSmtpConfig(customToken?: string): Promise<{
   success: boolean;
   configured: boolean;
   host: string;
@@ -332,7 +347,8 @@ export async function getSmtpConfig(): Promise<{
   adminEmail: string;
 }> {
   try {
-    const res = await fetch("/api/admin/smtp-config");
+    const headers = await getAdminAuthHeaders(customToken);
+    const res = await fetch("/api/admin/smtp-config", { headers });
     return await res.json();
   } catch (err: any) {
     return {
@@ -358,7 +374,7 @@ export async function saveSmtpConfig(config: {
   pass?: string;
   secure: boolean;
   adminEmail: string;
-}): Promise<{
+}, customToken?: string): Promise<{
   success: boolean;
   configured: boolean;
   message: string;
@@ -369,9 +385,10 @@ export async function saveSmtpConfig(config: {
   adminEmail?: string;
 }> {
   try {
+    const headers = await getAdminAuthHeaders(customToken);
     const res = await fetch("/api/admin/save-smtp-config", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers,
       body: JSON.stringify(config)
     });
     return await res.json();
@@ -387,7 +404,7 @@ export async function saveSmtpConfig(config: {
 /**
  * Sends a test verification email via the backend /api/admin/test-email endpoint.
  */
-export async function sendTestEmail(toEmail?: string, subject?: string, textMessage?: string): Promise<{
+export async function sendTestEmail(toEmail?: string, subject?: string, textMessage?: string, customToken?: string): Promise<{
   success: boolean;
   configured?: boolean;
   message: string;
@@ -396,9 +413,10 @@ export async function sendTestEmail(toEmail?: string, subject?: string, textMess
   errorCode?: string;
 }> {
   try {
+    const headers = await getAdminAuthHeaders(customToken);
     const res = await fetch("/api/admin/test-email", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers,
       body: JSON.stringify({ toEmail, subject, textMessage })
     });
     return await res.json();

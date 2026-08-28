@@ -76,7 +76,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   onRefreshData
 }) => {
   const { showToast } = useToast();
-  const { userProfile, updateAdminCredentials } = useAuth();
+  const { userProfile, updateAdminCredentials, currentUser } = useAuth();
   const [activeTab, setActiveTab] = useState<
     "overview" | "books" | "orders" | "authors" | "categories" | "coupons" | "employees" | "email" | "security"
   >("overview");
@@ -441,9 +441,18 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
       // 1. Try atomic server restock API first
       try {
+        let token = "dev_admin";
+        if (currentUser) {
+          try {
+            token = await currentUser.getIdToken();
+          } catch (e) {}
+        }
         const res = await fetch("/api/admin/inventory/restock", {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
+          headers: {
+            "Content-Type": "application/json",
+            "Authorization": `Bearer ${token}`
+          },
           body: JSON.stringify({
             bookId,
             quantity: addQty,

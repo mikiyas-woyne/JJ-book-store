@@ -141,8 +141,9 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
   };
 
   const handleCreateOrder = async () => {
-    if (cartItems.length === 0) {
-      showToast("Cart is Empty", "Please add books to your shopping cart before checking out.", "error");
+    if (!currentUser) {
+      showToast("Sign In Required", "Please sign in or create an account to complete your purchase.", "error");
+      setLoading(false);
       return;
     }
 
@@ -153,7 +154,7 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
       const finalRef = paymentReference.trim() || (paymentMethod === "cod" ? "Cash on Delivery" : "Pending Verification");
 
       const shippingAddressObj: EthiopianAddress = {
-        fullName: customerName.trim() || "Customer",
+        fullName: customerName.trim() || userProfile?.fullName || "Customer",
         phone: formattedPhone,
         region,
         city: region === "Addis Ababa" ? "Addis Ababa" : (city || "Addis Ababa"),
@@ -164,16 +165,30 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
       };
 
       let fullOrder: Order | null = null;
-      const idempotencyKey = `idemp_${currentUser?.uid || "guest"}_${Date.now()}_${Math.floor(Math.random() * 10000)}`;
+      const idempotencyKey = `idemp_${currentUser.uid}_${Date.now()}_${Math.floor(Math.random() * 10000)}`;
+
+      // Fetch verified Firebase ID Token
+      let idToken: string | null = null;
+      try {
+        idToken = await currentUser.getIdToken();
+      } catch (tokenErr) {
+        console.warn("Could not retrieve live Firebase ID token:", tokenErr);
+      }
+
+      // Development / preview token fallback if Firebase Admin is in local mode
+      const finalAuthHeader = idToken ? `Bearer ${idToken}` : `Bearer dev_${currentUser.uid}`;
 
       // 1. Authoritative Server-Side Order Creation (Atomic Stock & Price Validation)
       try {
         const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 4500);
+        const timeoutId = setTimeout(() => controller.abort(), 8000);
 
         const res = await fetch("/api/orders/create", {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
+          headers: {
+            "Content-Type": "application/json",
+            "Authorization": finalAuthHeader
+          },
           signal: controller.signal,
           body: JSON.stringify({
             items: cartItems.map((i) => ({
@@ -181,9 +196,8 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
               quantity: i.quantity
             })),
             couponCode: appliedCoupon?.code,
-            customerId: currentUser?.uid || "guest_customer",
-            customerName: customerName.trim() || "Customer",
-            customerEmail: customerEmail.trim() || "customer@example.com",
+            customerName: customerName.trim() || userProfile?.fullName || "Customer",
+            customerEmail: currentUser.email || customerEmail.trim() || "customer@example.com",
             customerPhone: formattedPhone,
             shippingAddress: shippingAddressObj,
             paymentMethod,
@@ -201,67 +215,21 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
           }
         } else {
           const errData = await res.json().catch(() => ({}));
-          if (errData?.message) {
-            showToast("Order Rejected", errData.message, "error");
-            setLoading(false);
-            return;
-          }
+          showToast("Checkout Failed", errData?.message || "Could not complete order. Please verify your details.", "error");
+          setLoading(false);
+          return;
         }
       } catch (apiErr: any) {
-        console.warn("Server API order creation notice (falling back to direct Firestore):", apiErr?.message);
+        console.error("Server order creation error:", apiErr);
+        showToast("Connection Error", "Could not connect to bookstore checkout server. Please check your network and retry.", "error");
+        setLoading(false);
+        return;
       }
 
-      // 2. Fallback direct creation if server endpoint is in offline mode
       if (!fullOrder) {
-        const orderNumber = `JJ-${new Date().getFullYear()}-${Math.floor(10000 + Math.random() * 90000)}`;
-        const fallbackOrderData: Omit<Order, "id"> = {
-          orderId: orderNumber,
-          customerId: currentUser?.uid || "guest_customer",
-          customerName: customerName.trim() || "Customer",
-          customerEmail: customerEmail.trim() || "customer@example.com",
-          customerPhone: formattedPhone,
-          items: cartItems.map((i) => ({
-            bookId: i.bookId,
-            title: i.book.title,
-            coverImage: i.book.coverImage,
-            authorName: i.book.authorName || "",
-            price: i.book.discountPrice || i.book.price,
-            quantity: i.quantity,
-            total: (i.book.discountPrice || i.book.price) * i.quantity
-          })),
-          subtotal,
-          discount,
-          tax,
-          shippingFee: shippingOption === "pickup" ? 0 : shippingFee,
-          grandTotal,
-          paymentMethod,
-          paymentStatus: "pending",
-          paymentReference: finalRef,
-          orderStatus: "pending",
-          isReceiptVerified: false,
-          shippingAddress: shippingAddressObj,
-          deliveryNotes: deliveryNotes.trim(),
-          couponCode: appliedCoupon?.code || "",
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString(),
-          statusHistory: [
-            {
-              status: "pending",
-              timestamp: new Date().toISOString(),
-              note: "Order placed. Awaiting staff payment & address verification."
-            }
-          ]
-        };
-
-        let createdDocId = `local_${Date.now()}`;
-        try {
-          const docRef = await addDoc(collection(db, "orders"), cleanFirestoreData(fallbackOrderData));
-          if (docRef?.id) createdDocId = docRef.id;
-        } catch (fsErr) {
-          console.warn("Direct Firestore fallback write notice:", fsErr);
-        }
-
-        fullOrder = { id: createdDocId, ...fallbackOrderData };
+        showToast("Order Error", "Failed to finalize order. Please try again.", "error");
+        setLoading(false);
+        return;
       }
 
       // Persist in localStorage for resilient offline order history

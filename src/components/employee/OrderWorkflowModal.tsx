@@ -32,6 +32,7 @@ import {
   Banknote
 } from "lucide-react";
 import { BarcodeScannerModal } from "./BarcodeScannerModal";
+import { useAuth } from "../../context/AuthContext";
 
 interface OrderWorkflowModalProps {
   isOpen?: boolean;
@@ -59,6 +60,7 @@ export const OrderWorkflowModal: React.FC<OrderWorkflowModalProps> = ({
   currentEmployee,
   onNavigateHome
 }) => {
+  const { currentUser } = useAuth();
   const [loading, setLoading] = useState(false);
   const [note, setNote] = useState("");
   const [isScannerOpen, setIsScannerOpen] = useState(false);
@@ -368,14 +370,23 @@ export const OrderWorkflowModal: React.FC<OrderWorkflowModalProps> = ({
 
       // 1. Try atomic server return endpoint
       try {
+        let token = "dev_staff";
+        if (currentUser) {
+          try {
+            token = await currentUser.getIdToken();
+          } catch (e) {}
+        }
         await fetch("/api/orders/return", {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
+          headers: {
+            "Content-Type": "application/json",
+            "Authorization": `Bearer ${token}`
+          },
           body: JSON.stringify({
             orderId: order.id,
             returnCondition,
-            performedBy: currentEmployee?.uid || "staff-01",
-            performedByName: currentEmployee?.fullName || "Store Staff",
+            performedBy: currentEmployee?.uid || currentUser?.uid || "staff-01",
+            performedByName: currentEmployee?.fullName || currentUser?.displayName || "Store Staff",
             notes: retNote
           })
         });

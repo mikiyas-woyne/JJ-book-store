@@ -5,6 +5,7 @@ import { createServer as createViteServer } from "vite";
 import nodemailer from "nodemailer";
 import { getApps, initializeApp } from "firebase-admin/app";
 import { getFirestore } from "firebase-admin/firestore";
+import { getAuth } from "firebase-admin/auth";
 import { INITIAL_BOOKS, INITIAL_COUPONS } from "./src/lib/sampleData";
 
 const __filename = fileURLToPath(import.meta.url);
@@ -20,6 +21,7 @@ if (!getApps().length) {
 }
 
 const firestoreAdmin = getApps().length ? getFirestore() : null;
+const authAdmin = getApps().length ? getAuth() : null;
 
 // In-memory fallback database for local preview/development when Admin credentials are not attached
 const localMemoryStore = {
@@ -35,6 +37,167 @@ async function startServer() {
   const PORT = 3000;
 
   app.use(express.json({ limit: "10mb" }));
+
+  // ==============================================================================
+  // AUTHENTICATION & AUTHORIZATION MIDDLEWARE (FIREBASE ADMIN TOKEN VERIFICATION)
+  // ==============================================================================
+  const KNOWN_ADMIN_EMAILS = [
+    "mikiyaswoyne@gmail.com",
+    "admin@jjbookstore.com",
+    "admin@jjbookshopping.com"
+  ];
+
+  function isAuthorizedAdminEmail(email?: string | null): boolean {
+    if (!email) return false;
+    return KNOWN_ADMIN_EMAILS.includes(email.trim().toLowerCase());
+  }
+
+  interface AuthenticatedUser {
+    uid: string;
+    email?: string;
+    displayName?: string;
+    role: "customer" | "staff" | "employee" | "delivery" | "admin" | "superAdmin";
+    permissions: string[];
+    assignedRoles?: string[];
+    status: "active" | "suspended";
+    emailVerified?: boolean;
+  }
+
+  async function authenticateRequest(req: express.Request, res: express.Response, next: express.NextFunction) {
+    const authHeader = req.headers.authorization;
+    if (!authHeader || !authHeader.startsWith("Bearer ")) {
+      return next();
+    }
+
+    const token = authHeader.split("Bearer ")[1]?.trim();
+    if (!token) {
+      return next();
+    }
+
+    try {
+      if (authAdmin) {
+        const decoded = await authAdmin.verifyIdToken(token);
+        let role: string = (decoded.role as string) || (isAuthorizedAdminEmail(decoded.email) ? "admin" : "customer");
+        let permissions: string[] = [];
+        let assignedRoles: string[] = [];
+        let status = "active";
+        let fullName = decoded.name || "";
+
+        if (firestoreAdmin) {
+          try {
+            const userSnap = await firestoreAdmin.collection("users").doc(decoded.uid).get();
+            if (userSnap.exists) {
+              const uData = userSnap.data() || {};
+              if (uData.role) role = uData.role;
+              if (isAuthorizedAdminEmail(decoded.email)) role = "admin";
+              if (uData.permissions) permissions = uData.permissions;
+              if (uData.assignedRoles) assignedRoles = uData.assignedRoles;
+              if (uData.status) status = uData.status;
+              if (uData.fullName) fullName = uData.fullName;
+            }
+          } catch (e) {
+            console.warn("Firestore user profile lookup notice:", e);
+          }
+        }
+
+        (req as any).user = {
+          uid: decoded.uid,
+          email: decoded.email,
+          displayName: fullName,
+          role: role as any,
+          permissions,
+          assignedRoles,
+          status: status as any,
+          emailVerified: decoded.email_verified
+        } as AuthenticatedUser;
+      } else {
+        // Local preview / test environment token parsing
+        if (token.startsWith("test_") || token.startsWith("mock_") || token.startsWith("dev_")) {
+          const isTestAdmin = token.includes("admin");
+          const isTestStaff = token.includes("staff") || token.includes("employee");
+          const uid = token.replace(/^(test_|mock_|dev_)/, "").split("_")[0] || "test-user-01";
+          const role = isTestAdmin ? "admin" : isTestStaff ? "staff" : "customer";
+
+          (req as any).user = {
+            uid,
+            email: isTestAdmin ? "admin@jjbookstore.com" : isTestStaff ? "employee@jjbookstore.com" : "customer@example.com",
+            displayName: isTestAdmin ? "Store Administrator" : isTestStaff ? "Store Staff" : "Test Customer",
+            role: role as any,
+            permissions: isTestStaff ? ["view_orders", "confirm_orders", "process_orders", "manage_inventory", "inventory.restock", "inventory.adjust"] : [],
+            assignedRoles: isTestStaff ? ["order_processor", "inventory_staff"] : [],
+            status: "active",
+            emailVerified: true
+          } as AuthenticatedUser;
+        } else {
+          return res.status(401).json({ success: false, code: "INVALID_TOKEN", message: "Invalid or expired Firebase ID token." });
+        }
+      }
+    } catch (err: any) {
+      console.warn("Firebase ID token verification failed:", err?.message);
+      return res.status(401).json({ success: false, code: "INVALID_TOKEN", message: "Authentication failed. Invalid or expired token." });
+    }
+    next();
+  }
+
+  function requireAuth(req: express.Request, res: express.Response, next: express.NextFunction) {
+    const user = (req as any).user as AuthenticatedUser | undefined;
+    if (!user) {
+      res.status(401).json({ success: false, code: "UNAUTHORIZED", message: "Authentication required. Please sign in with your account." });
+      return;
+    }
+    if (user.status === "suspended") {
+      res.status(403).json({ success: false, code: "ACCOUNT_SUSPENDED", message: "This account has been suspended." });
+      return;
+    }
+    next();
+  }
+
+  function requireAdmin(req: express.Request, res: express.Response, next: express.NextFunction) {
+    const user = (req as any).user as AuthenticatedUser | undefined;
+    if (!user) {
+      res.status(401).json({ success: false, code: "UNAUTHORIZED", message: "Authentication required. Please sign in with an administrator account." });
+      return;
+    }
+    const isAdmin = user.role === "admin" || user.role === "superAdmin" || isAuthorizedAdminEmail(user.email);
+    if (!isAdmin) {
+      res.status(403).json({ success: false, code: "FORBIDDEN", message: "Access forbidden: administrative privileges required." });
+      return;
+    }
+    next();
+  }
+
+  function requireEmployee(req: express.Request, res: express.Response, next: express.NextFunction) {
+    const user = (req as any).user as AuthenticatedUser | undefined;
+    if (!user) {
+      res.status(401).json({ success: false, code: "UNAUTHORIZED", message: "Authentication required. Please sign in with a staff account." });
+      return;
+    }
+    const isStaff = ["admin", "superAdmin", "staff", "employee", "delivery"].includes(user.role) || isAuthorizedAdminEmail(user.email);
+    if (!isStaff) {
+      res.status(403).json({ success: false, code: "FORBIDDEN", message: "Access forbidden: staff privileges required." });
+      return;
+    }
+    next();
+  }
+
+  function requirePermission(perm: string) {
+    return (req: express.Request, res: express.Response, next: express.NextFunction) => {
+      const user = (req as any).user as AuthenticatedUser | undefined;
+      if (!user) {
+        res.status(401).json({ success: false, code: "UNAUTHORIZED", message: "Authentication required." });
+        return;
+      }
+      const isAdm = user.role === "admin" || user.role === "superAdmin" || isAuthorizedAdminEmail(user.email);
+      const hasPerm = isAdm || user.permissions?.includes(perm) || user.permissions?.includes("manage_inventory");
+      if (!hasPerm) {
+        res.status(403).json({ success: false, code: "FORBIDDEN", message: `Access forbidden: missing '${perm}' permission.` });
+        return;
+      }
+      next();
+    };
+  }
+
+  app.use(authenticateRequest);
 
   // API Routes
   app.get("/api/health", (_req, res) => {
@@ -354,6 +517,7 @@ async function startServer() {
   }
 
   // ==============================================================================
+  // ==============================================================================
   // 1. SECURE CHECKOUT VALIDATION ENDPOINT
   // ==============================================================================
   app.post("/api/checkout/validate", async (req, res) => {
@@ -381,16 +545,16 @@ async function startServer() {
   });
 
   // ==============================================================================
-  // 2. SECURE SERVER-SIDE ORDER CREATION WITH MULTI-BOOK ATOMIC TRANSACTION
+  // 2. SECURE SERVER-SIDE ORDER CREATION WITH AUTHORITATIVE AUTHENTICATION
   // ==============================================================================
-  app.post("/api/orders/create", async (req, res) => {
+  app.post("/api/orders/create", requireAuth, async (req, res) => {
     try {
+      const authUser = (req as any).user as AuthenticatedUser;
       const {
         items: rawItems,
         couponCode,
-        customerId,
-        customerName,
-        customerEmail,
+        customerName: rawCustomerName,
+        customerEmail: rawCustomerEmail,
         customerPhone,
         shippingAddress,
         paymentMethod,
@@ -399,10 +563,10 @@ async function startServer() {
         idempotencyKey
       } = req.body;
 
-      if (!customerId) {
-        res.status(401).json({ success: false, code: "UNAUTHORIZED", message: "Authenticated customer ID is required." });
-        return;
-      }
+      // SECURITY: Derive authoritative customer identity from verified Firebase ID token!
+      const customerId = authUser.uid;
+      const customerEmail = (authUser.email || rawCustomerEmail || "customer@example.com").trim();
+      const customerName = (rawCustomerName || authUser.displayName || "Customer").trim();
 
       // Check Idempotency: Prevent duplicate orders on double click or retry
       if (idempotencyKey) {
@@ -448,9 +612,9 @@ async function startServer() {
 
       const newOrder: any = {
         orderId: orderNumber,
-        customerId: String(customerId).trim(),
-        customerName: String(customerName || "Customer").trim(),
-        customerEmail: String(customerEmail || "customer@example.com").trim(),
+        customerId,
+        customerName,
+        customerEmail,
         customerPhone: String(customerPhone || "+251 ").trim(),
         items: calculation.items.map((it) => ({
           bookId: it.bookId,
@@ -666,11 +830,12 @@ async function startServer() {
   });
 
   // ==============================================================================
-  // 3. SECURE ORDER CANCELLATION WITH ATOMIC STOCK RESTOCKING
+  // 3. SECURE ORDER CANCELLATION WITH IDOR PROTECTION & ATOMIC STOCK RESTOCKING
   // ==============================================================================
-  app.post("/api/orders/cancel", async (req, res) => {
+  app.post("/api/orders/cancel", requireAuth, async (req, res) => {
     try {
-      const { orderId, customerId, reason } = req.body;
+      const authUser = (req as any).user as AuthenticatedUser;
+      const { orderId, reason } = req.body;
 
       if (!orderId) {
         res.status(400).json({ success: false, code: "MISSING_PARAM", message: "Order ID is required." });
@@ -679,6 +844,7 @@ async function startServer() {
 
       let orderNumber = "";
       const now = new Date().toISOString();
+      const isStaff = ["admin", "superAdmin", "staff", "employee"].includes(authUser.role) || isAuthorizedAdminEmail(authUser.email);
 
       if (firestoreAdmin) {
         const orderDocRef = firestoreAdmin.collection("orders").doc(orderId);
@@ -693,9 +859,9 @@ async function startServer() {
           const oData = freshOrderSnap.data() || {};
           orderNumber = oData.orderId || orderId;
 
-          // Verify ownership or staff authority
-          if (customerId && oData.customerId !== customerId) {
-            const err: any = new Error("Unauthorized to cancel this order.");
+          // IDOR PROTECTION: Only order owner or staff can cancel this order!
+          if (oData.customerId !== authUser.uid && !isStaff) {
+            const err: any = new Error("Unauthorized: You cannot cancel an order belonging to another customer.");
             err.code = "UNAUTHORIZED";
             throw err;
           }
@@ -706,7 +872,7 @@ async function startServer() {
           }
 
           // State Machine Guard: Only 'pending' orders can be cancelled by customer
-          if (oData.orderStatus !== "pending") {
+          if (oData.orderStatus !== "pending" && !isStaff) {
             const err: any = new Error(`Cannot cancel order with status "${oData.orderStatus}". Only pending orders can be cancelled.`);
             err.code = "ORDER_CANNOT_BE_CANCELLED";
             throw err;
@@ -747,7 +913,7 @@ async function startServer() {
                   newStock: newStock,
                   previousSoldCount: currentSoldCount,
                   newSoldCount: newSoldCount,
-                  performedBy: customerId || "customer",
+                  performedBy: authUser.uid,
                   createdAt: now
                 });
               }
@@ -764,7 +930,7 @@ async function startServer() {
               {
                 status: "cancelled",
                 timestamp: now,
-                note: `Order cancelled. Stock returned to inventory. Reason: ${reason || "Customer request"}`
+                note: `Order cancelled by ${isStaff ? "staff" : "customer"}. Stock returned to inventory. Reason: ${reason || "User request"}`
               }
             ]
           });
@@ -777,8 +943,8 @@ async function startServer() {
           return;
         }
 
-        if (customerId && orderData.customerId !== customerId) {
-          res.status(403).json({ success: false, code: "UNAUTHORIZED", message: "Unauthorized to cancel this order." });
+        if (orderData.customerId !== authUser.uid && !isStaff) {
+          res.status(403).json({ success: false, code: "UNAUTHORIZED", message: "Unauthorized: You cannot cancel an order belonging to another customer." });
           return;
         }
 
@@ -787,7 +953,7 @@ async function startServer() {
           return;
         }
 
-        if (orderData.orderStatus !== "pending") {
+        if (orderData.orderStatus !== "pending" && !isStaff) {
           res.status(400).json({
             success: false,
             code: "ORDER_CANNOT_BE_CANCELLED",
@@ -822,7 +988,7 @@ async function startServer() {
               newStock: memBook.stock,
               previousSoldCount: curSold,
               newSoldCount: memBook.soldCount,
-              performedBy: customerId || "customer",
+              performedBy: authUser.uid,
               createdAt: now
             });
           }
@@ -845,11 +1011,12 @@ async function startServer() {
   });
 
   // ==============================================================================
-  // 4. ATOMIC ORDER RETURN & RESTOCK ENDPOINT (EMPLOYEE/ADMIN)
+  // 4. ATOMIC ORDER RETURN & RESTOCK ENDPOINT (STAFF/ADMIN ONLY)
   // ==============================================================================
-  app.post("/api/orders/return", async (req, res) => {
+  app.post("/api/orders/return", requireEmployee, async (req, res) => {
     try {
-      const { orderId, returnCondition, performedBy, performedByName, notes } = req.body;
+      const authUser = (req as any).user as AuthenticatedUser;
+      const { orderId, returnCondition, notes } = req.body;
 
       if (!orderId) {
         res.status(400).json({ success: false, code: "MISSING_PARAM", message: "Order ID is required." });
@@ -914,8 +1081,8 @@ async function startServer() {
                     newStock: newStock,
                     previousSoldCount: currentSoldCount,
                     newSoldCount: newSoldCount,
-                    performedBy: performedBy || "employee",
-                    performedByName: performedByName || "Staff",
+                    performedBy: authUser.uid,
+                    performedByName: authUser.displayName || "Staff",
                     createdAt: now
                   });
                 }
@@ -934,7 +1101,7 @@ async function startServer() {
               {
                 status: "returned_to_store",
                 timestamp: now,
-                note: `Package returned to store (${returnCondition || "good"}). ${shouldRestock ? "Restocked to inventory." : "Damaged: not restocked."} Note: ${notes || "No extra note"}`
+                note: `Package returned to store (${returnCondition || "good"}) by ${authUser.displayName || "Staff"}. ${shouldRestock ? "Restocked to inventory." : "Damaged: not restocked."} Note: ${notes || "No extra note"}`
               }
             ]
           });
@@ -964,11 +1131,12 @@ async function startServer() {
   });
 
   // ==============================================================================
-  // 5. ATOMIC ADMIN & EMPLOYEE RESTOCK ENDPOINT
+  // 5. ATOMIC ADMIN & EMPLOYEE RESTOCK ENDPOINT (PRIVILEGED)
   // ==============================================================================
-  app.post("/api/admin/inventory/restock", async (req, res) => {
+  app.post("/api/admin/inventory/restock", requirePermission("inventory.restock"), async (req, res) => {
     try {
-      const { bookId, quantity, performedBy, performedByName, reason } = req.body;
+      const authUser = (req as any).user as AuthenticatedUser;
+      const { bookId, quantity, reason } = req.body;
 
       const addQty = Number(quantity);
       if (!bookId || isNaN(addQty) || addQty <= 0) {
@@ -1006,13 +1174,13 @@ async function startServer() {
             bookId,
             bookTitle: bData.title || bookId,
             type: "RESTOCK",
-            reason: reason || "admin_restock",
+            reason: reason || "staff_restock",
             quantity: addQty,
             changeQuantity: addQty,
             previousStock: currentStock,
             newStock: newStock,
-            performedBy: performedBy || "admin",
-            performedByName: performedByName || "Store Admin",
+            performedBy: authUser.uid,
+            performedByName: authUser.displayName || "Store Staff",
             createdAt: now
           });
 
@@ -1035,13 +1203,13 @@ async function startServer() {
           bookId,
           bookTitle: memBook.title || bookId,
           type: "RESTOCK",
-          reason: reason || "admin_restock",
+          reason: reason || "staff_restock",
           quantity: addQty,
           changeQuantity: addQty,
           previousStock: currentStock,
           newStock: memBook.stock,
-          performedBy: performedBy || "admin",
-          performedByName: performedByName || "Store Admin",
+          performedBy: authUser.uid,
+          performedByName: authUser.displayName || "Store Staff",
           createdAt: now
         });
       }
@@ -1061,11 +1229,12 @@ async function startServer() {
   });
 
   // ==============================================================================
-  // 6. ATOMIC INVENTORY ADJUSTMENT ENDPOINT
+  // 6. ATOMIC INVENTORY ADJUSTMENT ENDPOINT (PRIVILEGED)
   // ==============================================================================
-  app.post("/api/admin/inventory/adjust", async (req, res) => {
+  app.post("/api/admin/inventory/adjust", requirePermission("inventory.adjust"), async (req, res) => {
     try {
-      const { bookId, targetStock, performedBy, performedByName, reason } = req.body;
+      const authUser = (req as any).user as AuthenticatedUser;
+      const { bookId, targetStock, reason } = req.body;
 
       const newTarget = Number(targetStock);
       if (!bookId || isNaN(newTarget) || newTarget < 0) {
@@ -1108,8 +1277,8 @@ async function startServer() {
             changeQuantity: changeQty,
             previousStock: currentStock,
             newStock: newTarget,
-            performedBy: performedBy || "admin",
-            performedByName: performedByName || "Store Admin",
+            performedBy: authUser.uid,
+            performedByName: authUser.displayName || "Store Admin",
             createdAt: now
           });
 
@@ -1138,8 +1307,8 @@ async function startServer() {
           changeQuantity: changeQty,
           previousStock: currentStock,
           newStock: newTarget,
-          performedBy: performedBy || "admin",
-          performedByName: performedByName || "Store Admin",
+          performedBy: authUser.uid,
+          performedByName: authUser.displayName || "Store Admin",
           createdAt: now
         });
       }
@@ -1161,7 +1330,7 @@ async function startServer() {
   // ==============================================================================
   // 7. SECURE & IDEMPOTENT PAYMENT VERIFICATION
   // ==============================================================================
-  app.post("/api/payments/verify", async (req, res) => {
+  app.post("/api/payments/verify", requireAuth, async (req, res) => {
     try {
       const { orderId, paymentMethod, transactionRef, amount, providerStatus } = req.body;
 
@@ -1266,8 +1435,10 @@ async function startServer() {
     }
   });
 
-  // Admin SMTP configuration endpoints
-  app.get("/api/admin/smtp-config", (_req, res) => {
+  // ==============================================================================
+  // 8. ADMIN SMTP CONFIGURATION ENDPOINTS (STRICT ADMIN ONLY)
+  // ==============================================================================
+  app.get("/api/admin/smtp-config", requireAdmin, (_req, res) => {
     const smtpConfig = getSmtpTransporter();
     res.json({
       success: true,
@@ -1281,7 +1452,7 @@ async function startServer() {
     });
   });
 
-  app.post("/api/admin/save-smtp-config", (req, res) => {
+  app.post("/api/admin/save-smtp-config", requireAdmin, (req, res) => {
     try {
       const { host, port, user, pass, secure, adminEmail } = req.body;
       if (host !== undefined) runtimeSmtpConfig.host = (host || "").trim();

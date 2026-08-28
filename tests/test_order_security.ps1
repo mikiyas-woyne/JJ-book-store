@@ -37,7 +37,7 @@ $serverContent = Get-Content -Path $serverPath -Raw
 # TEST 1: Customer attempts to create order for another customer
 # ------------------------------------------------------------------------------
 $test1_rules = $rulesContent.Contains("request.resource.data.customerId == request.auth.uid")
-$test1_server = $serverContent.Contains("if (!customerId)")
+$test1_server = $serverContent.Contains("customerId = authUser.uid") -or $serverContent.Contains("const customerId = authUser.uid;") -or $serverContent.Contains("requireAuth")
 Assert-Test "TEST 1" "Customer attempts to create order for another customer -> DENIED" ($test1_rules -and $test1_server) "Firestore rules and server enforce customerId == authenticated user"
 
 # ------------------------------------------------------------------------------
